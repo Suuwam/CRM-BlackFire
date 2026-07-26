@@ -201,20 +201,20 @@ export default function Board() {
                             {(t.tags||[]).map(tg => <span key={tg} className="k-tag" style={isAawazz ? { background: '#eff6ff', color: '#1d4ed8' } : {}}>{tg}</span>)}
                           </div>
                           <div style={{ display:'flex', gap:8, fontSize:11 }}>
-                            {t.assignee && <span className="text-muted">👤 {t.assignee}</span>}
-                            {t.dueDate  && <span className="text-muted">📅 {t.dueDate}</span>}
+                            {t.assignee && <span className="text-muted" style={{ fontWeight: 500 }}>By: {t.assignee}</span>}
+                            {t.dueDate  && <span className="text-muted" style={{ fontWeight: 500 }}>Due: {t.dueDate}</span>}
                           </div>
                         </div>
                         <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4 }}>
                           <span className={`text-sm priority-${t.priority}`} style={{ fontWeight:600, textTransform:'capitalize' }}>{t.priority}</span>
-                          <div style={{ display:'flex', gap:3 }}>
-                            <label className="btn-icon" style={{ fontSize:12, padding:'2px 4px', cursor:'pointer' }} title="Upload card image">
-                              📷
+                          <div style={{ display:'flex', gap:4 }}>
+                            <label className="cal-ev-action-btn" style={{ fontSize:10.5, padding:'3px 6px', cursor:'pointer' }} title="Upload card image">
+                              Cover
                               <input type="file" accept="image/*" style={{ display:'none' }}
                                 onChange={e => { if (e.target.files[0]) handleCardPhotoUpload(t._id, e.target.files[0]); }} />
                             </label>
-                            <button className="btn-icon" style={{ fontSize:12, padding:'2px 4px' }} onClick={() => openEdit(t)}>✏️</button>
-                            <button className="btn-icon" style={{ fontSize:12, padding:'2px 4px' }} onClick={() => del(t._id)}>🗑</button>
+                            <button className="cal-ev-action-btn" style={{ fontSize:10.5, padding:'3px 6px' }} onClick={() => openEdit(t)}>Edit</button>
+                            <button className="cal-ev-action-btn cal-ev-action-btn--danger" style={{ fontSize:10.5, padding:'3px 6px' }} onClick={() => del(t._id)}>Delete</button>
                           </div>
                         </div>
                       </div>

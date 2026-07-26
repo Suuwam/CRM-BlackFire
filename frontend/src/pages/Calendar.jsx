@@ -228,7 +228,7 @@ export default function Calendar() {
                         const c = COLOR_MAP[ev.color] || COLOR_MAP.blue;
                         return (
                           <div key={ev._id} className="cal-chip" style={{ background: c.bg, color: c.text, borderLeft: `2px solid ${c.border}` }}>
-                            {ev.image && <span title="Has picture">🖼️</span>}
+                            {ev.image && <span title="Has picture"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></span>}
                             {ev.time && <span className="cal-chip-time">{ev.time}</span>}
                             <span className="cal-chip-title">{ev.title}</span>
                           </div>
@@ -355,15 +355,15 @@ export default function Calendar() {
 
                     <div className="cal-ev-actions">
                       <label className="cal-ev-action-btn" title="Add picture">
-                        📸 {ev.image ? 'Change Photo' : 'Add Photo'}
+                        {ev.image ? 'Change Photo' : 'Cover'}
                         <input type="file" accept="image/*" style={{ display:'none' }}
                           onChange={e => { if (e.target.files[0]) handleDirectUpload(ev._id, e.target.files[0]); }} />
                       </label>
                       <button className="cal-ev-action-btn" onClick={() => openEdit(ev)}>
-                        ✏️ Edit
+                        Edit
                       </button>
                       <button className="cal-ev-action-btn cal-ev-action-btn--danger" onClick={() => del(ev._id)}>
-                        🗑 Delete
+                        Delete
                       </button>
                     </div>
                   </div>
