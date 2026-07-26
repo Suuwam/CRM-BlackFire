@@ -8,6 +8,7 @@ const eventSchema = new mongoose.Schema({
   notes:    { type: String, default: '' },
   color:    { type: String, enum: ['blue','green','amber','gray'], default: 'blue' },
   status:   { type: String, enum: ['scheduled','done','cancelled'], default: 'scheduled' },
+  image:    { type: String, default: '' },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Event', eventSchema);

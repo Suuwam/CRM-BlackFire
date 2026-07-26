@@ -31,8 +31,9 @@ export default function References() {
   }
 
   async function del(id) {
-    if (!confirm('Delete?')) return;
-    await referencesApi.delete(id); toast('Deleted', 'success'); load();
+    await referencesApi.delete(id);
+    toast('Reference deleted', 'info');
+    load();
   }
 
   // All unique tags

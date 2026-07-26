@@ -1,5 +1,19 @@
 const router = require('express').Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const Event = require('../models/Event');
+
+// Multer storage
+const storage = multer.diskStorage({
+  destination: (_, __, cb) => {
+    const dir = path.join(__dirname, '../uploads');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (_, file, cb) => cb(null, 'evt-' + Date.now() + '-' + file.originalname.replace(/\s+/g, '_')),
+});
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 router.get('/', async (req, res) => {
   try {
@@ -20,6 +34,19 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try { res.json(await Event.findByIdAndUpdate(req.params.id, req.body, { new: true })); }
   catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Upload image for event
+router.patch('/:id/image', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
+    const event = await Event.findByIdAndUpdate(
+      req.params.id,
+      { image: req.file.filename },
+      { new: true }
+    );
+    res.json(event);
+  } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
 router.delete('/:id', async (req, res) => {

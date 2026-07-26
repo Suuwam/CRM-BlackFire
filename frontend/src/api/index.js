@@ -19,6 +19,11 @@ export const eventsApi = {
   list: (params) => api.get('/events', { params }),
   create: (data) => api.post('/events', data),
   update: (id, data) => api.put(`/events/${id}`, data),
+  uploadImage: (id, file) => {
+    const fd = new FormData();
+    fd.append('image', file);
+    return api.patch(`/events/${id}/image`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
   delete: (id) => api.delete(`/events/${id}`),
 };
 
@@ -40,6 +45,11 @@ export const tasksApi = {
   list: (project) => api.get('/tasks', { params: { project } }),
   create: (data) => api.post('/tasks', data),
   update: (id, data) => api.put(`/tasks/${id}`, data),
+  uploadImage: (id, file) => {
+    const fd = new FormData();
+    fd.append('image', file);
+    return api.patch(`/tasks/${id}/image`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
   move: (id, column) => api.patch(`/tasks/${id}/move`, { column }),
   delete: (id) => api.delete(`/tasks/${id}`),
 };

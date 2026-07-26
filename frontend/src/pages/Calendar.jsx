@@ -1,11 +1,11 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { eventsApi, clientsApi } from '../api';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-const EMPTY_EV = { title:'', date:'', time:'', clientId:'', notes:'', color:'blue', status:'scheduled' };
+const EMPTY_EV = { title:'', date:'', time:'', clientId:'', notes:'', color:'blue', status:'' };
 
 const COLOR_MAP = {
   blue:  { bg: '#eef2ff', border: '#818cf8', text: '#4338ca', dot: '#6366f1' },
@@ -24,6 +24,8 @@ export default function Calendar() {
   const [modal, setModal] = useState(false);
   const [form, setForm]   = useState(EMPTY_EV);
   const [editing, setEditing] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
+  const fileInputRef = useRef(null);
   const toast = useToast();
 
   async function load() {
@@ -40,7 +42,7 @@ export default function Calendar() {
   function prevMonth() { if (month === 0) { setMonth(11); setYear(y => y-1); } else setMonth(m => m-1); }
   function nextMonth() { if (month === 11) { setMonth(0); setYear(y => y+1); } else setMonth(m => m+1); }
 
-  // Build calendar grid — accurate day mapping
+  // Build calendar grid — accurate day mapping & wider square layout
   const cells = useMemo(() => {
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -72,44 +74,66 @@ export default function Calendar() {
   const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
 
   function openAdd(dateS) {
-    setForm({ ...EMPTY_EV, date: dateS });
+    setForm({ ...EMPTY_EV, date: dateS, status:'scheduled' });
     setEditing(null);
+    setImageFile(null);
     setModal(true);
   }
   function openEdit(ev) {
-    setForm({ title:ev.title, date:ev.date, time:ev.time, clientId:ev.clientId?._id||ev.clientId||'', notes:ev.notes, color:ev.color, status:ev.status });
+    setForm({ title:ev.title, date:ev.date, time:ev.time||'', clientId:ev.clientId?._id||ev.clientId||'', notes:ev.notes||'', color:ev.color||'blue', status:ev.status||'scheduled' });
     setEditing(ev._id);
+    setImageFile(null);
     setModal(true);
   }
 
   async function save() {
     if (!form.title.trim() || !form.date) return toast('Title and date required', 'error');
     try {
-      if (editing) await eventsApi.update(editing, form);
-      else         await eventsApi.create(form);
+      let savedEv;
+      if (editing) {
+        const res = await eventsApi.update(editing, form);
+        savedEv = res.data;
+      } else {
+        const res = await eventsApi.create(form);
+        savedEv = res.data;
+      }
+
+      // Handle image upload if selected
+      if (imageFile && savedEv?._id) {
+        await eventsApi.uploadImage(savedEv._id, imageFile);
+      }
+
       toast('Event saved', 'success');
       setModal(false);
+      setImageFile(null);
       load();
-    } catch { toast('Error', 'error'); }
+    } catch { toast('Error saving event', 'error'); }
   }
 
   async function del(id) {
-    if (!confirm('Delete this event?')) return;
+    // Delete instantly without browser confirm popups
     await eventsApi.delete(id);
-    toast('Deleted', 'success');
+    toast('Event deleted', 'info');
     load();
+  }
+
+  async function handleDirectUpload(eventId, file) {
+    try {
+      await eventsApi.uploadImage(eventId, file);
+      toast('Picture added', 'success');
+      load();
+    } catch { toast('Upload failed', 'error'); }
   }
 
   const selEvents = sel ? eventsFor(sel) : [];
   const selDate   = sel ? dateStr(sel) : '';
 
-  // Get week number of the selected day
   const weekRows = Math.ceil(cells.length / 7);
 
   return (
     <>
       <div className="page-head">
-        <div><h1>Calendar</h1><p>Schedule and track your work</p></div>
+        <div><h1>Calendar</h1><p>Schedule and track work on a spacious, accurate grid</p></div>
       </div>
       <div className="page-body cal-page-body">
         <div className="cal-container">
@@ -163,6 +187,7 @@ export default function Calendar() {
                           const c = COLOR_MAP[ev.color] || COLOR_MAP.blue;
                           return (
                             <div key={ev._id} className="cal-chip" style={{ background: c.bg, color: c.text, borderLeft: `2px solid ${c.border}` }}>
+                              {ev.image && <span title="Has image">🖼️</span>}
                               {ev.time && <span className="cal-chip-time">{ev.time}</span>}
                               <span className="cal-chip-title">{ev.title}</span>
                             </div>
@@ -233,6 +258,12 @@ export default function Calendar() {
                       <div className="cal-ev-dot" style={{ background: c.dot }}></div>
                       <span className="cal-ev-title">{ev.title}</span>
                     </div>
+
+                    {/* Display Event Picture */}
+                    {ev.image && (
+                      <img src={`/uploads/${ev.image}`} alt={ev.title} className="cal-ev-img" />
+                    )}
+
                     <div className="cal-ev-meta">
                       {ev.time && (
                         <span className="cal-ev-meta-item">
@@ -250,13 +281,16 @@ export default function Calendar() {
                     </div>
                     {ev.notes && <div className="cal-ev-notes">{ev.notes}</div>}
                     <div className="cal-ev-actions">
+                      <label className="cal-ev-action-btn" title="Add / change picture">
+                        📸 {ev.image ? 'Change Photo' : 'Add Photo'}
+                        <input type="file" accept="image/*" style={{ display:'none' }}
+                          onChange={e => { if (e.target.files[0]) handleDirectUpload(ev._id, e.target.files[0]); }} />
+                      </label>
                       <button className="cal-ev-action-btn" onClick={() => openEdit(ev)}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                        Edit
+                        ✏️ Edit
                       </button>
                       <button className="cal-ev-action-btn cal-ev-action-btn--danger" onClick={() => del(ev._id)}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                        Delete
+                        🗑 Delete
                       </button>
                     </div>
                   </div>
@@ -288,10 +322,15 @@ export default function Calendar() {
             </select>
           </div>
         </div>
-        <div className="form-group"><label>Status</label>
-          <select value={form.status} onChange={e => setForm(f=>({...f,status:e.target.value}))}>
-            <option value="scheduled">Scheduled</option><option value="done">Done</option><option value="cancelled">Cancelled</option>
-          </select>
+        <div className="form-row">
+          <div className="form-group"><label>Status</label>
+            <select value={form.status} onChange={e => setForm(f=>({...f,status:e.target.value}))}>
+              <option value="scheduled">Scheduled</option><option value="done">Done</option><option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div className="form-group"><label>Event Picture</label>
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0] || null)} />
+          </div>
         </div>
         <div className="form-group"><label>Notes</label><textarea value={form.notes} onChange={e => setForm(f=>({...f,notes:e.target.value}))} placeholder="Any notes..." /></div>
       </Modal>

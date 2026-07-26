@@ -4,8 +4,8 @@ import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 
 const PROJECTS = [
-  { id: 'blackfire', label: 'Blackfire AI', color: '#222', dot: '#222', sub: 'Main Project' },
-  { id: 'aawazz',   label: 'Aawazz',       color: '#3b5bdb', dot: '#3b5bdb', sub: 'SaaS Product' },
+  { id: 'blackfire', label: 'Blackfire AI', color: '#18181b', dot: '#18181b', sub: 'Main Project' },
+  { id: 'aawazz',   label: 'Aawazz',       color: '#2563eb', dot: '#2563eb', sub: 'SaaS Product' },
 ];
 const COLUMNS = [
   { id: 'backlog',    label: 'Backlog' },
@@ -23,28 +23,48 @@ export default function Board() {
   const [form, setForm]       = useState(EMPTY_TASK);
   const [editCol, setEditCol] = useState('backlog');
   const [editing, setEditing] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
   const dragId = useRef(null);
   const toast = useToast();
 
   async function load() { const r = await tasksApi.list(project); setTasks(r.data); }
   useEffect(() => { load(); }, [project]);
 
-  function openAdd(col) { setForm({ ...EMPTY_TASK }); setEditCol(col); setEditing(null); setModal(true); }
-  function openEdit(t)  { setForm({ title:t.title, description:t.description, priority:t.priority, tags:(t.tags||[]).join(', '), assignee:t.assignee, dueDate:t.dueDate }); setEditCol(t.column); setEditing(t._id); setModal(true); }
+  function openAdd(col) { setForm({ ...EMPTY_TASK }); setEditCol(col); setEditing(null); setImageFile(null); setModal(true); }
+  function openEdit(t)  { setForm({ title:t.title, description:t.description||'', priority:t.priority||'medium', tags:(t.tags||[]).join(', '), assignee:t.assignee||'', dueDate:t.dueDate||'' }); setEditCol(t.column); setEditing(t._id); setImageFile(null); setModal(true); }
 
   async function save() {
     if (!form.title.trim()) return toast('Title required', 'error');
     const data = { ...form, tags: form.tags.split(',').map(t=>t.trim()).filter(Boolean), column: editCol, project };
     try {
-      if (editing) await tasksApi.update(editing, data);
-      else         await tasksApi.create(data);
-      toast('Saved', 'success'); setModal(false); load();
-    } catch { toast('Error', 'error'); }
+      let savedTask;
+      if (editing) {
+        const res = await tasksApi.update(editing, data);
+        savedTask = res.data;
+      } else {
+        const res = await tasksApi.create(data);
+        savedTask = res.data;
+      }
+
+      if (imageFile && savedTask?._id) {
+        await tasksApi.uploadImage(savedTask._id, imageFile);
+      }
+
+      toast('Task saved', 'success'); setModal(false); setImageFile(null); load();
+    } catch { toast('Error saving task', 'error'); }
   }
 
   async function del(id) {
-    if (!confirm('Delete task?')) return;
-    await tasksApi.delete(id); toast('Deleted', 'success'); load();
+    // Delete instantly without browser confirm popups
+    await tasksApi.delete(id); toast('Task deleted', 'info'); load();
+  }
+
+  async function handleCardPhotoUpload(taskId, file) {
+    try {
+      await tasksApi.uploadImage(taskId, file);
+      toast('Card cover uploaded', 'success');
+      load();
+    } catch { toast('Upload failed', 'error'); }
   }
 
   // Drag & Drop
@@ -60,24 +80,49 @@ export default function Board() {
   }
 
   function colTasks(col) { return tasks.filter(t => t.column === col); }
-  const proj = PROJECTS.find(p => p.id === project);
+  const isAawazz = project === 'aawazz';
 
   return (
     <>
       <div className="page-head">
-        <div><h1>Project Board</h1><p>Trello-style QA and task tracking</p></div>
+        <div><h1>Project Board</h1><p>Trello-style QA and task tracking for Blackfire AI & Aawazz</p></div>
       </div>
       <div className="page-body">
         {/* Project tabs */}
         <div className="board-tabs">
           {PROJECTS.map(p => (
-            <button key={p.id} className={`board-tab${project===p.id?' active':''}`} onClick={() => setProject(p.id)}>
+            <button key={p.id} className={`board-tab${project===p.id?' active':''}`} onClick={() => setProject(p.id)}
+              style={project===p.id && p.id==='aawazz' ? { background: '#2563eb', borderColor: '#2563eb' } : {}}>
               <span className="proj-dot" style={{ background: project===p.id ? '#fff' : p.dot }} />
               {p.label}
               <span className="text-sm" style={{ opacity:.7, marginLeft:4 }}>{p.sub}</span>
             </button>
           ))}
         </div>
+
+        {/* Dedicated Aawazz Header Banner */}
+        {isAawazz && (
+          <div className="aawazz-banner">
+            <div>
+              <div className="aawazz-logo-wrap">
+                <span className="aawazz-logo-text">
+                  aa
+                  <svg className="aawazz-wave-svg" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M 10 50 Q 30 10 50 50 T 90 50" />
+                  </svg>
+                  wazz
+                </span>
+                <span className="aawazz-badge">Official SaaS Product</span>
+              </div>
+              <div className="aawazz-slogan">
+                Aawazz — say it your way, <span className="aawazz-highlight">script to sound</span> made for creators.
+              </div>
+            </div>
+            <div style={{ textAlign:'right', flexShrink:0 }}>
+              <span className="text-sm" style={{ opacity:.85, fontWeight:550 }}>Audio AI Platform</span>
+            </div>
+          </div>
+        )}
 
         {/* Kanban board */}
         <div className="kanban">
@@ -86,7 +131,7 @@ export default function Board() {
             return (
               <div key={col.id} className="col">
                 <div className="col-head">
-                  <span className="col-name">{col.label}</span>
+                  <span className="col-name" style={isAawazz ? { color: '#2563eb' } : {}}>{col.label}</span>
                   <span className="col-count">{ct.length}</span>
                 </div>
                 <div
@@ -98,12 +143,20 @@ export default function Board() {
                   {ct.map(t => (
                     <div key={t._id} className="k-card" draggable
                       onDragStart={() => onDragStart(t._id)}>
+
+                      {/* Display Task Cover Picture */}
+                      {t.image && (
+                        <div className="k-card-img-wrap">
+                          <img src={`/uploads/${t.image}`} alt={t.title} className="k-card-img" />
+                        </div>
+                      )}
+
                       <div className="k-card-title">{t.title}</div>
                       {t.description && <div className="k-card-desc">{t.description}</div>}
                       <div className="k-card-foot">
                         <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
                           <div className="k-card-tags">
-                            {(t.tags||[]).map(tg => <span key={tg} className="k-tag">{tg}</span>)}
+                            {(t.tags||[]).map(tg => <span key={tg} className="k-tag" style={isAawazz ? { background: '#eff6ff', color: '#1d4ed8' } : {}}>{tg}</span>)}
                           </div>
                           <div style={{ display:'flex', gap:8, fontSize:11 }}>
                             {t.assignee && <span className="text-muted">👤 {t.assignee}</span>}
@@ -112,7 +165,12 @@ export default function Board() {
                         </div>
                         <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4 }}>
                           <span className={`text-sm priority-${t.priority}`} style={{ fontWeight:600, textTransform:'capitalize' }}>{t.priority}</span>
-                          <div style={{ display:'flex', gap:2 }}>
+                          <div style={{ display:'flex', gap:3 }}>
+                            <label className="btn-icon" style={{ fontSize:12, padding:'2px 4px', cursor:'pointer' }} title="Upload card image">
+                              📷
+                              <input type="file" accept="image/*" style={{ display:'none' }}
+                                onChange={e => { if (e.target.files[0]) handleCardPhotoUpload(t._id, e.target.files[0]); }} />
+                            </label>
                             <button className="btn-icon" style={{ fontSize:12, padding:'2px 4px' }} onClick={() => openEdit(t)}>✏️</button>
                             <button className="btn-icon" style={{ fontSize:12, padding:'2px 4px' }} onClick={() => del(t._id)}>🗑</button>
                           </div>
@@ -120,7 +178,7 @@ export default function Board() {
                       </div>
                     </div>
                   ))}
-                  <button className="add-card-btn" onClick={() => openAdd(col.id)}>
+                  <button className="add-card-btn" onClick={() => openAdd(col.id)} style={isAawazz ? { color: '#2563eb', borderColor: '#93c5fd' } : {}}>
                     <span style={{ fontSize:14 }}>+</span> Add card
                   </button>
                 </div>
@@ -131,7 +189,7 @@ export default function Board() {
       </div>
 
       <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Task' : `Add to ${COLUMNS.find(c=>c.id===editCol)?.label}`}
-        footer={<><button className="btn btn-secondary" onClick={() => setModal(false)}>Cancel</button><button className="btn btn-primary" onClick={save}>Save</button></>}>
+        footer={<><button className="btn btn-secondary" onClick={() => setModal(false)}>Cancel</button><button className="btn btn-primary" onClick={save} style={isAawazz ? { background: '#2563eb', borderColor: '#2563eb' } : {}}>Save</button></>}>
         <div className="form-group"><label>Title *</label><input value={form.title} onChange={e => setForm(f=>({...f,title:e.target.value}))} placeholder="Task title" /></div>
         <div className="form-group"><label>Description</label><textarea value={form.description} onChange={e => setForm(f=>({...f,description:e.target.value}))} placeholder="Optional details..." /></div>
         <div className="form-row">
@@ -150,7 +208,10 @@ export default function Board() {
           <div className="form-group"><label>Assignee</label><input value={form.assignee} onChange={e => setForm(f=>({...f,assignee:e.target.value}))} placeholder="Who's responsible?" /></div>
           <div className="form-group"><label>Due Date</label><input type="date" value={form.dueDate} onChange={e => setForm(f=>({...f,dueDate:e.target.value}))} /></div>
         </div>
-        <div className="form-group"><label>Tags (comma separated)</label><input value={form.tags} onChange={e => setForm(f=>({...f,tags:e.target.value}))} placeholder="bug, feature, design" /></div>
+        <div className="form-row">
+          <div className="form-group"><label>Tags (comma separated)</label><input value={form.tags} onChange={e => setForm(f=>({...f,tags:e.target.value}))} placeholder="bug, feature, audio" /></div>
+          <div className="form-group"><label>Card Cover Picture</label><input type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0] || null)} /></div>
+        </div>
       </Modal>
     </>
   );

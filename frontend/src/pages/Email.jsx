@@ -47,9 +47,11 @@ export default function Email() {
   }
 
   async function del() {
-    if (!selTpl || !confirm('Delete template?')) return;
+    if (!selTpl) return;
     await templatesApi.delete(selTpl._id);
-    setSelTpl(null); toast('Deleted', 'success'); load();
+    setSelTpl(null);
+    toast('Template deleted', 'info');
+    load();
   }
 
   function insertToken(token) {

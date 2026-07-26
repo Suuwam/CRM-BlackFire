@@ -35,8 +35,9 @@ export default function Clients() {
   }
 
   async function del(id) {
-    if (!confirm('Delete this client?')) return;
-    await clientsApi.delete(id); toast('Deleted', 'success'); load();
+    await clientsApi.delete(id);
+    toast('Client deleted', 'info');
+    load();
     if (detail?._id === id) setDetail(null);
   }
 
