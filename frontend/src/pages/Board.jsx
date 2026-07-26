@@ -45,8 +45,12 @@ export default function Board() {
   function openAdd(col) { setForm({ ...EMPTY_TASK }); setEditCol(col); setEditing(null); setImageFile(null); setModal(true); }
   function openEdit(t)  { setForm({ title:t.title, description:t.description||'', priority:t.priority||'medium', color:t.color||'blue', tags:(t.tags||[]).join(', '), assignee:t.assignee||'', dueDate:t.dueDate||'' }); setEditCol(t.column); setEditing(t._id); setImageFile(null); setModal(true); }
 
+  const [saving, setSaving] = useState(false);
+
   async function save() {
+    if (saving) return;
     if (!form.title.trim()) return toast('Title required', 'error');
+    setSaving(true);
     const data = { ...form, tags: form.tags.split(',').map(t=>t.trim()).filter(Boolean), column: editCol, project };
     try {
       let savedTask;
@@ -64,6 +68,7 @@ export default function Board() {
 
       toast('Task saved', 'success'); setModal(false); setImageFile(null); load();
     } catch { toast('Error saving task', 'error'); }
+    finally { setSaving(false); }
   }
 
   async function del(id) {
@@ -200,7 +205,7 @@ export default function Board() {
       </div>
 
       <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Task' : `Add to ${COLUMNS.find(c=>c.id===editCol)?.label}`}
-        footer={<><button className="btn btn-secondary" onClick={() => setModal(false)}>Cancel</button><button className="btn btn-primary" onClick={save} style={isAawazz ? { background: '#2563eb', borderColor: '#2563eb' } : {}}>Save</button></>}>
+        footer={<><button className="btn btn-secondary" onClick={() => setModal(false)}>Cancel</button><button className="btn btn-primary" onClick={save} disabled={saving} style={isAawazz ? { background: '#2563eb', borderColor: '#2563eb' } : {}}>{saving ? 'Saving...' : 'Save'}</button></>}>
         <div className="form-group"><label>Title *</label><input value={form.title} onChange={e => setForm(f=>({...f,title:e.target.value}))} placeholder="Task title" /></div>
         
         {/* Task Color Coding Selector */}

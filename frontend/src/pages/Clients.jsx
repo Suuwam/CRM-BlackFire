@@ -25,13 +25,18 @@ export default function Clients() {
   function openAdd() { setForm(EMPTY); setEditing(null); setModal(true); }
   function openEdit(c) { setForm({ name:c.name,company:c.company,email:c.email,phone:c.phone,status:c.status,project:c.project,notes:c.notes }); setEditing(c._id); setModal(true); }
 
+  const [saving, setSaving] = useState(false);
+
   async function save() {
+    if (saving) return;
     if (!form.name.trim()) return toast('Name is required', 'error');
+    setSaving(true);
     try {
       if (editing) { await clientsApi.update(editing, form); toast('Client updated', 'success'); }
       else         { await clientsApi.create(form); toast('Client added', 'success'); }
       setModal(false); load();
     } catch { toast('Error saving client', 'error'); }
+    finally { setSaving(false); }
   }
 
   async function del(id) {
@@ -112,7 +117,7 @@ export default function Clients() {
 
       {/* Add/Edit Modal */}
       <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Client' : 'Add Client'}
-        footer={<><button className="btn btn-secondary" onClick={() => setModal(false)}>Cancel</button><button className="btn btn-primary" onClick={save}>Save</button></>}>
+        footer={<><button className="btn btn-secondary" onClick={() => setModal(false)}>Cancel</button><button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button></>}>
         <div className="form-row">
           <div className="form-group"><label>Name *</label><input value={form.name} onChange={e => setForm(f => ({...f, name:e.target.value}))} placeholder="Full name" /></div>
           <div className="form-group"><label>Company</label><input value={form.company} onChange={e => setForm(f => ({...f, company:e.target.value}))} placeholder="Company name" /></div>

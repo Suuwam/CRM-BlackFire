@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Toast from './components/Toast';
@@ -7,13 +8,32 @@ import Calendar from './pages/Calendar';
 import Email from './pages/Email';
 import References from './pages/References';
 import Board from './pages/Board';
+import Auth from './pages/Auth';
 import { ToastProvider } from './components/Toast';
 
 export default function App() {
+  const [authenticated, setAuthenticated] = useState(() => {
+    return localStorage.getItem('crm_auth') === 'true';
+  });
+
+  function handleLogout() {
+    localStorage.removeItem('crm_auth');
+    setAuthenticated(false);
+  }
+
+  if (!authenticated) {
+    return (
+      <ToastProvider>
+        <Auth onLogin={() => setAuthenticated(true)} />
+        <Toast />
+      </ToastProvider>
+    );
+  }
+
   return (
     <ToastProvider>
       <div className="layout">
-        <Sidebar />
+        <Sidebar onLogout={handleLogout} />
         <div className="main">
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />

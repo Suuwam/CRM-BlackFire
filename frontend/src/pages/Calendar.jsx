@@ -2,17 +2,10 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { eventsApi, clientsApi } from '../api';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
+import SocialIcon, { PLATFORMS } from '../components/SocialIcon';
 
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-
-const PLATFORMS = [
-  { id: 'linkedin',  label: 'LinkedIn',  icon: '💼', badgeClass: 'platform-linkedin' },
-  { id: 'instagram', label: 'Instagram', icon: '📸', badgeClass: 'platform-instagram' },
-  { id: 'facebook',  label: 'Facebook',  icon: '📘', badgeClass: 'platform-facebook' },
-  { id: 'tiktok',    label: 'TikTok',    icon: '🎵', badgeClass: 'platform-tiktok' },
-  { id: 'x',         label: 'X / Twitter', icon: '𝕏', badgeClass: 'platform-x' },
-];
 
 const COLORS = [
   { id: 'blue',   hex: '#3b82f6', bg: '#eef2ff', border: '#818cf8', text: '#1e40af' },
@@ -118,8 +111,12 @@ export default function Calendar() {
     });
   }
 
+  const [saving, setSaving] = useState(false);
+
   async function save() {
+    if (saving) return;
     if (!form.title.trim() || !form.date) return toast('Title and date required', 'error');
+    setSaving(true);
     try {
       const payload = { ...form, clientId: form.clientId || null };
       let savedEv;
@@ -142,6 +139,8 @@ export default function Calendar() {
     } catch (err) {
       console.error(err);
       toast('Error saving event', 'error');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -167,7 +166,7 @@ export default function Calendar() {
   return (
     <>
       <div className="page-head">
-        <div><h1>Calendar & Content Scheduler</h1><p>Social media post tracking with multi-platform icons & custom day color coding</p></div>
+        <div><h1>Calendar & Content Scheduler</h1><p>Social media post tracking with vector SVG platform logos & custom day color coding</p></div>
       </div>
       <div className="page-body cal-page-body">
         <div className="cal-container">
@@ -213,7 +212,6 @@ export default function Calendar() {
 
                 // Collect all social platforms scheduled for this day
                 const dayPlatforms = [...new Set(evs.flatMap(e => e.platforms || []))];
-                // Check if any event has a custom color accent
                 const topColorEv = evs.find(e => e.color && e.color !== 'blue') || evs[0];
                 const dayAccent = topColorEv ? COLOR_MAP[topColorEv.color] || COLOR_MAP.blue : null;
 
@@ -242,15 +240,15 @@ export default function Calendar() {
                       {evs.length > 2 && <div className="cal-chip-overflow">+{evs.length - 2} more</div>}
                     </div>
 
-                    {/* Social Media Post Platform Icons Row */}
+                    {/* Social Media SVG Vector Platforms Row */}
                     {dayPlatforms.length > 0 && (
                       <div className="cal-cell-platforms">
                         {dayPlatforms.map(pId => {
                           const p = PLATFORMS.find(x => x.id === pId);
                           if (!p) return null;
                           return (
-                            <span key={pId} className={`platform-icon-btn ${p.badgeClass}`} title={p.label}>
-                              {p.icon}
+                            <span key={pId} className={`platform-icon-btn platform-${pId}`} title={p.label}>
+                              <SocialIcon id={pId} size={12} />
                             </span>
                           );
                         })}
@@ -324,7 +322,7 @@ export default function Calendar() {
                       <img src={ev.image.startsWith('data:') || ev.image.startsWith('http') ? ev.image : `/uploads/${ev.image}`} alt={ev.title} className="cal-ev-img" />
                     )}
 
-                    {/* Social Media Platform Icons */}
+                    {/* SVG Vector Social Media Platform Icons */}
                     {(ev.platforms||[]).length > 0 && (
                       <div style={{ display:'flex', gap:6, marginTop:8, alignItems:'center' }}>
                         <span className="text-xs text-muted" style={{ fontWeight:600 }}>Platforms:</span>
@@ -332,8 +330,8 @@ export default function Calendar() {
                           const p = PLATFORMS.find(x => x.id === pId);
                           if (!p) return null;
                           return (
-                            <span key={pId} className={`platform-icon-btn ${p.badgeClass}`} title={p.label}>
-                              {p.icon}
+                            <span key={pId} className={`platform-icon-btn platform-${pId}`} title={p.label}>
+                              <SocialIcon id={pId} size={12} />
                             </span>
                           );
                         })}
@@ -380,21 +378,22 @@ export default function Calendar() {
       </div>
 
       <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Event / Post' : 'Add Event / Post'}
-        footer={<><button className="btn btn-secondary" onClick={() => setModal(false)}>Cancel</button><button className="btn btn-primary" onClick={save}>Save</button></>}>
+        footer={<><button className="btn btn-secondary" onClick={() => setModal(false)}>Cancel</button><button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button></>}>
         <div className="form-group"><label>Title *</label><input value={form.title} onChange={e => setForm(f=>({...f,title:e.target.value}))} placeholder="Post or event title" /></div>
         
-        {/* Social Platforms Selector */}
+        {/* Social Platforms Selector with Vector SVG Icons */}
         <div className="form-group">
           <label>Target Social Platforms (Multiple Allowed)</label>
-          <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:4 }}>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:6 }}>
             {PLATFORMS.map(p => {
               const sel = form.platforms.includes(p.id);
               return (
                 <button type="button" key={p.id}
                   className={`btn btn-sm ${sel ? 'btn-primary' : 'btn-secondary'}`}
-                  style={sel ? { background: p.badgeClass==='platform-linkedin'?'#0a66c2':p.badgeClass==='platform-facebook'?'#1877f2':'#18181b', borderColor: 'transparent' } : {}}
+                  style={sel ? { background: p.id==='linkedin'?'#0a66c2':p.id==='facebook'?'#1877f2':p.id==='instagram'?'#dc2743':'#18181b', borderColor: 'transparent', display:'flex', alignItems:'center', gap:6 } : { display:'flex', alignItems:'center', gap:6 }}
                   onClick={() => togglePlatform(p.id)}>
-                  {p.icon} {p.label}
+                  <SocialIcon id={p.id} size={14} />
+                  <span>{p.label}</span>
                 </button>
               );
             })}

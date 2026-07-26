@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clientsApi, eventsApi, tasksApi } from '../api';
+import SocialIcon from '../components/SocialIcon';
 
 export default function Dashboard() {
   const [clients, setClients]   = useState([]);
@@ -31,20 +32,12 @@ export default function Dashboard() {
     return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 
-  const PLATFORM_MAP = {
-    linkedin:  { icon: '💼', label: 'LinkedIn' },
-    instagram: { icon: '📸', label: 'Instagram' },
-    facebook:  { icon: '📘', label: 'Facebook' },
-    tiktok:    { icon: '🎵', label: 'TikTok' },
-    x:         { icon: '𝕏', label: 'X' },
-  };
-
   return (
     <>
       <div className="page-head">
         <div>
           <h1>Dashboard</h1>
-          <p>Welcome back — here's your high-level overview.</p>
+          <p>Blackfire AI — Product Platform & Venture Engine Overview</p>
         </div>
       </div>
       <div className="page-body">
@@ -56,19 +49,19 @@ export default function Dashboard() {
             <div className="stat-sub">{active} active · {prospect} prospects</div>
           </div>
           <div className="stat-card">
-            <div className="stat-label">Upcoming Events & Posts</div>
+            <div className="stat-label">Upcoming Schedule & Posts</div>
             <div className="stat-value">{upcoming.length}</div>
             <div className="stat-sub">Next 30 days</div>
           </div>
           <div className="stat-card">
-            <div className="stat-label">Tasks In Progress</div>
+            <div className="stat-label">Product Tasks In Progress</div>
             <div className="stat-value">{inProgress}</div>
             <div className="stat-sub">Active workflow</div>
           </div>
           <div className="stat-card">
-            <div className="stat-label">Completed Tasks</div>
+            <div className="stat-label">Completed Features</div>
             <div className="stat-value">{completed}</div>
-            <div className="stat-sub">All projects</div>
+            <div className="stat-sub">All products</div>
           </div>
         </div>
 
@@ -86,9 +79,10 @@ export default function Dashboard() {
                     <div className="up-meta">
                       {ev.clientId?.name && <span>{ev.clientId.name}</span>}
                       {ev.time && <span>{ev.time}</span>}
+                      {/* Official SVG Vector Icons */}
                       {(ev.platforms || []).map(pId => (
-                        <span key={pId} title={PLATFORM_MAP[pId]?.label || pId} style={{ fontSize:13 }}>
-                          {PLATFORM_MAP[pId]?.icon || pId}
+                        <span key={pId} style={{ display:'inline-flex', alignItems:'center', marginLeft:4 }} title={pId}>
+                          <SocialIcon id={pId} size={12} />
                         </span>
                       ))}
                     </div>
@@ -103,14 +97,14 @@ export default function Dashboard() {
           <div>
             <div className="section-title">Quick Actions</div>
             <div className="quick-actions">
-              <button className="quick-btn" onClick={() => nav('/clients')}>
-                <span style={{ fontSize: 18 }}>👤</span> Manage Clients
+              <button className="quick-btn" onClick={() => nav('/board')}>
+                <span style={{ fontSize: 18 }}>📋</span> Aawazz Product Board
               </button>
               <button className="quick-btn" onClick={() => nav('/calendar')}>
-                <span style={{ fontSize: 18 }}>📅</span> Open Calendar
+                <span style={{ fontSize: 18 }}>📅</span> Content Calendar
               </button>
-              <button className="quick-btn" onClick={() => nav('/board')}>
-                <span style={{ fontSize: 18 }}>📋</span> Aawazz Project Board
+              <button className="quick-btn" onClick={() => nav('/clients')}>
+                <span style={{ fontSize: 18 }}>👤</span> Manage Clients
               </button>
               <button className="quick-btn" onClick={() => nav('/email')}>
                 <span style={{ fontSize: 18 }}>✉️</span> Email Automation
