@@ -10,7 +10,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@300;400;500;600;700;800&family=Jost:wght@300;400;500&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#000;flex-direction:column;gap:16px;font-family:sans-serif;">
+        <svg width="40" height="40" viewBox="0 0 64 64" fill="none" style="animation: pulse 1.5s ease-in-out infinite; color: #fff;">
+          <path d="M32 4C32 4 20 18 20 32C20 42 25 48 25 48C22 44 22 38 25 34C25 40 29 44 32 46C29 40 30 34 34 30C33 36 37 40 41 42C38 38 38 32 41 27C42 33 46 36 46 42C46 51 40 60 32 60C22 60 14 52 14 40C14 24 32 4 32 4Z" stroke="currentColor" stroke-width="1.5" fill="none"/>
+        </svg>
+        <style>@keyframes pulse { 0%,100% {opacity:1;transform:scale(1);} 50% {opacity:0.6;transform:scale(1.05);} }</style>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

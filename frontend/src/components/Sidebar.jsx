@@ -1,15 +1,15 @@
 import { NavLink } from 'react-router-dom';
 
 const nav = [
-  { to: '/dashboard',  label: 'Dashboard' },
-  { to: '/clients',    label: 'Clients' },
-  { to: '/calendar',   label: 'Calendar' },
-  { to: '/email',      label: 'Email' },
-  { to: '/references', label: 'References' },
+  { to: '/dashboard',  label: 'Dashboard', icon: '📊' },
+  { to: '/clients',    label: 'Clients',   icon: '👥' },
+  { to: '/calendar',   label: 'Calendar',  icon: '📅' },
+  { to: '/email',      label: 'Email',     icon: '✉️' },
+  { to: '/references', label: 'Links',     icon: '🔗' },
 ];
 
 const boardNav = [
-  { to: '/board', label: 'Project Board' },
+  { to: '/board', label: 'Board', icon: '📋' },
 ];
 
 export default function Sidebar({ onLogout, routeLoading }) {
@@ -28,6 +28,7 @@ export default function Sidebar({ onLogout, routeLoading }) {
             className={({ isActive }) => `sb-item${isActive ? ' active' : ''}`}>
             {({ isActive }) => (
               <>
+                <span className="ico">{n.icon}</span>
                 {n.label}
                 {isActive && routeLoading && (
                   <div style={{ marginLeft: 'auto', width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'authSpin 0.6s linear infinite' }} />
@@ -43,6 +44,7 @@ export default function Sidebar({ onLogout, routeLoading }) {
             className={({ isActive }) => `sb-item${isActive ? ' active' : ''}`}>
             {({ isActive }) => (
               <>
+                <span className="ico">{n.icon}</span>
                 {n.label}
                 {isActive && routeLoading && (
                   <div style={{ marginLeft: 'auto', width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'authSpin 0.6s linear infinite' }} />
