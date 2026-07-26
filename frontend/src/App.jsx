@@ -13,11 +13,11 @@ import { ToastProvider } from './components/Toast';
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState(() => {
-    return localStorage.getItem('crm_auth') === 'true';
+    return sessionStorage.getItem('crm_auth') === 'true';
   });
 
   function handleLogout() {
-    localStorage.removeItem('crm_auth');
+    sessionStorage.removeItem('crm_auth');
     setAuthenticated(false);
   }
 

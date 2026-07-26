@@ -31,7 +31,7 @@ export default function Auth({ onLogin }) {
     setTimeout(() => {
       const val = pw.trim().toLowerCase();
       if (val === 'blackfire' || val === 'aawazz') {
-        localStorage.setItem('crm_auth', 'true');
+        sessionStorage.setItem('crm_auth', 'true');
         onLogin();
       } else {
         setLoading(false);
