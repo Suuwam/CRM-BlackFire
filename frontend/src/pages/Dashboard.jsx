@@ -60,7 +60,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="dash-grid">
+        <div style={{ marginTop: 24 }}>
           {/* Upcoming Schedule */}
           <div>
             <div className="section-title">Upcoming Schedule & Social Posts</div>
@@ -85,28 +85,6 @@ export default function Dashboard() {
                   <div className="up-date">{fmtDate(ev.date)}</div>
                 </div>
               ))}
-            </div>
-          </div>
-
-          {/* Quick Actions */}
-          <div>
-            <div className="section-title">Quick Actions</div>
-            <div className="quick-actions">
-              <button className="quick-btn" onClick={() => nav('/board')}>
-                <span style={{ fontSize: 18 }}>📋</span> Aawazz Product Board
-              </button>
-              <button className="quick-btn" onClick={() => nav('/calendar')}>
-                <span style={{ fontSize: 18 }}>📅</span> Content Calendar
-              </button>
-              <button className="quick-btn" onClick={() => nav('/clients')}>
-                <span style={{ fontSize: 18 }}>👤</span> Manage Clients
-              </button>
-              <button className="quick-btn" onClick={() => nav('/email')}>
-                <span style={{ fontSize: 18 }}>✉️</span> Email Automation
-              </button>
-              <button className="quick-btn" onClick={() => nav('/references')}>
-                <span style={{ fontSize: 18 }}>🔗</span> Reference Links
-              </button>
             </div>
           </div>
         </div>
