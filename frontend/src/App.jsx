@@ -43,22 +43,21 @@ export default function App() {
     <ToastProvider>
       <div className="layout">
         <Sidebar onLogout={handleLogout} routeLoading={routeLoading} />
-        <div className="main">
-          {routeLoading ? (
-            <div className="intentional-loader">
+        <div className="main" style={{ position: 'relative' }}>
+          {routeLoading && (
+            <div className="intentional-loader" style={{ position: 'absolute', inset: 0, zIndex: 50, background: 'var(--bg)' }}>
               <div className="spinner-large" />
             </div>
-          ) : (
-            <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard"  element={<Dashboard />} />
-              <Route path="/clients"    element={<Clients />} />
-              <Route path="/calendar"   element={<Calendar />} />
-              <Route path="/email"      element={<Email />} />
-              <Route path="/references" element={<References />} />
-              <Route path="/board"      element={<Board />} />
-            </Routes>
           )}
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard"  element={<Dashboard />} />
+            <Route path="/clients"    element={<Clients />} />
+            <Route path="/calendar"   element={<Calendar />} />
+            <Route path="/email"      element={<Email />} />
+            <Route path="/references" element={<References />} />
+            <Route path="/board"      element={<Board />} />
+          </Routes>
         </div>
         <Toast />
       </div>

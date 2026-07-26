@@ -158,11 +158,12 @@ export default function Board() {
         )}
 
         {/* Kanban board */}
-        {isLoading ? (
-          <div className="intentional-loader" style={{ minHeight: '50vh' }}>
-            <div className="spinner-large" />
-          </div>
-        ) : (
+        <div className="kanban-wrapper" style={{ position: 'relative', minHeight: '50vh' }}>
+          {isLoading && (
+            <div className="intentional-loader" style={{ position: 'absolute', inset: 0, zIndex: 10, background: 'var(--bg)' }}>
+              <div className="spinner-large" />
+            </div>
+          )}
           <div className="kanban">
             {COLUMNS.map(col => {
               const ct = colTasks(col.id);
@@ -224,7 +225,7 @@ export default function Board() {
             );
             })}
           </div>
-        )}
+        </div>
       </div>
 
       <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Task' : `Add to ${COLUMNS.find(c=>c.id===editCol)?.label}`}
