@@ -29,9 +29,8 @@ export default function Auth({ onLogin }) {
     setLoading(true);
 
     setTimeout(() => {
-      // Passcode check: accepts "blackfire", "aawazz", or any valid 4+ char passcode for demo
       const val = pw.trim().toLowerCase();
-      if (val === 'blackfire' || val === 'aawazz' || val.length >= 4) {
+      if (val === 'blackfire' || val === 'aawazz') {
         localStorage.setItem('crm_auth', 'true');
         onLogin();
       } else {
@@ -42,8 +41,6 @@ export default function Auth({ onLogin }) {
       }
     }, 1000);
   }
-
-  const strengthPct = Math.min((pw.length / 16) * 100, 100);
 
   return (
     <div className="auth-page-root">
@@ -95,9 +92,7 @@ export default function Auth({ onLogin }) {
             </div>
           </div>
 
-          <div className="strength">
-            <div className="strength-fill" style={{ width: `${strengthPct}%` }}></div>
-          </div>
+
 
           <div className={`error-msg${showError ? ' show' : ''}`}>
             {errorMsg}
