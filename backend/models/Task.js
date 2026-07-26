@@ -12,6 +12,7 @@ const taskSchema = new mongoose.Schema({
   assignee:    { type: String, default: '' },
   dueDate:     { type: String, default: '' },
   image:       { type: String, default: '' },
+  color:       { type: String, default: 'blue' },
   order:       { type: Number, default: 0 },
 }, { timestamps: true });
 

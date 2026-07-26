@@ -14,7 +14,19 @@ const COLUMNS = [
   { id: 'qa',         label: 'QA / Review' },
   { id: 'done',       label: 'Done' },
 ];
-const EMPTY_TASK = { title:'', description:'', priority:'medium', tags:'', assignee:'', dueDate:'' };
+
+const COLORS = [
+  { id: 'blue',   hex: '#3b82f6' },
+  { id: 'purple', hex: '#8b5cf6' },
+  { id: 'pink',   hex: '#ec4899' },
+  { id: 'green',  hex: '#10b981' },
+  { id: 'amber',  hex: '#f59e0b' },
+  { id: 'red',    hex: '#ef4444' },
+  { id: 'teal',   hex: '#06b6d4' },
+  { id: 'gray',   hex: '#71717a' },
+];
+
+const EMPTY_TASK = { title:'', description:'', priority:'medium', color:'blue', tags:'', assignee:'', dueDate:'' };
 
 export default function Board() {
   const [project, setProject] = useState('blackfire');
@@ -31,7 +43,7 @@ export default function Board() {
   useEffect(() => { load(); }, [project]);
 
   function openAdd(col) { setForm({ ...EMPTY_TASK }); setEditCol(col); setEditing(null); setImageFile(null); setModal(true); }
-  function openEdit(t)  { setForm({ title:t.title, description:t.description||'', priority:t.priority||'medium', tags:(t.tags||[]).join(', '), assignee:t.assignee||'', dueDate:t.dueDate||'' }); setEditCol(t.column); setEditing(t._id); setImageFile(null); setModal(true); }
+  function openEdit(t)  { setForm({ title:t.title, description:t.description||'', priority:t.priority||'medium', color:t.color||'blue', tags:(t.tags||[]).join(', '), assignee:t.assignee||'', dueDate:t.dueDate||'' }); setEditCol(t.column); setEditing(t._id); setImageFile(null); setModal(true); }
 
   async function save() {
     if (!form.title.trim()) return toast('Title required', 'error');
@@ -55,7 +67,6 @@ export default function Board() {
   }
 
   async function del(id) {
-    // Delete instantly without browser confirm popups
     await tasksApi.delete(id); toast('Task deleted', 'info'); load();
   }
 
@@ -85,7 +96,7 @@ export default function Board() {
   return (
     <>
       <div className="page-head">
-        <div><h1>Project Board</h1><p>Trello-style QA and task tracking for Blackfire AI & Aawazz</p></div>
+        <div><h1>Project Board</h1><p>Task tracking with color coding & cover image attachments</p></div>
       </div>
       <div className="page-body">
         {/* Project tabs */}
@@ -141,7 +152,7 @@ export default function Board() {
                   onDrop={() => onDrop(col.id)}
                 >
                   {ct.map(t => (
-                    <div key={t._id} className="k-card" draggable
+                    <div key={t._id} className={`k-card card-color-${t.color || 'blue'}`} draggable
                       onDragStart={() => onDragStart(t._id)}>
 
                       {/* Display Task Cover Picture */}
@@ -191,6 +202,21 @@ export default function Board() {
       <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Task' : `Add to ${COLUMNS.find(c=>c.id===editCol)?.label}`}
         footer={<><button className="btn btn-secondary" onClick={() => setModal(false)}>Cancel</button><button className="btn btn-primary" onClick={save} style={isAawazz ? { background: '#2563eb', borderColor: '#2563eb' } : {}}>Save</button></>}>
         <div className="form-group"><label>Title *</label><input value={form.title} onChange={e => setForm(f=>({...f,title:e.target.value}))} placeholder="Task title" /></div>
+        
+        {/* Task Color Coding Selector */}
+        <div className="form-group">
+          <label>Color Code Accent</label>
+          <div className="color-picker-row">
+            {COLORS.map(c => (
+              <div key={c.id}
+                className={`color-dot-opt${form.color === c.id ? ' selected' : ''}`}
+                style={{ background: c.hex }}
+                title={c.id}
+                onClick={() => setForm(f=>({...f, color: c.id}))} />
+            ))}
+          </div>
+        </div>
+
         <div className="form-group"><label>Description</label><textarea value={form.description} onChange={e => setForm(f=>({...f,description:e.target.value}))} placeholder="Optional details..." /></div>
         <div className="form-row">
           <div className="form-group"><label>Priority</label>
