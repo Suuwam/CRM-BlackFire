@@ -44,11 +44,6 @@ export default function App() {
       <div className="layout">
         <Sidebar onLogout={handleLogout} routeLoading={routeLoading} />
         <div className="main" style={{ position: 'relative' }}>
-          {routeLoading && (
-            <div className="intentional-loader" style={{ position: 'absolute', inset: 0, zIndex: 50, background: 'var(--bg)' }}>
-              <div className="spinner-large" />
-            </div>
-          )}
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard"  element={<Dashboard />} />

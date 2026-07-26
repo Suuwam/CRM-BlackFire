@@ -76,7 +76,7 @@ export default function Board() {
 
       toast('Task saved', 'success'); setModal(false); setImageFile(null);
       mutate(swrKey); // revalidate in background
-    } catch { toast('Error saving task', 'error'); mutate(swrKey); }
+    } catch (err) { console.error('Task save error:', err); toast(err?.response?.data?.error || err.message || 'Error saving task', 'error'); mutate(swrKey); }
     finally { setSaving(false); }
   }
 
@@ -161,11 +161,6 @@ export default function Board() {
 
         {/* Kanban board */}
         <div className="kanban-wrapper" style={{ position: 'relative', minHeight: '50vh' }}>
-          {isLoading && tasks.length === 0 && (
-            <div className="intentional-loader" style={{ position: 'absolute', inset: 0, zIndex: 10, background: 'var(--bg)' }}>
-              <div className="spinner-large" />
-            </div>
-          )}
           <div className="kanban">
             {COLUMNS.map(col => {
               const ct = colTasks(col.id);
