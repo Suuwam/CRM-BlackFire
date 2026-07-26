@@ -503,3 +503,72 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
 }
 .auth-page-root .footer-note a:hover { color: #ffffff; border-color: #ffffff; }
 @media (max-width: 420px) { .auth-page-root .field-inner { height: 50px; } }
+
+/* Intentional Loading Screen */
+.intentional-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  min-height: calc(100vh - 120px);
+  background: transparent;
+  animation: fadeIn 0.2s ease;
+}
+.spinner-large {
+  width: 44px;
+  height: 44px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: authSpin 0.65s linear infinite;
+}
+
+/* Reactivity & Press States */
+button:active, .btn:active, .sb-item:active, .client-card:active, .board-tab:active, .ref-card:active, .cal-ev-card:active {
+  transform: scale(0.975) !important;
+  transition: transform 0.1s ease !important;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .layout { flex-direction: column; }
+  .sidebar {
+    top: auto; bottom: 0;
+    width: 100%; height: 64px;
+    border-right: none; border-top: 1px solid var(--border);
+    display: flex; flex-direction: row;
+    z-index: 999;
+  }
+  .main { margin-left: 0; margin-bottom: 64px; }
+  
+  .sb-brand, .sb-section, .sb-footer { display: none !important; }
+  .sb-nav {
+    display: flex; flex-direction: row;
+    padding: 0 16px; overflow-x: auto;
+    width: 100%; align-items: center;
+    gap: 8px; justify-content: space-between;
+  }
+  .sb-item {
+    flex-direction: column;
+    padding: 8px 12px; font-size: 10px;
+    margin-bottom: 0; gap: 4px;
+    flex-shrink: 0; text-align: center;
+    justify-content: center;
+  }
+  .sb-item .badge { display: none; }
+
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .cal-container { grid-template-columns: 1fr; }
+  .email-layout { grid-template-columns: 1fr; }
+  .dash-grid { grid-template-columns: 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+  
+  .page-head { flex-direction: column; align-items: flex-start; padding: 20px 24px 16px; }
+  .page-body { padding: 20px 24px; }
+  .kanban { padding-bottom: 24px; }
+  .board-tabs { overflow-x: auto; flex-wrap: nowrap; width: 100%; padding-bottom: 8px; }
+  .board-tab { flex-shrink: 0; }
+  .aawazz-banner { flex-direction: column; text-align: center; }
+  .aawazz-banner > div:last-child { text-align: center !important; margin-top: 12px; }
+}

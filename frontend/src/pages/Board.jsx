@@ -36,10 +36,24 @@ export default function Board() {
   const [editCol, setEditCol] = useState('backlog');
   const [editing, setEditing] = useState(null);
   const [imageFile, setImageFile] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const dragId = useRef(null);
   const toast = useToast();
 
-  async function load() { const r = await tasksApi.list(project); setTasks(r.data); }
+  async function load() { 
+    setIsLoading(true);
+    try {
+      const r = await tasksApi.list(project); 
+      // Add a slight delay so the beautiful loading animation is actually visible 
+      // on fast local connections before rendering the new data
+      setTimeout(() => {
+        setTasks(r.data); 
+        setIsLoading(false);
+      }, 350);
+    } catch {
+      setIsLoading(false);
+    }
+  }
   useEffect(() => { load(); }, [project]);
 
   function openAdd(col) { setForm({ ...EMPTY_TASK }); setEditCol(col); setEditing(null); setImageFile(null); setModal(true); }
@@ -109,7 +123,11 @@ export default function Board() {
           {PROJECTS.map(p => (
             <button key={p.id} className={`board-tab${project===p.id?' active':''}`} onClick={() => setProject(p.id)}
               style={project===p.id && p.id==='aawazz' ? { background: '#2563eb', borderColor: '#2563eb' } : {}}>
-              <span className="proj-dot" style={{ background: project===p.id ? '#fff' : p.dot }} />
+              {(project === p.id && isLoading) ? (
+                <div style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'authSpin 0.6s linear infinite' }} />
+              ) : (
+                <span className="proj-dot" style={{ background: project===p.id ? '#fff' : p.dot }} />
+              )}
               {p.label}
             </button>
           ))}
@@ -140,9 +158,14 @@ export default function Board() {
         )}
 
         {/* Kanban board */}
-        <div className="kanban">
-          {COLUMNS.map(col => {
-            const ct = colTasks(col.id);
+        {isLoading ? (
+          <div className="intentional-loader" style={{ minHeight: '50vh' }}>
+            <div className="spinner-large" />
+          </div>
+        ) : (
+          <div className="kanban">
+            {COLUMNS.map(col => {
+              const ct = colTasks(col.id);
             return (
               <div key={col.id} className="col">
                 <div className="col-head">
@@ -199,8 +222,9 @@ export default function Board() {
                 </div>
               </div>
             );
-          })}
-        </div>
+            })}
+          </div>
+        )}
       </div>
 
       <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Task' : `Add to ${COLUMNS.find(c=>c.id===editCol)?.label}`}

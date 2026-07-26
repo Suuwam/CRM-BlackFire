@@ -12,7 +12,7 @@ const boardNav = [
   { to: '/board', label: 'Project Board' },
 ];
 
-export default function Sidebar({ onLogout }) {
+export default function Sidebar({ onLogout, routeLoading }) {
   return (
     <aside className="sidebar">
       <div className="sb-brand">
@@ -26,7 +26,14 @@ export default function Sidebar({ onLogout }) {
         {nav.map(n => (
           <NavLink key={n.to} to={n.to}
             className={({ isActive }) => `sb-item${isActive ? ' active' : ''}`}>
-            {n.label}
+            {({ isActive }) => (
+              <>
+                {n.label}
+                {isActive && routeLoading && (
+                  <div style={{ marginLeft: 'auto', width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'authSpin 0.6s linear infinite' }} />
+                )}
+              </>
+            )}
           </NavLink>
         ))}
 
@@ -34,7 +41,14 @@ export default function Sidebar({ onLogout }) {
         {boardNav.map(n => (
           <NavLink key={n.to} to={n.to}
             className={({ isActive }) => `sb-item${isActive ? ' active' : ''}`}>
-            {n.label}
+            {({ isActive }) => (
+              <>
+                {n.label}
+                {isActive && routeLoading && (
+                  <div style={{ marginLeft: 'auto', width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'authSpin 0.6s linear infinite' }} />
+                )}
+              </>
+            )}
           </NavLink>
         ))}
       </nav>

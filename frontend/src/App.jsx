@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Toast from './components/Toast';
 import Dashboard from './pages/Dashboard';
@@ -30,20 +30,35 @@ export default function App() {
     );
   }
 
+  const location = useLocation();
+  const [routeLoading, setRouteLoading] = useState(false);
+
+  useEffect(() => {
+    setRouteLoading(true);
+    const timer = setTimeout(() => setRouteLoading(false), 400);
+    return () => clearTimeout(timer);
+  }, [location.pathname]);
+
   return (
     <ToastProvider>
       <div className="layout">
-        <Sidebar onLogout={handleLogout} />
+        <Sidebar onLogout={handleLogout} routeLoading={routeLoading} />
         <div className="main">
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard"  element={<Dashboard />} />
-            <Route path="/clients"    element={<Clients />} />
-            <Route path="/calendar"   element={<Calendar />} />
-            <Route path="/email"      element={<Email />} />
-            <Route path="/references" element={<References />} />
-            <Route path="/board"      element={<Board />} />
-          </Routes>
+          {routeLoading ? (
+            <div className="intentional-loader">
+              <div className="spinner-large" />
+            </div>
+          ) : (
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard"  element={<Dashboard />} />
+              <Route path="/clients"    element={<Clients />} />
+              <Route path="/calendar"   element={<Calendar />} />
+              <Route path="/email"      element={<Email />} />
+              <Route path="/references" element={<References />} />
+              <Route path="/board"      element={<Board />} />
+            </Routes>
+          )}
         </div>
         <Toast />
       </div>

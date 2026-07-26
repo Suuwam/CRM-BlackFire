@@ -1,6 +1,15 @@
 const router = require('express').Router();
 const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
+const streamifier = require('streamifier');
 const Client = require('../models/Client');
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
 // Memory storage for Vercel serverless compatibility
 const upload = multer({
@@ -36,10 +45,24 @@ router.put('/:id', async (req, res) => {
 router.patch('/:id/photo', upload.single('photo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    const b64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+
+    const uploadFromBuffer = (buffer) => {
+      return new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          { folder: 'crm_clients' },
+          (error, result) => {
+            if (result) resolve(result);
+            else reject(error);
+          }
+        );
+        streamifier.createReadStream(buffer).pipe(uploadStream);
+      });
+    };
+
+    const result = await uploadFromBuffer(req.file.buffer);
     const client = await Client.findByIdAndUpdate(
       req.params.id,
-      { photo: b64 },
+      { photo: result.secure_url },
       { new: true }
     );
     res.json(client);
