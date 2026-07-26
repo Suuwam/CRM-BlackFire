@@ -4,8 +4,8 @@ import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 
 const PROJECTS = [
-  { id: 'blackfire', label: 'Blackfire AI', color: '#18181b', dot: '#18181b', sub: 'Main Project' },
-  { id: 'aawazz',   label: 'Aawazz',       color: '#2563eb', dot: '#2563eb', sub: 'SaaS Product' },
+  { id: 'blackfire', label: 'Blackfire AI', color: '#18181b', dot: '#18181b' },
+  { id: 'aawazz',   label: 'Aawazz Product', color: '#2563eb', dot: '#2563eb' },
 ];
 const COLUMNS = [
   { id: 'backlog',    label: 'Backlog' },
@@ -111,7 +111,6 @@ export default function Board() {
               style={project===p.id && p.id==='aawazz' ? { background: '#2563eb', borderColor: '#2563eb' } : {}}>
               <span className="proj-dot" style={{ background: project===p.id ? '#fff' : p.dot }} />
               {p.label}
-              <span className="text-sm" style={{ opacity:.7, marginLeft:4 }}>{p.sub}</span>
             </button>
           ))}
         </div>

@@ -1,15 +1,15 @@
 import { NavLink } from 'react-router-dom';
 
 const nav = [
-  { to: '/dashboard',  label: 'Dashboard',   ico: '⬚' },
-  { to: '/clients',    label: 'Clients',      ico: '👤' },
-  { to: '/calendar',   label: 'Calendar',     ico: '📅' },
-  { to: '/email',      label: 'Email',        ico: '✉️' },
-  { to: '/references', label: 'References',   ico: '🔗' },
+  { to: '/dashboard',  label: 'Dashboard' },
+  { to: '/clients',    label: 'Clients' },
+  { to: '/calendar',   label: 'Calendar' },
+  { to: '/email',      label: 'Email' },
+  { to: '/references', label: 'References' },
 ];
 
 const boardNav = [
-  { to: '/board', label: 'Project Board',  ico: '📋' },
+  { to: '/board', label: 'Project Board' },
 ];
 
 export default function Sidebar({ onLogout }) {
@@ -17,8 +17,8 @@ export default function Sidebar({ onLogout }) {
     <aside className="sidebar">
       <div className="sb-brand">
         <div className="name">Blackfire AI</div>
-        <div className="sub">Venture & Product Engine</div>
-        <span className="sb-badge">Platform</span>
+        <div className="sub">Product Platform Engine</div>
+        <span className="sb-badge">Engine</span>
       </div>
 
       <nav className="sb-nav">
@@ -26,16 +26,14 @@ export default function Sidebar({ onLogout }) {
         {nav.map(n => (
           <NavLink key={n.to} to={n.to}
             className={({ isActive }) => `sb-item${isActive ? ' active' : ''}`}>
-            <span className="ico">{n.ico}</span>
             {n.label}
           </NavLink>
         ))}
 
-        <div className="sb-section" style={{ marginTop: 8 }}>Products</div>
+        <div className="sb-section" style={{ marginTop: 12 }}>Products</div>
         {boardNav.map(n => (
           <NavLink key={n.to} to={n.to}
             className={({ isActive }) => `sb-item${isActive ? ' active' : ''}`}>
-            <span className="ico">{n.ico}</span>
             {n.label}
           </NavLink>
         ))}
@@ -43,11 +41,11 @@ export default function Sidebar({ onLogout }) {
 
       <div className="sb-footer" style={{ display:'flex', flexDirection:'column', gap:6 }}>
         <button onClick={() => window.open('https://cloud.mongodb.com', '_blank')}>
-          <span>🛢</span> MongoDB Atlas
+          MongoDB Atlas
         </button>
         {onLogout && (
           <button onClick={onLogout} style={{ color: '#ef4444' }}>
-            <span>🔒</span> Lock Access
+            Lock Access
           </button>
         )}
       </div>

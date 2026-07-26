@@ -39,6 +39,7 @@ export const referencesApi = {
   create: (data) => api.post('/references', data),
   update: (id, data) => api.put(`/references/${id}`, data),
   delete: (id) => api.delete(`/references/${id}`),
+  scrape: (url) => api.post('/references/scrape', { url }),
 };
 
 export const tasksApi = {

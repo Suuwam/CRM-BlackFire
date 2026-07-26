@@ -3,31 +3,75 @@ import { referencesApi } from '../api';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 
-const EMPTY = { title:'', url:'', tags:'', notes:'' };
+const EMPTY = { title:'', url:'', description:'', image:'', tags:'', notes:'', category:'General' };
 
 export default function References() {
-  const [refs, setRefs]       = useState([]);
-  const [search, setSearch]   = useState('');
-  const [tagFilter, setTagFilter] = useState('');
-  const [modal, setModal]     = useState(false);
-  const [form, setForm]       = useState(EMPTY);
-  const [editing, setEditing] = useState(null);
+  const [refs, setRefs]             = useState([]);
+  const [search, setSearch]         = useState('');
+  const [tagFilter, setTagFilter]   = useState('');
+  const [modal, setModal]           = useState(false);
+  const [form, setForm]             = useState(EMPTY);
+  const [editing, setEditing]       = useState(null);
+  const [scraping, setScraping]     = useState(false);
+  const [saving, setSaving]         = useState(false);
   const toast = useToast();
 
   async function load() { const r = await referencesApi.list(); setRefs(r.data); }
   useEffect(() => { load(); }, []);
 
   function openAdd()   { setForm(EMPTY); setEditing(null); setModal(true); }
-  function openEdit(r) { setForm({ title:r.title, url:r.url, tags:(r.tags||[]).join(', '), notes:r.notes }); setEditing(r._id); setModal(true); }
+  function openEdit(r) {
+    setForm({
+      title: r.title,
+      url: r.url,
+      description: r.description || '',
+      image: r.image || '',
+      tags: (r.tags||[]).join(', '),
+      notes: r.notes || '',
+      category: r.category || 'General'
+    });
+    setEditing(r._id);
+    setModal(true);
+  }
+
+  async function handleScrape() {
+    if (!form.url.trim()) return toast('Enter a URL first', 'error');
+    setScraping(true);
+    try {
+      const res = await referencesApi.scrape(form.url.trim());
+      if (res.data) {
+        setForm(f => ({
+          ...f,
+          title: res.data.title || f.title || hostname(res.data.url),
+          description: res.data.description || f.description,
+          image: res.data.image || f.image,
+          url: res.data.url || f.url
+        }));
+        toast('Link details scraped!', 'success');
+      }
+    } catch (e) {
+      toast('Failed to scrape metadata', 'error');
+    } finally {
+      setScraping(false);
+    }
+  }
 
   async function save() {
-    if (!form.title.trim() || !form.url.trim()) return toast('Title and URL required', 'error');
-    const data = { ...form, tags: form.tags.split(',').map(t=>t.trim()).filter(Boolean) };
+    if (saving) return;
+    if (!form.url.trim()) return toast('URL is required', 'error');
+    const finalTitle = form.title.trim() || hostname(form.url);
+    const data = {
+      ...form,
+      title: finalTitle,
+      tags: form.tags.split(',').map(t=>t.trim()).filter(Boolean)
+    };
+    setSaving(true);
     try {
       if (editing) await referencesApi.update(editing, data);
       else         await referencesApi.create(data);
-      toast('Saved', 'success'); setModal(false); load();
-    } catch { toast('Error', 'error'); }
+      toast('Reference saved', 'success'); setModal(false); load();
+    } catch { toast('Error saving reference', 'error'); }
+    finally { setSaving(false); }
   }
 
   async function del(id) {
@@ -36,29 +80,33 @@ export default function References() {
     load();
   }
 
-  // All unique tags
   const allTags = [...new Set(refs.flatMap(r => r.tags || []))].sort();
 
   const visible = refs.filter(r => {
     const q = search.toLowerCase();
-    const matchQ = !q || r.title.toLowerCase().includes(q) || r.url.toLowerCase().includes(q);
+    const matchQ = !q || r.title.toLowerCase().includes(q) || r.url.toLowerCase().includes(q) || (r.description && r.description.toLowerCase().includes(q));
     const matchT = !tagFilter || (r.tags || []).includes(tagFilter);
     return matchQ && matchT;
   });
 
-  function hostname(url) { try { return new URL(url).hostname; } catch { return url; } }
+  function hostname(url) {
+    try {
+      const u = new URL(url.startsWith('http') ? url : 'https://' + url);
+      return u.hostname;
+    } catch { return url; }
+  }
 
   return (
     <>
       <div className="page-head">
-        <div><h1>References</h1><p>Curated links and resources</p></div>
+        <div><h1>References & Knowledge Vault</h1><p>Curated links with automatic preview cards & web metadata scraper</p></div>
         <button className="btn btn-primary" onClick={openAdd}>+ Add Link</button>
       </div>
       <div className="page-body">
         <div className="toolbar">
           <div className="search">
             <span className="search-ico">🔍</span>
-            <input placeholder="Search links..." value={search} onChange={e => setSearch(e.target.value)} />
+            <input placeholder="Search links & descriptions..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <div className="ref-tags" style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
             <button className={`ref-tag${!tagFilter?' on':''}`} onClick={() => setTagFilter('')}>All</button>
@@ -71,30 +119,51 @@ export default function References() {
         <div className="ref-grid">
           {visible.map(r => (
             <div key={r._id} className="ref-card">
-              <div className="ref-title">{r.title}</div>
-              <div className="ref-url">{hostname(r.url)}</div>
-              {r.notes && <div className="ref-notes">{r.notes}</div>}
-              <div className="ref-tags">
-                {(r.tags||[]).map(t => <span key={t} className="ref-tag" onClick={() => setTagFilter(t)}>{t}</span>)}
+              {r.image && (
+                <div className="ref-img-wrap">
+                  <img src={r.image} alt={r.title} className="ref-img" onError={e => e.target.style.display='none'} />
+                </div>
+              )}
+              <div className="ref-content">
+                <div className="ref-title">{r.title}</div>
+                <div className="ref-url-badge">{hostname(r.url)}</div>
+                {r.description && <div className="ref-desc">{r.description}</div>}
+                {r.notes && <div className="ref-notes">💡 {r.notes}</div>}
+                {r.tags && r.tags.length > 0 && (
+                  <div className="ref-tags" style={{ marginTop: 8 }}>
+                    {r.tags.map(t => <span key={t} className="ref-tag" onClick={() => setTagFilter(t)}>{t}</span>)}
+                  </div>
+                )}
               </div>
               <div className="ref-foot">
-                <a href={r.url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-secondary">↗ Open</a>
-                <button className="btn btn-sm btn-ghost" onClick={() => { navigator.clipboard.writeText(r.url); toast('Copied!', 'success'); }}>📋</button>
-                <button className="btn btn-sm btn-ghost" onClick={() => openEdit(r)}>✏️</button>
-                <button className="btn btn-sm btn-ghost" onClick={() => del(r._id)}>🗑</button>
+                <a href={r.url.startsWith('http') ? r.url : 'https://' + r.url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-secondary">↗ Open Link</a>
+                <button className="btn btn-sm btn-ghost" onClick={() => { navigator.clipboard.writeText(r.url); toast('Copied URL!', 'success'); }} title="Copy link">📋</button>
+                <button className="btn btn-sm btn-ghost" onClick={() => openEdit(r)} title="Edit link">✏️</button>
+                <button className="btn btn-sm btn-ghost" onClick={() => del(r._id)} title="Delete link">🗑</button>
               </div>
             </div>
           ))}
-          {visible.length === 0 && <div className="empty"><div className="empty-ico">🔗</div><p>No references found</p></div>}
+          {visible.length === 0 && <div className="empty"><div className="empty-ico">🔗</div><p>No reference links saved yet.</p></div>}
         </div>
       </div>
 
       <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Reference' : 'Add Reference'}
-        footer={<><button className="btn btn-secondary" onClick={() => setModal(false)}>Cancel</button><button className="btn btn-primary" onClick={save}>Save</button></>}>
-        <div className="form-group"><label>Title *</label><input value={form.title} onChange={e => setForm(f=>({...f,title:e.target.value}))} placeholder="Link title" /></div>
-        <div className="form-group"><label>URL *</label><input value={form.url} onChange={e => setForm(f=>({...f,url:e.target.value}))} placeholder="https://..." /></div>
-        <div className="form-group"><label>Tags (comma separated)</label><input value={form.tags} onChange={e => setForm(f=>({...f,tags:e.target.value}))} placeholder="design, inspiration, tools" /></div>
-        <div className="form-group"><label>Notes</label><textarea value={form.notes} onChange={e => setForm(f=>({...f,notes:e.target.value}))} placeholder="Why is this useful?" /></div>
+        footer={<><button className="btn btn-secondary" onClick={() => setModal(false)}>Cancel</button><button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button></>}>
+        <div className="form-group">
+          <label>URL *</label>
+          <div style={{ display:'flex', gap:8 }}>
+            <input value={form.url} onChange={e => setForm(f=>({...f,url:e.target.value}))} placeholder="https://example.com/article" style={{ flex:1 }} />
+            <button type="button" className="btn btn-secondary btn-sm" onClick={handleScrape} disabled={scraping}>
+              {scraping ? 'Scraping...' : '⚡ Auto-Scrape'}
+            </button>
+          </div>
+        </div>
+
+        <div className="form-group"><label>Title</label><input value={form.title} onChange={e => setForm(f=>({...f,title:e.target.value}))} placeholder="Auto-scraped or custom title" /></div>
+        <div className="form-group"><label>Cover Picture URL</label><input value={form.image} onChange={e => setForm(f=>({...f,image:e.target.value}))} placeholder="https://..." /></div>
+        <div className="form-group"><label>Short Summary / Description</label><textarea value={form.description} onChange={e => setForm(f=>({...f,description:e.target.value}))} placeholder="Short overview..." rows={2} /></div>
+        <div className="form-group"><label>Tags (comma separated)</label><input value={form.tags} onChange={e => setForm(f=>({...f,tags:e.target.value}))} placeholder="design, audio, ai, docs" /></div>
+        <div className="form-group"><label>Personal Notes</label><textarea value={form.notes} onChange={e => setForm(f=>({...f,notes:e.target.value}))} placeholder="Why is this reference important?" rows={2} /></div>
       </Modal>
     </>
   );
