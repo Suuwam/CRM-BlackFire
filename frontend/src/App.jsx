@@ -16,6 +16,15 @@ export default function App() {
     return sessionStorage.getItem('crm_auth') === 'true';
   });
 
+  const location = useLocation();
+  const [routeLoading, setRouteLoading] = useState(false);
+
+  useEffect(() => {
+    setRouteLoading(true);
+    const timer = setTimeout(() => setRouteLoading(false), 400);
+    return () => clearTimeout(timer);
+  }, [location.pathname]);
+
   function handleLogout() {
     sessionStorage.removeItem('crm_auth');
     setAuthenticated(false);
@@ -29,15 +38,6 @@ export default function App() {
       </ToastProvider>
     );
   }
-
-  const location = useLocation();
-  const [routeLoading, setRouteLoading] = useState(false);
-
-  useEffect(() => {
-    setRouteLoading(true);
-    const timer = setTimeout(() => setRouteLoading(false), 400);
-    return () => clearTimeout(timer);
-  }, [location.pathname]);
 
   return (
     <ToastProvider>
