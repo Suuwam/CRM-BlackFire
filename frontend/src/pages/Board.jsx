@@ -76,7 +76,13 @@ export default function Board() {
 
       toast('Task saved', 'success'); setModal(false); setImageFile(null);
       mutate(swrKey); // revalidate in background
-    } catch (err) { console.error('Task save error:', err); toast(err?.response?.data?.error || err.message || 'Error saving task', 'error'); mutate(swrKey); }
+    } catch (err) { 
+      console.error('Task save error:', err); 
+      const errMsg = err?.response?.data?.error;
+      const safeMsg = typeof errMsg === 'object' ? JSON.stringify(errMsg) : (errMsg || err.message || 'Error saving task');
+      toast(safeMsg, 'error'); 
+      mutate(swrKey); 
+    }
     finally { setSaving(false); }
   }
 
