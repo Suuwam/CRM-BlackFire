@@ -1,19 +1,12 @@
 const router = require('express').Router();
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const Client = require('../models/Client');
 
-// Multer setup
-const storage = multer.diskStorage({
-  destination: (_, __, cb) => {
-    const dir = path.join(__dirname, '../uploads');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (_, file, cb) => cb(null, Date.now() + '-' + file.originalname.replace(/\s+/g, '_')),
+// Memory storage for Vercel serverless compatibility
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }
 });
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
 // GET all
 router.get('/', async (_, res) => {
@@ -43,9 +36,10 @@ router.put('/:id', async (req, res) => {
 router.patch('/:id/photo', upload.single('photo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const b64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
     const client = await Client.findByIdAndUpdate(
       req.params.id,
-      { photo: req.file.filename },
+      { photo: b64 },
       { new: true }
     );
     res.json(client);

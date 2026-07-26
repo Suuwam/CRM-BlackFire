@@ -121,12 +121,13 @@ export default function Calendar() {
   async function save() {
     if (!form.title.trim() || !form.date) return toast('Title and date required', 'error');
     try {
+      const payload = { ...form, clientId: form.clientId || null };
       let savedEv;
       if (editing) {
-        const res = await eventsApi.update(editing, form);
+        const res = await eventsApi.update(editing, payload);
         savedEv = res.data;
       } else {
-        const res = await eventsApi.create(form);
+        const res = await eventsApi.create(payload);
         savedEv = res.data;
       }
 
@@ -138,7 +139,10 @@ export default function Calendar() {
       setModal(false);
       setImageFile(null);
       load();
-    } catch { toast('Error saving event', 'error'); }
+    } catch (err) {
+      console.error(err);
+      toast('Error saving event', 'error');
+    }
   }
 
   async function del(id) {
@@ -317,7 +321,7 @@ export default function Calendar() {
 
                     {/* Image Preview */}
                     {ev.image && (
-                      <img src={`/uploads/${ev.image}`} alt={ev.title} className="cal-ev-img" />
+                      <img src={ev.image.startsWith('data:') || ev.image.startsWith('http') ? ev.image : `/uploads/${ev.image}`} alt={ev.title} className="cal-ev-img" />
                     )}
 
                     {/* Social Media Platform Icons */}

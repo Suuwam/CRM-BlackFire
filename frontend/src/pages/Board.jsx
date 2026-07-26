@@ -29,7 +29,7 @@ const COLORS = [
 const EMPTY_TASK = { title:'', description:'', priority:'medium', color:'blue', tags:'', assignee:'', dueDate:'' };
 
 export default function Board() {
-  const [project, setProject] = useState('blackfire');
+  const [project, setProject] = useState('aawazz');
   const [tasks, setTasks]     = useState([]);
   const [modal, setModal]     = useState(false);
   const [form, setForm]       = useState(EMPTY_TASK);
@@ -158,7 +158,7 @@ export default function Board() {
                       {/* Display Task Cover Picture */}
                       {t.image && (
                         <div className="k-card-img-wrap">
-                          <img src={`/uploads/${t.image}`} alt={t.title} className="k-card-img" />
+                          <img src={t.image.startsWith('data:') || t.image.startsWith('http') ? t.image : `/uploads/${t.image}`} alt={t.title} className="k-card-img" />
                         </div>
                       )}
 

@@ -1,19 +1,12 @@
 const router = require('express').Router();
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const Event = require('../models/Event');
 
-// Multer storage
-const storage = multer.diskStorage({
-  destination: (_, __, cb) => {
-    const dir = path.join(__dirname, '../uploads');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (_, file, cb) => cb(null, 'evt-' + Date.now() + '-' + file.originalname.replace(/\s+/g, '_')),
+// Memory storage for serverless & Vercel compatibility
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }
 });
-const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 router.get('/', async (req, res) => {
   try {
@@ -27,22 +20,29 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  try { res.status(201).json(await Event.create(req.body)); }
-  catch (e) { res.status(400).json({ error: e.message }); }
+  try {
+    const payload = { ...req.body };
+    if (!payload.clientId) payload.clientId = null;
+    res.status(201).json(await Event.create(payload));
+  } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
 router.put('/:id', async (req, res) => {
-  try { res.json(await Event.findByIdAndUpdate(req.params.id, req.body, { new: true })); }
-  catch (e) { res.status(400).json({ error: e.message }); }
+  try {
+    const payload = { ...req.body };
+    if (!payload.clientId) payload.clientId = null;
+    res.json(await Event.findByIdAndUpdate(req.params.id, payload, { new: true }));
+  } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// Upload image for event
+// Upload image for event (memory storage -> base64 data URI)
 router.patch('/:id/image', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
+    const b64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
     const event = await Event.findByIdAndUpdate(
       req.params.id,
-      { image: req.file.filename },
+      { image: b64 },
       { new: true }
     );
     res.json(event);

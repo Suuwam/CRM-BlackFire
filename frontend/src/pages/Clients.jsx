@@ -82,7 +82,7 @@ export default function Clients() {
               <div className="client-top">
                 <div className="avatar">
                   {c.photo
-                    ? <img src={`/uploads/${c.photo}`} alt={c.name} />
+                    ? <img src={c.photo.startsWith('data:') || c.photo.startsWith('http') ? c.photo : `/uploads/${c.photo}`} alt={c.name} />
                     : initials(c.name)
                   }
                   <label className="add-photo-btn" title="Upload photo" onClick={e => { e.stopPropagation(); photoRef.current.dataset.id = c._id; photoRef.current.click(); }}>+</label>
