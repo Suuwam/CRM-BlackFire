@@ -532,45 +532,104 @@ button:active, .btn:active, .sb-item:active, .client-card:active, .board-tab:act
   transition: transform 0.1s ease !important;
 }
 
-/* Mobile Responsiveness */
+/* Mobile Responsiveness & Refinements */
 @media (max-width: 768px) {
   .layout { flex-direction: column; }
   .sidebar {
     top: auto; bottom: 0;
-    width: 100%; height: 64px;
+    width: 100%; height: 72px; /* Taller for thumbs */
     border-right: none; border-top: 1px solid var(--border);
+    background: var(--surface);
     display: flex; flex-direction: row;
-    z-index: 999;
+    z-index: 1000;
+    padding-bottom: env(safe-area-inset-bottom, 12px); /* iPhone home bar support */
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.03);
   }
-  .main { margin-left: 0; margin-bottom: 64px; }
+  .main { margin-left: 0; padding-bottom: 85px; min-height: 100vh; } 
   
   .sb-brand, .sb-section, .sb-footer { display: none !important; }
   .sb-nav {
     display: flex; flex-direction: row;
-    padding: 0 16px; overflow-x: auto;
+    padding: 0 8px; overflow-x: auto;
     width: 100%; align-items: center;
-    gap: 8px; justify-content: space-between;
+    justify-content: space-around;
   }
+  .sb-nav::-webkit-scrollbar { display: none; }
   .sb-item {
     flex-direction: column;
-    padding: 8px 12px; font-size: 10px;
+    padding: 6px 4px; font-size: 10.5px;
     margin-bottom: 0; gap: 4px;
-    flex-shrink: 0; text-align: center;
+    flex: 1; text-align: center;
     justify-content: center;
+    border-radius: var(--r-sm);
   }
+  .sb-item .ico { font-size: 18px; margin-bottom: 1px; width: 100%; }
   .sb-item .badge { display: none; }
+  .sb-item.active { box-shadow: none; background: transparent; color: var(--accent); font-weight: 700; }
+  .sb-item.active::after { content: ''; width: 4px; height: 4px; background: var(--accent); border-radius: 50%; margin-top: 2px; display: inline-block; }
 
-  .stats-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
-  .cal-container { grid-template-columns: 1fr; }
-  .email-layout { grid-template-columns: 1fr; }
-  .dash-grid { grid-template-columns: 1fr; }
-  .form-row { grid-template-columns: 1fr; }
+  /* Input scaling prevention for iOS */
+  input, textarea, select { font-size: 16px !important; }
   
-  .page-head { flex-direction: column; align-items: flex-start; padding: 20px 24px 16px; }
-  .page-body { padding: 20px 24px; }
-  .kanban { padding-bottom: 24px; }
-  .board-tabs { overflow-x: auto; flex-wrap: nowrap; width: 100%; padding-bottom: 8px; }
+  /* Modals - Bottom Sheet */
+  .backdrop { align-items: flex-end; padding: 0; background: rgba(0,0,0,.5); }
+  .modal { 
+    border-radius: 20px 20px 0 0; 
+    margin: 0; border: none; 
+    max-height: 88vh;
+    animation: slideSheetUp 0.3s cubic-bezier(.17,.89,.32,1.28);
+  }
+  @keyframes slideSheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+  /* Page Layout & Headings */
+  .page-head { flex-direction: column; align-items: flex-start; padding: 20px 20px 14px; gap: 12px; }
+  .page-head h1 { font-size: 19px; }
+  .page-head button, .page-head .btn { width: 100%; justify-content: center; } 
+  .page-body { padding: 16px 20px 24px; }
+
+  /* Grids & Cards */
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .stat-card { padding: 16px; }
+  .email-layout { grid-template-columns: 1fr; gap: 16px; }
+  .dash-grid { grid-template-columns: 1fr; gap: 16px; }
+  .form-row { grid-template-columns: 1fr; gap: 12px; }
+  .card { padding: 16px; }
+
+  /* Calendar Refinement */
+  .cal-container { grid-template-columns: 1fr; min-height: auto; }
+  .cal-main { padding: 16px; }
+  .cal-month-title { font-size: 20px; }
+  .cal-nav-btn { width: 32px; height: 32px; }
+  .cal-today-btn { padding: 6px 12px; font-size: 12px; }
+  .cal-dow-cell { font-size: 9px; padding: 4px 0; }
+  .cal-cell { aspect-ratio: auto; min-height: 54px; padding: 4px; justify-content: flex-start; }
+  .cal-cell-head { margin-bottom: 2px; justify-content: center; }
+  .cal-cell-num { font-size: 12px; width: 22px; height: 22px; }
+  .cal-cell-events { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 2px; align-items: center; overflow: visible; }
+  .cal-chip { padding: 0; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; border: none; font-size: 0; color: transparent; min-height: 0; }
+  .cal-chip-time, .cal-chip-title, .cal-chip-overflow { display: none; } 
+  .cal-cell-platforms { display: none; }
+
+  /* Kanban Board Refinement */
+  .kanban { 
+    padding-bottom: 16px; 
+    scroll-snap-type: x mandatory; 
+    -webkit-overflow-scrolling: touch;
+    scroll-padding: 20px; /* Offset for safe area */
+  }
+  .col { 
+    flex: 0 0 85vw; 
+    scroll-snap-align: center; 
+    max-width: 320px;
+  }
+  .board-tabs { overflow-x: auto; flex-wrap: nowrap; width: 100%; padding-bottom: 8px; margin-bottom: 16px; }
   .board-tab { flex-shrink: 0; }
-  .aawazz-banner { flex-direction: column; text-align: center; }
-  .aawazz-banner > div:last-child { text-align: center !important; margin-top: 12px; }
+  
+  /* Banners */
+  .aawazz-banner { flex-direction: column; text-align: center; padding: 16px; }
+  .aawazz-banner > div:last-child { margin-top: 12px; width: 100%; display: flex; justify-content: center; }
+  
+  /* References & Clients */
+  .ref-grid { grid-template-columns: 1fr; gap: 14px; }
+  .clients-grid { grid-template-columns: 1fr; gap: 14px; }
 }
