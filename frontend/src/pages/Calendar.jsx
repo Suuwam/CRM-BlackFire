@@ -1,5 +1,6 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
-import { eventsApi, clientsApi } from '../api';
+import { useState, useMemo, useRef } from 'react';
+import useSWR, { mutate } from 'swr';
+import { eventsApi, clientsApi, fetcher } from '../api';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 import SocialIcon, { PLATFORMS } from '../components/SocialIcon';
@@ -26,8 +27,6 @@ export default function Calendar() {
   const today = new Date();
   const [year, setYear]   = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
-  const [events, setEvents] = useState([]);
-  const [clients, setClients] = useState([]);
   const [sel, setSel]     = useState(null);
   const [modal, setModal] = useState(false);
   const [form, setForm]   = useState(EMPTY_EV);
@@ -36,16 +35,10 @@ export default function Calendar() {
   const fileInputRef = useRef(null);
   const toast = useToast();
 
-  async function load() {
-    const pad = String(month + 1).padStart(2, '0');
-    const [ev, cl] = await Promise.all([
-      eventsApi.list({ month: `${year}-${pad}` }),
-      clientsApi.list(),
-    ]);
-    setEvents(ev.data);
-    setClients(cl.data);
-  }
-  useEffect(() => { load(); }, [year, month]);
+  const pad = String(month + 1).padStart(2, '0');
+  const eventsKey = `/events?month=${year}-${pad}`;
+  const { data: events = [] } = useSWR(eventsKey, fetcher, { keepPreviousData: true, revalidateOnFocus: false });
+  const { data: clients = [] } = useSWR('/clients', fetcher, { revalidateOnFocus: false });
 
   function prevMonth() { if (month === 0) { setMonth(11); setYear(y => y-1); } else setMonth(m => m-1); }
   function nextMonth() { if (month === 11) { setMonth(0); setYear(y => y+1); } else setMonth(m => m+1); }
@@ -121,11 +114,13 @@ export default function Calendar() {
       const payload = { ...form, clientId: form.clientId || null };
       let savedEv;
       if (editing) {
+        mutate(eventsKey, events.map(e => e._id === editing ? { ...e, ...payload } : e), false);
         const res = await eventsApi.update(editing, payload);
         savedEv = res.data;
       } else {
         const res = await eventsApi.create(payload);
         savedEv = res.data;
+        mutate(eventsKey, [...events, savedEv], false);
       }
 
       if (imageFile && savedEv?._id) {
@@ -135,26 +130,28 @@ export default function Calendar() {
       toast('Event saved', 'success');
       setModal(false);
       setImageFile(null);
-      load();
+      mutate(eventsKey);
     } catch (err) {
       console.error(err);
       toast('Error saving event', 'error');
+      mutate(eventsKey);
     } finally {
       setSaving(false);
     }
   }
 
   async function del(id) {
-    await eventsApi.delete(id);
+    mutate(eventsKey, events.filter(e => e._id !== id), false);
     toast('Event deleted', 'info');
-    load();
+    await eventsApi.delete(id);
+    mutate(eventsKey);
   }
 
   async function handleDirectUpload(eventId, file) {
     try {
       await eventsApi.uploadImage(eventId, file);
       toast('Picture added', 'success');
-      load();
+      mutate(eventsKey);
     } catch { toast('Upload failed', 'error'); }
   }
 

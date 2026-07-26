@@ -2,6 +2,8 @@ import axios from 'axios';
 
 const api = axios.create({ baseURL: '/api' });
 
+export const fetcher = url => api.get(url).then(res => res.data);
+
 export const clientsApi = {
   list: () => api.get('/clients'),
   get: (id) => api.get(`/clients/${id}`),

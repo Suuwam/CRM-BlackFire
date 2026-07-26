@@ -1,26 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { clientsApi, eventsApi, tasksApi } from '../api';
+import useSWR from 'swr';
+import { fetcher } from '../api';
 import SocialIcon from '../components/SocialIcon';
 
 export default function Dashboard() {
-  const [clients, setClients]   = useState([]);
-  const [upcoming, setUpcoming] = useState([]);
-  const [tasks, setTasks]       = useState([]);
   const nav = useNavigate();
 
-  useEffect(() => {
-    clientsApi.list().then(r => setClients(r.data));
-    eventsApi.list().then(r => {
-      const today = new Date().toISOString().slice(0, 10);
-      const sorted = r.data
-        .filter(e => e.date >= today)
-        .sort((a, b) => a.date.localeCompare(b.date))
-        .slice(0, 6);
-      setUpcoming(sorted);
-    });
-    tasksApi.list().then(r => setTasks(r.data));
-  }, []);
+  const { data: clients = [] } = useSWR('/clients', fetcher, { revalidateOnFocus: false });
+  const { data: allEvents = [] } = useSWR('/events', fetcher, { revalidateOnFocus: false });
+  const { data: tasks = [] } = useSWR('/tasks', fetcher, { revalidateOnFocus: false });
+
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = allEvents
+    .filter(e => e.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 6);
 
   const active   = clients.filter(c => c.status === 'Active').length;
   const prospect = clients.filter(c => c.status === 'Prospect').length;

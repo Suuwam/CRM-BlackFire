@@ -1,5 +1,6 @@
-import { useEffect, useState, useRef } from 'react';
-import { tasksApi } from '../api';
+import { useState, useRef } from 'react';
+import useSWR, { mutate } from 'swr';
+import { tasksApi, fetcher } from '../api';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 
@@ -30,31 +31,20 @@ const EMPTY_TASK = { title:'', description:'', priority:'medium', color:'blue', 
 
 export default function Board() {
   const [project, setProject] = useState('aawazz');
-  const [tasks, setTasks]     = useState([]);
   const [modal, setModal]     = useState(false);
   const [form, setForm]       = useState(EMPTY_TASK);
   const [editCol, setEditCol] = useState('backlog');
   const [editing, setEditing] = useState(null);
   const [imageFile, setImageFile] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
   const dragId = useRef(null);
   const toast = useToast();
 
-  async function load() { 
-    setIsLoading(true);
-    try {
-      const r = await tasksApi.list(project); 
-      // Add a slight delay so the beautiful loading animation is actually visible 
-      // on fast local connections before rendering the new data
-      setTimeout(() => {
-        setTasks(r.data); 
-        setIsLoading(false);
-      }, 350);
-    } catch {
-      setIsLoading(false);
-    }
-  }
-  useEffect(() => { load(); }, [project]);
+  // SWR: cache tasks per project, revalidate in background
+  const swrKey = `/tasks?project=${project}`;
+  const { data: tasks = [], isLoading } = useSWR(swrKey, fetcher, {
+    keepPreviousData: true,
+    revalidateOnFocus: false,
+  });
 
   function openAdd(col) { setForm({ ...EMPTY_TASK }); setEditCol(col); setEditing(null); setImageFile(null); setModal(true); }
   function openEdit(t)  { setForm({ title:t.title, description:t.description||'', priority:t.priority||'medium', color:t.color||'blue', tags:(t.tags||[]).join(', '), assignee:t.assignee||'', dueDate:t.dueDate||'' }); setEditCol(t.column); setEditing(t._id); setImageFile(null); setModal(true); }
@@ -69,31 +59,40 @@ export default function Board() {
     try {
       let savedTask;
       if (editing) {
+        // Optimistic: update local cache immediately
+        mutate(swrKey, tasks.map(t => t._id === editing ? { ...t, ...data } : t), false);
         const res = await tasksApi.update(editing, data);
         savedTask = res.data;
       } else {
         const res = await tasksApi.create(data);
         savedTask = res.data;
+        // Optimistic: add to cache
+        mutate(swrKey, [...tasks, savedTask], false);
       }
 
       if (imageFile && savedTask?._id) {
         await tasksApi.uploadImage(savedTask._id, imageFile);
       }
 
-      toast('Task saved', 'success'); setModal(false); setImageFile(null); load();
-    } catch { toast('Error saving task', 'error'); }
+      toast('Task saved', 'success'); setModal(false); setImageFile(null);
+      mutate(swrKey); // revalidate in background
+    } catch { toast('Error saving task', 'error'); mutate(swrKey); }
     finally { setSaving(false); }
   }
 
   async function del(id) {
-    await tasksApi.delete(id); toast('Task deleted', 'info'); load();
+    // Optimistic: remove from cache immediately
+    mutate(swrKey, tasks.filter(t => t._id !== id), false);
+    toast('Task deleted', 'info');
+    await tasksApi.delete(id);
+    mutate(swrKey);
   }
 
   async function handleCardPhotoUpload(taskId, file) {
     try {
       await tasksApi.uploadImage(taskId, file);
       toast('Card cover uploaded', 'success');
-      load();
+      mutate(swrKey);
     } catch { toast('Upload failed', 'error'); }
   }
 
@@ -103,10 +102,13 @@ export default function Board() {
   function onDragStart(id) { dragId.current = id; }
   async function onDrop(col) {
     if (!dragId.current) return;
-    await tasksApi.move(dragId.current, col);
+    const id = dragId.current;
+    // Optimistic: move card in cache immediately
+    mutate(swrKey, tasks.map(t => t._id === id ? { ...t, column: col } : t), false);
     dragId.current = null;
     setDragOver(null);
-    load();
+    await tasksApi.move(id, col);
+    mutate(swrKey);
   }
 
   function colTasks(col) { return tasks.filter(t => t.column === col); }
@@ -159,7 +161,7 @@ export default function Board() {
 
         {/* Kanban board */}
         <div className="kanban-wrapper" style={{ position: 'relative', minHeight: '50vh' }}>
-          {isLoading && (
+          {isLoading && tasks.length === 0 && (
             <div className="intentional-loader" style={{ position: 'absolute', inset: 0, zIndex: 10, background: 'var(--bg)' }}>
               <div className="spinner-large" />
             </div>

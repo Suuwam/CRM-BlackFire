@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import { templatesApi, clientsApi } from '../api';
+import { useState } from 'react';
+import useSWR, { mutate } from 'swr';
+import { templatesApi, clientsApi, fetcher } from '../api';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 
@@ -17,8 +18,6 @@ function substitute(text, client) {
 }
 
 export default function Email() {
-  const [templates, setTemplates] = useState([]);
-  const [clients, setClients]     = useState([]);
   const [selTpl, setSelTpl]       = useState(null);
   const [selClient, setSelClient] = useState('');
   const [modal, setModal]         = useState(false);
@@ -26,13 +25,11 @@ export default function Email() {
   const [editing, setEditing]     = useState(null);
   const toast = useToast();
 
-  async function load() {
-    const [t, c] = await Promise.all([templatesApi.list(), clientsApi.list()]);
-    setTemplates(t.data);
-    setClients(c.data);
-    if (!selTpl && t.data.length > 0) setSelTpl(t.data[0]);
-  }
-  useEffect(() => { load(); }, []);
+  const { data: templates = [] } = useSWR('/templates', fetcher, {
+    revalidateOnFocus: false,
+    onSuccess: (data) => { if (!selTpl && data.length > 0) setSelTpl(data[0]); }
+  });
+  const { data: clients = [] } = useSWR('/clients', fetcher, { revalidateOnFocus: false });
 
   function openAdd()  { setForm(EMPTY_TPL); setEditing(null); setModal(true); }
   function openEdit() { if(!selTpl) return; setForm({name:selTpl.name,subject:selTpl.subject,body:selTpl.body}); setEditing(selTpl._id); setModal(true); }
@@ -40,18 +37,25 @@ export default function Email() {
   async function save() {
     if (!form.name.trim()) return toast('Name required', 'error');
     try {
-      if (editing) { const r = await templatesApi.update(editing, form); setSelTpl(r.data); }
-      else         { const r = await templatesApi.create(form); setSelTpl(r.data); }
-      toast('Saved', 'success'); setModal(false); load();
+      if (editing) {
+        const r = await templatesApi.update(editing, form);
+        setSelTpl(r.data);
+      } else {
+        const r = await templatesApi.create(form);
+        setSelTpl(r.data);
+      }
+      toast('Saved', 'success'); setModal(false);
+      mutate('/templates');
     } catch { toast('Error', 'error'); }
   }
 
   async function del() {
     if (!selTpl) return;
-    await templatesApi.delete(selTpl._id);
+    mutate('/templates', templates.filter(t => t._id !== selTpl._id), false);
     setSelTpl(null);
     toast('Template deleted', 'info');
-    load();
+    await templatesApi.delete(selTpl._id);
+    mutate('/templates');
   }
 
   function insertToken(token) {

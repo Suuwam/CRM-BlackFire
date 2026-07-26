@@ -1,12 +1,12 @@
-import { useEffect, useState, useRef } from 'react';
-import { clientsApi } from '../api';
+import { useState, useRef } from 'react';
+import useSWR, { mutate } from 'swr';
+import { clientsApi, fetcher } from '../api';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 
 const EMPTY = { name: '', company: '', email: '', phone: '', status: 'Active', project: '', notes: '' };
 
 export default function Clients() {
-  const [clients, setClients] = useState([]);
   const [search, setSearch]   = useState('');
   const [filter, setFilter]   = useState('All');
   const [modal, setModal]     = useState(false);
@@ -16,11 +16,7 @@ export default function Clients() {
   const toast = useToast();
   const photoRef = useRef();
 
-  async function load() {
-    const r = await clientsApi.list();
-    setClients(r.data);
-  }
-  useEffect(() => { load(); }, []);
+  const { data: clients = [] } = useSWR('/clients', fetcher, { revalidateOnFocus: false });
 
   function openAdd() { setForm(EMPTY); setEditing(null); setModal(true); }
   function openEdit(c) { setForm({ name:c.name,company:c.company,email:c.email,phone:c.phone,status:c.status,project:c.project,notes:c.notes }); setEditing(c._id); setModal(true); }
@@ -32,26 +28,34 @@ export default function Clients() {
     if (!form.name.trim()) return toast('Name is required', 'error');
     setSaving(true);
     try {
-      if (editing) { await clientsApi.update(editing, form); toast('Client updated', 'success'); }
-      else         { await clientsApi.create(form); toast('Client added', 'success'); }
-      setModal(false); load();
-    } catch { toast('Error saving client', 'error'); }
+      if (editing) {
+        mutate('/clients', clients.map(c => c._id === editing ? { ...c, ...form } : c), false);
+        await clientsApi.update(editing, form);
+        toast('Client updated', 'success');
+      } else {
+        const res = await clientsApi.create(form);
+        mutate('/clients', [...clients, res.data], false);
+        toast('Client added', 'success');
+      }
+      setModal(false);
+      mutate('/clients');
+    } catch { toast('Error saving client', 'error'); mutate('/clients'); }
     finally { setSaving(false); }
   }
 
   async function del(id) {
-    await clientsApi.delete(id);
+    mutate('/clients', clients.filter(c => c._id !== id), false);
     toast('Client deleted', 'info');
-    load();
     if (detail?._id === id) setDetail(null);
+    await clientsApi.delete(id);
+    mutate('/clients');
   }
 
   async function uploadPhoto(clientId, file) {
     try {
       await clientsApi.uploadPhoto(clientId, file);
       toast('Photo updated', 'success');
-      load();
-      if (detail) setDetail(c => clients.find(x => x._id === clientId) || c);
+      mutate('/clients');
     } catch { toast('Upload failed', 'error'); }
   }
 
@@ -144,7 +148,7 @@ export default function Clients() {
           <>
             <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:4 }}>
               <div className="avatar" style={{ width:52, height:52, fontSize:18 }}>
-                {detail.photo ? <img src={`/uploads/${detail.photo}`} alt={detail.name} /> : initials(detail.name)}
+                {detail.photo ? <img src={detail.photo.startsWith('data:') || detail.photo.startsWith('http') ? detail.photo : `/uploads/${detail.photo}`} alt={detail.name} /> : initials(detail.name)}
               </div>
               <div>
                 <div style={{ fontSize:16, fontWeight:650 }}>{detail.name}</div>

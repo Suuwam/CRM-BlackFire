@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
-import { referencesApi } from '../api';
+import { useState } from 'react';
+import useSWR, { mutate } from 'swr';
+import { referencesApi, fetcher } from '../api';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 
 const EMPTY = { title:'', url:'', description:'', image:'', tags:'', notes:'', category:'General' };
 
 export default function References() {
-  const [refs, setRefs]             = useState([]);
   const [search, setSearch]         = useState('');
   const [tagFilter, setTagFilter]   = useState('');
   const [modal, setModal]           = useState(false);
@@ -16,8 +16,7 @@ export default function References() {
   const [saving, setSaving]         = useState(false);
   const toast = useToast();
 
-  async function load() { const r = await referencesApi.list(); setRefs(r.data); }
-  useEffect(() => { load(); }, []);
+  const { data: refs = [] } = useSWR('/references', fetcher, { revalidateOnFocus: false });
 
   function openAdd()   { setForm(EMPTY); setEditing(null); setModal(true); }
   function openEdit(r) {
@@ -67,17 +66,24 @@ export default function References() {
     };
     setSaving(true);
     try {
-      if (editing) await referencesApi.update(editing, data);
-      else         await referencesApi.create(data);
-      toast('Reference saved', 'success'); setModal(false); load();
-    } catch { toast('Error saving reference', 'error'); }
+      if (editing) {
+        mutate('/references', refs.map(r => r._id === editing ? { ...r, ...data } : r), false);
+        await referencesApi.update(editing, data);
+      } else {
+        const res = await referencesApi.create(data);
+        mutate('/references', [...refs, res.data], false);
+      }
+      toast('Reference saved', 'success'); setModal(false);
+      mutate('/references');
+    } catch { toast('Error saving reference', 'error'); mutate('/references'); }
     finally { setSaving(false); }
   }
 
   async function del(id) {
-    await referencesApi.delete(id);
+    mutate('/references', refs.filter(r => r._id !== id), false);
     toast('Reference deleted', 'info');
-    load();
+    await referencesApi.delete(id);
+    mutate('/references');
   }
 
   const allTags = [...new Set(refs.flatMap(r => r.tags || []))].sort();
