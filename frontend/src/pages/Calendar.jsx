@@ -182,6 +182,18 @@ export default function Calendar() {
     mutate(eventsKey);
   }
 
+  async function changeEventStatus(id, newStatus) {
+    mutate(eventsKey, events.map(e => e._id === id ? { ...e, status: newStatus } : e), false);
+    toast(`Event marked as ${newStatus}`, 'success');
+    try {
+      await eventsApi.update(id, { status: newStatus });
+      mutate(eventsKey);
+    } catch {
+      toast('Failed to update status', 'error');
+      mutate(eventsKey);
+    }
+  }
+
   async function handleDirectUpload(eventId, file) {
     try {
       await eventsApi.uploadImage(eventId, file);
@@ -383,7 +395,7 @@ export default function Calendar() {
                           {ev.clientId.name}
                         </span>
                       )}
-                      <span className="cal-ev-status" style={{ background: c.bg, color: c.text }}>{ev.status}</span>
+                      <span className={`cal-ev-status ${ev.status === 'done' ? 'status-done' : ev.status === 'cancelled' ? 'status-cancelled' : ''}`} style={ev.status === 'scheduled' ? { background: c.bg, color: c.text } : {}}>{ev.status}</span>
                       {ev.date < todayStr && ev.status !== 'done' && ev.status !== 'cancelled' && (
                         <span className="cal-ev-status" style={{ background: '#fef2f2', color: '#991b1b', marginLeft: 6, border: '1px solid #f87171' }}>Overdue</span>
                       )}
@@ -392,6 +404,12 @@ export default function Calendar() {
                     {ev.notes && <div className="cal-ev-notes">{ev.notes}</div>}
 
                     <div className="cal-ev-actions">
+                      {ev.status !== 'done' && (
+                        <button className="cal-ev-action-btn" onClick={() => changeEventStatus(ev._id, 'done')} style={{ color: '#10b981' }}>Mark Done</button>
+                      )}
+                      {ev.status !== 'cancelled' && (
+                        <button className="cal-ev-action-btn" onClick={() => changeEventStatus(ev._id, 'cancelled')}>Cancel</button>
+                      )}
                       <label className="cal-ev-action-btn" title="Add picture">
                         {ev.image ? 'Change Photo' : 'Cover'}
                         <input type="file" accept="image/*" style={{ display:'none' }}

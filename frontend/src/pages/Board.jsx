@@ -14,6 +14,7 @@ const COLUMNS = [
   { id: 'inprogress', label: 'In Progress' },
   { id: 'qa',         label: 'QA / Review' },
   { id: 'done',       label: 'Done' },
+  { id: 'cancelled',  label: 'Cancelled' },
 ];
 
 const COLORS = [
@@ -53,6 +54,7 @@ export default function Board() {
   const [form, setForm]       = useState(EMPTY_TASK);
   const [editCol, setEditCol] = useState('backlog');
   const [editing, setEditing] = useState(null);
+  const [viewingTask, setViewingTask] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const dragId = useRef(null);
   const toast = useToast();
@@ -132,6 +134,21 @@ export default function Board() {
     await tasksApi.delete(id);
     mutate(swrKey);
   }
+
+  async function updateTaskColumn(id, col) {
+    mutate(swrKey, tasks.map(t => t._id === id ? { ...t, column: col } : t), false);
+    toast(col === 'done' ? 'Task marked as done' : 'Task cancelled', 'success');
+    try {
+      await tasksApi.move(id, col);
+      mutate(swrKey);
+    } catch {
+      toast('Error updating task', 'error');
+      mutate(swrKey);
+    }
+  }
+
+  function markTaskDone(id) { updateTaskColumn(id, 'done'); }
+  function cancelTask(id) { updateTaskColumn(id, 'cancelled'); }
 
   async function handleCardPhotoUpload(taskId, file) {
     try {
@@ -223,7 +240,7 @@ export default function Board() {
                 >
                   {ct.map(t => (
                     <div key={t._id} className={`k-card card-color-${t.color || 'blue'}`} draggable
-                      onDragStart={() => onDragStart(t._id)}>
+                      onDragStart={() => onDragStart(t._id)} onClick={() => setViewingTask(t)}>
 
                       {/* Display Task Cover Picture */}
                       {t.image && (
@@ -250,14 +267,16 @@ export default function Board() {
                         </div>
                         <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4 }}>
                           <span className={`text-sm priority-${t.priority}`} style={{ fontWeight:600, textTransform:'capitalize' }}>{t.priority}</span>
-                          <div style={{ display:'flex', gap:4 }}>
-                            <label className="cal-ev-action-btn" style={{ fontSize:10.5, padding:'3px 6px', cursor:'pointer' }} title="Upload card image">
+                          <div style={{ display:'flex', gap:4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            {t.column !== 'done' && <button className="cal-ev-action-btn" style={{ fontSize:10.5, padding:'3px 6px', color: '#10b981' }} onClick={(e) => { e.stopPropagation(); markTaskDone(t._id); }}>Done</button>}
+                            {t.column !== 'cancelled' && <button className="cal-ev-action-btn" style={{ fontSize:10.5, padding:'3px 6px' }} onClick={(e) => { e.stopPropagation(); cancelTask(t._id); }}>Cancel</button>}
+                            <label className="cal-ev-action-btn" style={{ fontSize:10.5, padding:'3px 6px', cursor:'pointer' }} title="Upload card image" onClick={e => e.stopPropagation()}>
                               Cover
                               <input type="file" accept="image/*" style={{ display:'none' }}
                                 onChange={e => { if (e.target.files[0]) handleCardPhotoUpload(t._id, e.target.files[0]); }} />
                             </label>
-                            <button className="cal-ev-action-btn" style={{ fontSize:10.5, padding:'3px 6px' }} onClick={() => openEdit(t)}>Edit</button>
-                            <button className="cal-ev-action-btn cal-ev-action-btn--danger" style={{ fontSize:10.5, padding:'3px 6px' }} onClick={() => del(t._id)}>Delete</button>
+                            <button className="cal-ev-action-btn" style={{ fontSize:10.5, padding:'3px 6px' }} onClick={(e) => { e.stopPropagation(); openEdit(t); }}>Edit</button>
+                            <button className="cal-ev-action-btn cal-ev-action-btn--danger" style={{ fontSize:10.5, padding:'3px 6px' }} onClick={(e) => { e.stopPropagation(); del(t._id); }}>Delete</button>
                           </div>
                         </div>
                       </div>
@@ -313,6 +332,50 @@ export default function Board() {
           <div className="form-group"><label>Tags (comma separated)</label><input value={form.tags} onChange={e => setForm(f=>({...f,tags:e.target.value}))} placeholder="bug, feature, audio" /></div>
           <div className="form-group"><label>Card Cover Picture</label><input type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0] || null)} /></div>
         </div>
+      </Modal>
+
+      <Modal open={!!viewingTask} onClose={() => setViewingTask(null)} title="Task Details" footer={<button className="btn btn-secondary" onClick={() => setViewingTask(null)}>Close</button>}>
+        {viewingTask && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {viewingTask.image && (
+              <img src={viewingTask.image.startsWith('data:') || viewingTask.image.startsWith('http') ? viewingTask.image : `/uploads/${viewingTask.image}`} alt={viewingTask.title} style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 8, marginBottom: 8 }} />
+            )}
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)' }}>Title</label>
+              <div style={{ fontSize: 16, fontWeight: 600 }}>{viewingTask.title}</div>
+            </div>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)' }}>Description</label>
+              <div style={{ fontSize: 14, whiteSpace: 'pre-wrap' }}>{viewingTask.description || 'No description provided.'}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)' }}>Priority</label>
+                <div style={{ fontSize: 13, textTransform: 'capitalize' }} className={`priority-${viewingTask.priority}`}>{viewingTask.priority}</div>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)' }}>Column</label>
+                <div style={{ fontSize: 13 }}>{COLUMNS.find(c => c.id === viewingTask.column)?.label || viewingTask.column}</div>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)' }}>Assignee</label>
+                <div style={{ fontSize: 13 }}>{viewingTask.assignee || 'Unassigned'}</div>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)' }}>Due Date</label>
+                <div style={{ fontSize: 13 }}>{viewingTask.dueDate || 'None'}</div>
+              </div>
+            </div>
+            {viewingTask.tags && viewingTask.tags.length > 0 && (
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)' }}>Tags</label>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                  {viewingTask.tags.map(tg => <span key={tg} className="k-tag">{tg}</span>)}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
     </>
   );
