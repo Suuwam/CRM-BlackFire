@@ -107,6 +107,12 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
 .toast.success { background: #15803d; }
 .toast.error   { background: #dc2626; }
 
+/* Overdue badge */
+.overdue-badge { background: #fef2f2; color: #991b1b; font-weight: 600; padding: 2px 6px; border-radius: 12px; margin-left: 6px; }
+
+/* Overdue stat card */
+.stat-card--overdue { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 20px 22px; box-shadow: 0 0 0 2px #fef2f2; }
+
 /* Stats grid */
 .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
 .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 20px 22px; transition: all var(--transition); }

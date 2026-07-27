@@ -241,7 +241,11 @@ export default function Board() {
                           </div>
                           <div style={{ display:'flex', gap:8, fontSize:11 }}>
                             {t.assignee && <span className="text-muted" style={{ fontWeight: 500 }}>By: {t.assignee}</span>}
-                            {t.dueDate  && <span className="text-muted" style={{ fontWeight: 500 }}>Due: {t.dueDate}</span>}
+                            {t.dueDate  && (
+                              <span className="text-muted" style={{ fontWeight: 500, color: t.dueDate < new Date().toISOString().slice(0, 10) && t.column !== 'done' ? '#ef4444' : undefined }}>
+                                Due: {t.dueDate} {t.dueDate < new Date().toISOString().slice(0, 10) && t.column !== 'done' && <strong style={{color: '#ef4444'}}>(Overdue)</strong>}
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4 }}>

@@ -17,6 +17,16 @@ export default function Dashboard() {
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 6);
 
+  // Overdue: past-date events not done/cancelled
+  const overdueEvents = allEvents
+    .filter(e => e.date < today && e.status !== 'done' && e.status !== 'cancelled')
+    .sort((a, b) => a.date.localeCompare(b.date));
+  // Overdue: past-dueDate tasks not in done column
+  const overdueTasks = tasks
+    .filter(t => t.dueDate && t.dueDate < today && t.column !== 'done')
+    .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+  const totalOverdue = overdueEvents.length + overdueTasks.length;
+
   const active   = clients.filter(c => c.status === 'Active').length;
   const prospect = clients.filter(c => c.status === 'Prospect').length;
   const inProgress = tasks.filter(t => t.column === 'inprogress').length;
@@ -58,6 +68,13 @@ export default function Dashboard() {
             <div className="stat-value">{completed}</div>
             <div className="stat-sub">All products</div>
           </div>
+          {totalOverdue > 0 && (
+            <div className="stat-card stat-card--overdue">
+              <div className="stat-label">Overdue Items</div>
+              <div className="stat-value" style={{ color: '#ef4444' }}>{totalOverdue}</div>
+              <div className="stat-sub">{overdueEvents.length} event{overdueEvents.length !== 1 ? 's' : ''} · {overdueTasks.length} task{overdueTasks.length !== 1 ? 's' : ''}</div>
+            </div>
+          )}
         </div>
 
         <div style={{ marginTop: 24 }}>
@@ -87,6 +104,42 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
+
+          {/* Overdue Items */}
+          {totalOverdue > 0 && (
+            <div style={{ marginTop: 24 }}>
+              <div className="section-title" style={{ color: '#ef4444' }}>⚠ Overdue Items</div>
+              <div className="upcoming-list">
+                {overdueEvents.map(ev => (
+                  <div key={ev._id} className="upcoming-item overdue-item">
+                    <div className="up-dot" style={{ background: '#ef4444' }} />
+                    <div className="up-info">
+                      <div className="up-title">{ev.title}</div>
+                      <div className="up-meta">
+                        {ev.clientId?.name && <span>{ev.clientId.name}</span>}
+                        <span className="overdue-badge">Overdue</span>
+                      </div>
+                    </div>
+                    <div className="up-date" style={{ color: '#ef4444' }}>{fmtDate(ev.date)}</div>
+                  </div>
+                ))}
+                {overdueTasks.map(t => (
+                  <div key={t._id} className="upcoming-item overdue-item">
+                    <div className="up-dot" style={{ background: '#ef4444' }} />
+                    <div className="up-info">
+                      <div className="up-title">{t.title}</div>
+                      <div className="up-meta">
+                        <span>Task</span>
+                        {t.assignee && <span>{t.assignee}</span>}
+                        <span className="overdue-badge">Overdue</span>
+                      </div>
+                    </div>
+                    <div className="up-date" style={{ color: '#ef4444' }}>{fmtDate(t.dueDate)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>

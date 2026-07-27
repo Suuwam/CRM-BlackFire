@@ -384,6 +384,9 @@ export default function Calendar() {
                         </span>
                       )}
                       <span className="cal-ev-status" style={{ background: c.bg, color: c.text }}>{ev.status}</span>
+                      {ev.date < todayStr && ev.status !== 'done' && ev.status !== 'cancelled' && (
+                        <span className="cal-ev-status" style={{ background: '#fef2f2', color: '#991b1b', marginLeft: 6, border: '1px solid #f87171' }}>Overdue</span>
+                      )}
                     </div>
 
                     {ev.notes && <div className="cal-ev-notes">{ev.notes}</div>}
