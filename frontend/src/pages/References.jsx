@@ -181,8 +181,8 @@ export default function References() {
               <div className="ref-foot">
                 <a href={r.url.startsWith('http') ? r.url : 'https://' + r.url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-secondary">↗ Open Link</a>
                 <button className="btn btn-sm btn-ghost" onClick={() => { navigator.clipboard.writeText(r.url); toast('Copied URL!', 'success'); }} title="Copy link">📋</button>
-                <button className="btn btn-sm btn-ghost" onClick={() => openEdit(r)} title="Edit link">✏️</button>
-                <button className="btn btn-sm btn-ghost" onClick={() => del(r._id)} title="Delete link">🗑</button>
+                <button className="btn btn-sm btn-secondary" onClick={() => openEdit(r)} title="Edit link">Edit</button>
+                <button className="btn btn-sm btn-danger" onClick={() => del(r._id)} title="Delete link">Delete</button>
               </div>
             </div>
           ))}

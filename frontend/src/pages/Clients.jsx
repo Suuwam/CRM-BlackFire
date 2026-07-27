@@ -30,6 +30,7 @@ export default function Clients() {
   const [detail, setDetail]   = useState(null);
   const [form, setForm]       = useState(EMPTY);
   const [editing, setEditing] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
   const toast = useToast();
   const photoRef = useRef();
 
@@ -43,19 +44,19 @@ export default function Clients() {
   function openAdd() {
     const draft = loadClientDraft(null);
     if (draft && draft.form.name.trim()) {
-      setForm(draft.form); setEditing(null); setModal(true);
+      setForm(draft.form); setEditing(null); setImageFile(null); setModal(true);
       toast('Restored unsaved draft', 'info');
     } else {
-      setForm(EMPTY); setEditing(null); setModal(true);
+      setForm(EMPTY); setEditing(null); setImageFile(null); setModal(true);
     }
   }
   function openEdit(c) {
     const draft = loadClientDraft(c._id);
     if (draft && draft.form.name.trim()) {
-      setForm(draft.form); setEditing(c._id); setModal(true);
+      setForm(draft.form); setEditing(c._id); setImageFile(null); setModal(true);
       toast('Restored unsaved edits', 'info');
     } else {
-      setForm({ name:c.name,company:c.company,email:c.email,phone:c.phone,status:c.status,project:c.project,notes:c.notes }); setEditing(c._id); setModal(true);
+      setForm({ name:c.name,company:c.company,email:c.email,phone:c.phone,status:c.status,project:c.project,notes:c.notes }); setEditing(c._id); setImageFile(null); setModal(true);
     }
   }
 
@@ -66,17 +67,26 @@ export default function Clients() {
     if (!form.name.trim()) return toast('Name is required', 'error');
     setSaving(true);
     try {
+      let savedClient;
       if (editing) {
         mutate('/clients', clients.map(c => c._id === editing ? { ...c, ...form } : c), false);
-        await clientsApi.update(editing, form);
+        const res = await clientsApi.update(editing, form);
+        savedClient = res.data;
         toast('Client updated', 'success');
       } else {
         const res = await clientsApi.create(form);
-        mutate('/clients', [...clients, res.data], false);
+        savedClient = res.data;
+        mutate('/clients', [...clients, savedClient], false);
         toast('Client added', 'success');
       }
+
+      if (imageFile && savedClient?._id) {
+        await clientsApi.uploadPhoto(savedClient._id, imageFile);
+      }
+
       clearClientDraft(editing);
       setModal(false);
+      setImageFile(null);
       mutate('/clients');
     } catch { toast('Error saving client', 'error'); mutate('/clients'); }
     finally { setSaving(false); }
@@ -144,8 +154,8 @@ export default function Clients() {
               <div className="client-foot">
                 <span className={`tag status-${c.status}`}>{c.status}</span>
                 <div style={{ display:'flex', gap:4 }}>
-                  <button className="btn-icon btn-sm" onClick={e => { e.stopPropagation(); openEdit(c); }}>✏️</button>
-                  <button className="btn-icon btn-sm" onClick={e => { e.stopPropagation(); del(c._id); }}>🗑</button>
+                  <button className="btn btn-sm btn-secondary" onClick={e => { e.stopPropagation(); openEdit(c); }}>Edit</button>
+                  <button className="btn btn-sm btn-danger" onClick={e => { e.stopPropagation(); del(c._id); }}>Delete</button>
                 </div>
               </div>
             </div>
@@ -178,6 +188,7 @@ export default function Clients() {
           <div className="form-group"><label>Project</label><input value={form.project} onChange={e => setForm(f => ({...f, project:e.target.value}))} placeholder="Current project" /></div>
         </div>
         <div className="form-group"><label>Notes</label><textarea value={form.notes} onChange={e => setForm(f => ({...f, notes:e.target.value}))} placeholder="Any notes about this client..." /></div>
+        <div className="form-group"><label>Upload Image (optional)</label><input type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0] || null)} /></div>
       </Modal>
 
       {/* Detail Modal */}
