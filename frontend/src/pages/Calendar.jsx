@@ -403,22 +403,17 @@ export default function Calendar() {
 
                     {ev.notes && <div className="cal-ev-notes">{ev.notes}</div>}
 
-                    <div className="cal-ev-actions">
+                    <div className="cal-ev-actions" style={{ display: 'flex', flexWrap: 'nowrap', gap: 4, width: '100%', overflowX: 'auto', paddingBottom: 2 }}>
                       {ev.status !== 'done' && (
-                        <button className="cal-ev-action-btn" onClick={() => changeEventStatus(ev._id, 'done')} style={{ color: '#10b981' }}>Mark Done</button>
+                        <button className="cal-ev-action-btn" onClick={() => changeEventStatus(ev._id, 'done')} style={{ fontSize: 11, padding: '4px 8px', background: '#d1fae5', color: '#065f46', borderColor: '#a7f3d0' }}>Mark Done</button>
                       )}
                       {ev.status !== 'cancelled' && (
-                        <button className="cal-ev-action-btn" onClick={() => changeEventStatus(ev._id, 'cancelled')}>Cancel</button>
+                        <button className="cal-ev-action-btn" onClick={() => changeEventStatus(ev._id, 'cancelled')} style={{ fontSize: 11, padding: '4px 8px', background: '#fef3c7', color: '#92400e', borderColor: '#fde68a' }}>Cancel</button>
                       )}
-                      <label className="cal-ev-action-btn" title="Add picture">
-                        {ev.image ? 'Change Photo' : 'Cover'}
-                        <input type="file" accept="image/*" style={{ display:'none' }}
-                          onChange={e => { if (e.target.files[0]) handleDirectUpload(ev._id, e.target.files[0]); }} />
-                      </label>
-                      <button className="cal-ev-action-btn" onClick={() => openEdit(ev)}>
+                      <button className="cal-ev-action-btn" onClick={() => openEdit(ev)} style={{ fontSize: 11, padding: '4px 8px', background: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd' }}>
                         Edit
                       </button>
-                      <button className="cal-ev-action-btn cal-ev-action-btn--danger" onClick={() => del(ev._id)}>
+                      <button className="cal-ev-action-btn" onClick={() => del(ev._id)} style={{ fontSize: 11, padding: '4px 8px', background: '#fee2e2', color: '#991b1b', borderColor: '#fecaca' }}>
                         Delete
                       </button>
                     </div>

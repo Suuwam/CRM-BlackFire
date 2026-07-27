@@ -151,13 +151,7 @@ export default function Board() {
   function markTaskDone(id) { updateTaskColumn(id, 'done'); }
   function cancelTask(id) { updateTaskColumn(id, 'cancelled'); }
 
-  async function handleCardPhotoUpload(taskId, file) {
-    try {
-      await tasksApi.uploadImage(taskId, file);
-      toast('Card cover uploaded', 'success');
-      mutate(swrKey);
-    } catch { toast('Upload failed', 'error'); }
-  }
+
 
   // Drag & Drop
   const [dragOver, setDragOver] = useState(null);
@@ -273,16 +267,11 @@ export default function Board() {
                         </div>
                         <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4 }}>
                           <span className={`text-sm priority-${t.priority}`} style={{ fontWeight:600, textTransform:'capitalize' }}>{t.priority}</span>
-                          <div style={{ display:'flex', gap:4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                            {t.column !== 'done' && <button className="cal-ev-action-btn" style={{ fontSize:10.5, padding:'3px 6px', color: '#10b981' }} onClick={(e) => { e.stopPropagation(); markTaskDone(t._id); }}>Done</button>}
-                            {t.column !== 'cancelled' && <button className="cal-ev-action-btn" style={{ fontSize:10.5, padding:'3px 6px' }} onClick={(e) => { e.stopPropagation(); cancelTask(t._id); }}>Cancel</button>}
-                            <label className="cal-ev-action-btn" style={{ fontSize:10.5, padding:'3px 6px', cursor:'pointer' }} title="Upload card image" onClick={e => e.stopPropagation()}>
-                              Cover
-                              <input type="file" accept="image/*" style={{ display:'none' }}
-                                onChange={e => { if (e.target.files[0]) handleCardPhotoUpload(t._id, e.target.files[0]); }} />
-                            </label>
-                            <button className="cal-ev-action-btn" style={{ fontSize:10.5, padding:'3px 6px' }} onClick={(e) => { e.stopPropagation(); openEdit(t); }}>Edit</button>
-                            <button className="cal-ev-action-btn cal-ev-action-btn--danger" style={{ fontSize:10.5, padding:'3px 6px' }} onClick={(e) => { e.stopPropagation(); del(t._id); }}>Delete</button>
+                          <div style={{ display:'flex', gap:4, flexWrap: 'nowrap', justifyContent: 'flex-end', width: '100%', overflowX: 'auto', paddingBottom: 2 }}>
+                            {t.column !== 'done' && <button className="cal-ev-action-btn" style={{ fontSize:10, padding:'3px 6px', background: '#d1fae5', color: '#065f46', borderColor: '#a7f3d0' }} onClick={(e) => { e.stopPropagation(); markTaskDone(t._id); }}>Done</button>}
+                            {t.column !== 'cancelled' && <button className="cal-ev-action-btn" style={{ fontSize:10, padding:'3px 6px', background: '#fef3c7', color: '#92400e', borderColor: '#fde68a' }} onClick={(e) => { e.stopPropagation(); cancelTask(t._id); }}>Cancel</button>}
+                            <button className="cal-ev-action-btn" style={{ fontSize:10, padding:'3px 6px', background: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd' }} onClick={(e) => { e.stopPropagation(); openEdit(t); }}>Edit</button>
+                            <button className="cal-ev-action-btn" style={{ fontSize:10, padding:'3px 6px', background: '#fee2e2', color: '#991b1b', borderColor: '#fecaca' }} onClick={(e) => { e.stopPropagation(); del(t._id); }}>Delete</button>
                           </div>
                         </div>
                       </div>
