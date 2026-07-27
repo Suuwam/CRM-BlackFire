@@ -19,6 +19,14 @@ export default function Sidebar({ onLogout, routeLoading }) {
         <div className="name">Blackfire AI</div>
         <div className="sub">Product Platform Engine</div>
         <span className="sb-badge">Engine</span>
+        <button 
+          onClick={() => {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+          }}
+          style={{ display: 'block', marginTop: 16, padding: '6px 8px', fontSize: 11, fontWeight: 600, background: 'var(--surface2)', borderRadius: 6, color: 'var(--text)', border: '1px solid var(--border)', cursor: 'pointer', width: '100%', textAlign: 'center', transition: 'all 0.2s' }}>
+          Toggle Dark Mode
+        </button>
       </div>
 
       <nav className="sb-nav">
