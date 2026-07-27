@@ -251,12 +251,12 @@ export default function Board() {
 
                       <div className="k-card-title">{t.title}</div>
                       {t.description && <div className="k-card-desc">{t.description}</div>}
-                      <div className="k-card-foot">
+                      <div className="k-card-foot" style={{ alignItems: 'flex-start' }}>
                         <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
                           <div className="k-card-tags">
                             {(t.tags||[]).map(tg => <span key={tg} className="k-tag" style={isAawazz ? { background: '#eff6ff', color: '#1d4ed8' } : {}}>{tg}</span>)}
                           </div>
-                          <div style={{ display:'flex', gap:8, fontSize:11 }}>
+                          <div style={{ display:'flex', gap:8, fontSize:11, flexWrap: 'wrap' }}>
                             {t.assignee && <span className="text-muted" style={{ fontWeight: 500 }}>By: {t.assignee}</span>}
                             {t.dueDate  && (
                               <span className="text-muted" style={{ fontWeight: 500, color: t.dueDate < new Date().toISOString().slice(0, 10) && t.column !== 'done' ? '#ef4444' : undefined }}>
@@ -265,15 +265,15 @@ export default function Board() {
                             )}
                           </div>
                         </div>
-                        <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4 }}>
+                        <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink: 0, marginLeft: 8 }}>
                           <span className={`text-sm priority-${t.priority}`} style={{ fontWeight:600, textTransform:'capitalize' }}>{t.priority}</span>
-                          <div style={{ display:'flex', gap:4, flexWrap: 'nowrap', justifyContent: 'flex-end', width: '100%', overflowX: 'auto', paddingBottom: 2 }}>
-                            {t.column !== 'done' && <button className="cal-ev-action-btn" style={{ fontSize:10, padding:'3px 6px', background: '#d1fae5', color: '#065f46', borderColor: '#a7f3d0' }} onClick={(e) => { e.stopPropagation(); markTaskDone(t._id); }}>Done</button>}
-                            {t.column !== 'cancelled' && <button className="cal-ev-action-btn" style={{ fontSize:10, padding:'3px 6px', background: '#fef3c7', color: '#92400e', borderColor: '#fde68a' }} onClick={(e) => { e.stopPropagation(); cancelTask(t._id); }}>Cancel</button>}
-                            <button className="cal-ev-action-btn" style={{ fontSize:10, padding:'3px 6px', background: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd' }} onClick={(e) => { e.stopPropagation(); openEdit(t); }}>Edit</button>
-                            <button className="cal-ev-action-btn" style={{ fontSize:10, padding:'3px 6px', background: '#fee2e2', color: '#991b1b', borderColor: '#fecaca' }} onClick={(e) => { e.stopPropagation(); del(t._id); }}>Delete</button>
-                          </div>
                         </div>
+                      </div>
+                      <div style={{ display:'flex', gap:4, flexWrap: 'nowrap', marginTop: 10, paddingBottom: 2, overflowX: 'auto' }}>
+                        {t.column !== 'done' && <button className="cal-ev-action-btn" style={{ fontSize:10, padding:'3px 6px', background: '#d1fae5', color: '#065f46', borderColor: '#a7f3d0' }} onClick={(e) => { e.stopPropagation(); markTaskDone(t._id); }}>Done</button>}
+                        {t.column !== 'cancelled' && <button className="cal-ev-action-btn" style={{ fontSize:10, padding:'3px 6px', background: '#fef3c7', color: '#92400e', borderColor: '#fde68a' }} onClick={(e) => { e.stopPropagation(); cancelTask(t._id); }}>Cancel</button>}
+                        <button className="cal-ev-action-btn" style={{ fontSize:10, padding:'3px 6px', background: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd' }} onClick={(e) => { e.stopPropagation(); openEdit(t); }}>Edit</button>
+                        <button className="cal-ev-action-btn" style={{ fontSize:10, padding:'3px 6px', background: '#fee2e2', color: '#991b1b', borderColor: '#fecaca' }} onClick={(e) => { e.stopPropagation(); del(t._id); }}>Delete</button>
                       </div>
                     </div>
                   ))}
