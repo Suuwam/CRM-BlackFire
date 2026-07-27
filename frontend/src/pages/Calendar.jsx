@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import useSWR, { mutate } from 'swr';
 import { eventsApi, clientsApi, fetcher } from '../api';
 import Modal from '../components/Modal';
@@ -23,6 +23,23 @@ const COLOR_MAP = COLORS.reduce((acc, c) => ({ ...acc, [c.id]: c }), {});
 
 const EMPTY_EV = { title:'', date:'', time:'', clientId:'', notes:'', color:'blue', platforms:[], status:'scheduled' };
 
+// --- Draft cache helpers for Calendar events ---
+const CAL_DRAFT_PREFIX = 'crm_cal_draft_';
+function getCalDraftKey(id) { return CAL_DRAFT_PREFIX + (id || 'new'); }
+function saveCalDraft(id, formData) {
+  try { sessionStorage.setItem(getCalDraftKey(id), JSON.stringify({ form: formData, ts: Date.now() })); } catch {}
+}
+function loadCalDraft(id) {
+  try {
+    const raw = sessionStorage.getItem(getCalDraftKey(id));
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (Date.now() - d.ts > 86400000) { sessionStorage.removeItem(getCalDraftKey(id)); return null; }
+    return d;
+  } catch { return null; }
+}
+function clearCalDraft(id) { try { sessionStorage.removeItem(getCalDraftKey(id)); } catch {} }
+
 export default function Calendar() {
   const today = new Date();
   const [year, setYear]   = useState(today.getFullYear());
@@ -39,6 +56,11 @@ export default function Calendar() {
   const eventsKey = `/events?month=${year}-${pad}`;
   const { data: events = [] } = useSWR(eventsKey, fetcher, { keepPreviousData: true, revalidateOnFocus: false });
   const { data: clients = [] } = useSWR('/clients', fetcher, { revalidateOnFocus: false });
+
+  // Auto-save form to sessionStorage while modal is open
+  useEffect(() => {
+    if (modal) saveCalDraft(editing, form);
+  }, [modal, form, editing]);
 
   function prevMonth() { if (month === 0) { setMonth(11); setYear(y => y-1); } else setMonth(m => m-1); }
   function nextMonth() { if (month === 11) { setMonth(0); setYear(y => y+1); } else setMonth(m => m+1); }
@@ -75,25 +97,37 @@ export default function Calendar() {
   const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
 
   function openAdd(dateS) {
-    setForm({ ...EMPTY_EV, date: dateS });
-    setEditing(null);
-    setImageFile(null);
-    setModal(true);
+    const draft = loadCalDraft(null);
+    if (draft && draft.form.title.trim()) {
+      setForm(draft.form); setEditing(null); setImageFile(null); setModal(true);
+      toast('Restored unsaved draft', 'info');
+    } else {
+      setForm({ ...EMPTY_EV, date: dateS });
+      setEditing(null);
+      setImageFile(null);
+      setModal(true);
+    }
   }
   function openEdit(ev) {
-    setForm({
-      title: ev.title,
-      date: ev.date,
-      time: ev.time||'',
-      clientId: ev.clientId?._id||ev.clientId||'',
-      notes: ev.notes||'',
-      color: ev.color||'blue',
-      platforms: ev.platforms||[],
-      status: ev.status||'scheduled'
-    });
-    setEditing(ev._id);
-    setImageFile(null);
-    setModal(true);
+    const draft = loadCalDraft(ev._id);
+    if (draft && draft.form.title.trim()) {
+      setForm(draft.form); setEditing(ev._id); setImageFile(null); setModal(true);
+      toast('Restored unsaved edits', 'info');
+    } else {
+      setForm({
+        title: ev.title,
+        date: ev.date,
+        time: ev.time||'',
+        clientId: ev.clientId?._id||ev.clientId||'',
+        notes: ev.notes||'',
+        color: ev.color||'blue',
+        platforms: ev.platforms||[],
+        status: ev.status||'scheduled'
+      });
+      setEditing(ev._id);
+      setImageFile(null);
+      setModal(true);
+    }
   }
 
   function togglePlatform(pId) {
@@ -127,6 +161,7 @@ export default function Calendar() {
         await eventsApi.uploadImage(savedEv._id, imageFile);
       }
 
+      clearCalDraft(editing);
       toast('Event saved', 'success');
       setModal(false);
       setImageFile(null);

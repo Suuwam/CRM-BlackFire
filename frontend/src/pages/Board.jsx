@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import useSWR, { mutate } from 'swr';
 import { tasksApi, fetcher } from '../api';
 import Modal from '../components/Modal';
@@ -29,6 +29,24 @@ const COLORS = [
 
 const EMPTY_TASK = { title:'', description:'', priority:'medium', color:'blue', tags:'', assignee:'', dueDate:'' };
 
+// --- Draft cache helpers for Board tasks ---
+const DRAFT_KEY_PREFIX = 'crm_board_draft_';
+function getDraftKey(taskId) { return DRAFT_KEY_PREFIX + (taskId || 'new'); }
+function saveDraft(taskId, formData, col) {
+  try { sessionStorage.setItem(getDraftKey(taskId), JSON.stringify({ form: formData, col, ts: Date.now() })); } catch {}
+}
+function loadDraft(taskId) {
+  try {
+    const raw = sessionStorage.getItem(getDraftKey(taskId));
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    // Expire drafts older than 24 hours
+    if (Date.now() - d.ts > 86400000) { sessionStorage.removeItem(getDraftKey(taskId)); return null; }
+    return d;
+  } catch { return null; }
+}
+function clearDraft(taskId) { try { sessionStorage.removeItem(getDraftKey(taskId)); } catch {} }
+
 export default function Board() {
   const [project, setProject] = useState('aawazz');
   const [modal, setModal]     = useState(false);
@@ -46,8 +64,29 @@ export default function Board() {
     revalidateOnFocus: false,
   });
 
-  function openAdd(col) { setForm({ ...EMPTY_TASK }); setEditCol(col); setEditing(null); setImageFile(null); setModal(true); }
-  function openEdit(t)  { setForm({ title:t.title, description:t.description||'', priority:t.priority||'medium', color:t.color||'blue', tags:(t.tags||[]).join(', '), assignee:t.assignee||'', dueDate:t.dueDate||'' }); setEditCol(t.column); setEditing(t._id); setImageFile(null); setModal(true); }
+  // Auto-save form to sessionStorage on every change while modal is open
+  useEffect(() => {
+    if (modal) saveDraft(editing, form, editCol);
+  }, [modal, form, editCol, editing]);
+
+  function openAdd(col) {
+    const draft = loadDraft(null);
+    if (draft && draft.form.title.trim()) {
+      setForm(draft.form); setEditCol(draft.col || col); setEditing(null); setImageFile(null); setModal(true);
+      toast('Restored unsaved draft', 'info');
+    } else {
+      setForm({ ...EMPTY_TASK }); setEditCol(col); setEditing(null); setImageFile(null); setModal(true);
+    }
+  }
+  function openEdit(t) {
+    const draft = loadDraft(t._id);
+    if (draft && draft.form.title.trim()) {
+      setForm(draft.form); setEditCol(draft.col || t.column); setEditing(t._id); setImageFile(null); setModal(true);
+      toast('Restored unsaved edits', 'info');
+    } else {
+      setForm({ title:t.title, description:t.description||'', priority:t.priority||'medium', color:t.color||'blue', tags:(t.tags||[]).join(', '), assignee:t.assignee||'', dueDate:t.dueDate||'' }); setEditCol(t.column); setEditing(t._id); setImageFile(null); setModal(true);
+    }
+  }
 
   const [saving, setSaving] = useState(false);
 
@@ -74,7 +113,7 @@ export default function Board() {
         await tasksApi.uploadImage(savedTask._id, imageFile);
       }
 
-      toast('Task saved', 'success'); setModal(false); setImageFile(null);
+      clearDraft(editing); toast('Task saved', 'success'); setModal(false); setImageFile(null);
       mutate(swrKey); // revalidate in background
     } catch (err) { 
       console.error('Task save error:', err); 

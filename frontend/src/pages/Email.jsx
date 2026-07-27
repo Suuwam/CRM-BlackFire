@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import useSWR, { mutate } from 'swr';
 import { templatesApi, clientsApi, fetcher } from '../api';
 import Modal from '../components/Modal';
@@ -6,6 +6,23 @@ import { useToast } from '../components/Toast';
 
 const TOKENS = ['{{name}}','{{company}}','{{email}}','{{phone}}','{{project}}'];
 const EMPTY_TPL = { name:'', subject:'', body:'' };
+
+// --- Draft cache helpers for Email templates ---
+const EMAIL_DRAFT_PREFIX = 'crm_email_draft_';
+function getEmailDraftKey(id) { return EMAIL_DRAFT_PREFIX + (id || 'new'); }
+function saveEmailDraft(id, formData) {
+  try { sessionStorage.setItem(getEmailDraftKey(id), JSON.stringify({ form: formData, ts: Date.now() })); } catch {}
+}
+function loadEmailDraft(id) {
+  try {
+    const raw = sessionStorage.getItem(getEmailDraftKey(id));
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (Date.now() - d.ts > 86400000) { sessionStorage.removeItem(getEmailDraftKey(id)); return null; }
+    return d;
+  } catch { return null; }
+}
+function clearEmailDraft(id) { try { sessionStorage.removeItem(getEmailDraftKey(id)); } catch {} }
 
 function substitute(text, client) {
   if (!client) return text;
@@ -31,8 +48,30 @@ export default function Email() {
   });
   const { data: clients = [] } = useSWR('/clients', fetcher, { revalidateOnFocus: false });
 
-  function openAdd()  { setForm(EMPTY_TPL); setEditing(null); setModal(true); }
-  function openEdit() { if(!selTpl) return; setForm({name:selTpl.name,subject:selTpl.subject,body:selTpl.body}); setEditing(selTpl._id); setModal(true); }
+  // Auto-save form to sessionStorage while modal is open
+  useEffect(() => {
+    if (modal) saveEmailDraft(editing, form);
+  }, [modal, form, editing]);
+
+  function openAdd() {
+    const draft = loadEmailDraft(null);
+    if (draft && draft.form.name.trim()) {
+      setForm(draft.form); setEditing(null); setModal(true);
+      toast('Restored unsaved draft', 'info');
+    } else {
+      setForm(EMPTY_TPL); setEditing(null); setModal(true);
+    }
+  }
+  function openEdit() {
+    if(!selTpl) return;
+    const draft = loadEmailDraft(selTpl._id);
+    if (draft && draft.form.name.trim()) {
+      setForm(draft.form); setEditing(selTpl._id); setModal(true);
+      toast('Restored unsaved edits', 'info');
+    } else {
+      setForm({name:selTpl.name,subject:selTpl.subject,body:selTpl.body}); setEditing(selTpl._id); setModal(true);
+    }
+  }
 
   async function save() {
     if (!form.name.trim()) return toast('Name required', 'error');
@@ -44,6 +83,7 @@ export default function Email() {
         const r = await templatesApi.create(form);
         setSelTpl(r.data);
       }
+      clearEmailDraft(editing);
       toast('Saved', 'success'); setModal(false);
       mutate('/templates');
     } catch { toast('Error', 'error'); }

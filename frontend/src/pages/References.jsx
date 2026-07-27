@@ -1,10 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import useSWR, { mutate } from 'swr';
 import { referencesApi, fetcher } from '../api';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 
 const EMPTY = { title:'', url:'', description:'', image:'', tags:'', notes:'', category:'General' };
+
+// --- Draft cache helpers for References ---
+const REF_DRAFT_PREFIX = 'crm_ref_draft_';
+function getRefDraftKey(id) { return REF_DRAFT_PREFIX + (id || 'new'); }
+function saveRefDraft(id, formData) {
+  try { sessionStorage.setItem(getRefDraftKey(id), JSON.stringify({ form: formData, ts: Date.now() })); } catch {}
+}
+function loadRefDraft(id) {
+  try {
+    const raw = sessionStorage.getItem(getRefDraftKey(id));
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (Date.now() - d.ts > 86400000) { sessionStorage.removeItem(getRefDraftKey(id)); return null; }
+    return d;
+  } catch { return null; }
+}
+function clearRefDraft(id) { try { sessionStorage.removeItem(getRefDraftKey(id)); } catch {} }
 
 export default function References() {
   const [search, setSearch]         = useState('');
@@ -18,19 +35,38 @@ export default function References() {
 
   const { data: refs = [] } = useSWR('/references', fetcher, { revalidateOnFocus: false });
 
-  function openAdd()   { setForm(EMPTY); setEditing(null); setModal(true); }
+  // Auto-save form to sessionStorage while modal is open
+  useEffect(() => {
+    if (modal) saveRefDraft(editing, form);
+  }, [modal, form, editing]);
+
+  function openAdd() {
+    const draft = loadRefDraft(null);
+    if (draft && (draft.form.url.trim() || draft.form.title.trim())) {
+      setForm(draft.form); setEditing(null); setModal(true);
+      toast('Restored unsaved draft', 'info');
+    } else {
+      setForm(EMPTY); setEditing(null); setModal(true);
+    }
+  }
   function openEdit(r) {
-    setForm({
-      title: r.title,
-      url: r.url,
-      description: r.description || '',
-      image: r.image || '',
-      tags: (r.tags||[]).join(', '),
-      notes: r.notes || '',
-      category: r.category || 'General'
-    });
-    setEditing(r._id);
-    setModal(true);
+    const draft = loadRefDraft(r._id);
+    if (draft && (draft.form.url.trim() || draft.form.title.trim())) {
+      setForm(draft.form); setEditing(r._id); setModal(true);
+      toast('Restored unsaved edits', 'info');
+    } else {
+      setForm({
+        title: r.title,
+        url: r.url,
+        description: r.description || '',
+        image: r.image || '',
+        tags: (r.tags||[]).join(', '),
+        notes: r.notes || '',
+        category: r.category || 'General'
+      });
+      setEditing(r._id);
+      setModal(true);
+    }
   }
 
   async function handleScrape() {
@@ -73,6 +109,7 @@ export default function References() {
         const res = await referencesApi.create(data);
         mutate('/references', [...refs, res.data], false);
       }
+      clearRefDraft(editing);
       toast('Reference saved', 'success'); setModal(false);
       mutate('/references');
     } catch { toast('Error saving reference', 'error'); mutate('/references'); }

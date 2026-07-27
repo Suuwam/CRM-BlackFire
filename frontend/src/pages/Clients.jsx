@@ -1,10 +1,27 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import useSWR, { mutate } from 'swr';
 import { clientsApi, fetcher } from '../api';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 
 const EMPTY = { name: '', company: '', email: '', phone: '', status: 'Active', project: '', notes: '' };
+
+// --- Draft cache helpers for Clients ---
+const CLIENT_DRAFT_PREFIX = 'crm_client_draft_';
+function getClientDraftKey(id) { return CLIENT_DRAFT_PREFIX + (id || 'new'); }
+function saveClientDraft(id, formData) {
+  try { sessionStorage.setItem(getClientDraftKey(id), JSON.stringify({ form: formData, ts: Date.now() })); } catch {}
+}
+function loadClientDraft(id) {
+  try {
+    const raw = sessionStorage.getItem(getClientDraftKey(id));
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (Date.now() - d.ts > 86400000) { sessionStorage.removeItem(getClientDraftKey(id)); return null; }
+    return d;
+  } catch { return null; }
+}
+function clearClientDraft(id) { try { sessionStorage.removeItem(getClientDraftKey(id)); } catch {} }
 
 export default function Clients() {
   const [search, setSearch]   = useState('');
@@ -18,8 +35,29 @@ export default function Clients() {
 
   const { data: clients = [] } = useSWR('/clients', fetcher, { revalidateOnFocus: false });
 
-  function openAdd() { setForm(EMPTY); setEditing(null); setModal(true); }
-  function openEdit(c) { setForm({ name:c.name,company:c.company,email:c.email,phone:c.phone,status:c.status,project:c.project,notes:c.notes }); setEditing(c._id); setModal(true); }
+  // Auto-save form to sessionStorage while modal is open
+  useEffect(() => {
+    if (modal) saveClientDraft(editing, form);
+  }, [modal, form, editing]);
+
+  function openAdd() {
+    const draft = loadClientDraft(null);
+    if (draft && draft.form.name.trim()) {
+      setForm(draft.form); setEditing(null); setModal(true);
+      toast('Restored unsaved draft', 'info');
+    } else {
+      setForm(EMPTY); setEditing(null); setModal(true);
+    }
+  }
+  function openEdit(c) {
+    const draft = loadClientDraft(c._id);
+    if (draft && draft.form.name.trim()) {
+      setForm(draft.form); setEditing(c._id); setModal(true);
+      toast('Restored unsaved edits', 'info');
+    } else {
+      setForm({ name:c.name,company:c.company,email:c.email,phone:c.phone,status:c.status,project:c.project,notes:c.notes }); setEditing(c._id); setModal(true);
+    }
+  }
 
   const [saving, setSaving] = useState(false);
 
@@ -37,6 +75,7 @@ export default function Clients() {
         mutate('/clients', [...clients, res.data], false);
         toast('Client added', 'success');
       }
+      clearClientDraft(editing);
       setModal(false);
       mutate('/clients');
     } catch { toast('Error saving client', 'error'); mutate('/clients'); }
