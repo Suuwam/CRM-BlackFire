@@ -470,7 +470,7 @@ export default function Calendar() {
         <div className="form-row">
           <div className="form-group"><label>Client</label>
             <select value={form.clientId} onChange={e => setForm(f=>({...f,clientId:e.target.value}))}>
-              <option value="">— No client —</option>
+              <option value="">No client</option>
               {clients.map(c => <option key={c._id} value={c._id}>{c.name} ({c.company})</option>)}
             </select>
           </div>

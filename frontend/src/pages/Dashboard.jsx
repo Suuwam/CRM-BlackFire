@@ -315,7 +315,7 @@ export default function Dashboard() {
       <div className="page-head">
         <div>
           <h1>Dashboard</h1>
-          <p>Blackfire AI — Product Platform & Venture Engine Overview</p>
+          <p>Blackfire AI, Product Platform & Venture Engine Overview</p>
         </div>
       </div>
       <div className="page-body">

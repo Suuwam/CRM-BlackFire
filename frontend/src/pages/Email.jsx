@@ -145,8 +145,8 @@ export default function Email() {
                 <div className="form-group">
                   <label>Select Client to Fill Variables</label>
                   <select value={selClient} onChange={e => setSelClient(e.target.value)}>
-                    <option value="">— Choose client —</option>
-                    {clients.map(c => <option key={c._id} value={c._id}>{c.name} — {c.company}</option>)}
+                    <option value="">Choose client</option>
+                    {clients.map(c => <option key={c._id} value={c._id}>{c.name} ({c.company})</option>)}
                   </select>
                 </div>
               </div>

@@ -208,10 +208,9 @@ export default function Board() {
                   </svg>
                   Blackfire AI
                 </span>
-                <span className="blackfire-badge">Core Engine & AI Platform</span>
               </div>
               <div className="blackfire-slogan">
-                Blackfire AI — ignite intelligence, <span className="blackfire-highlight">from concept to launch</span>.
+                Blackfire AI, ignite intelligence, <span className="blackfire-highlight">from concept to launch</span>.
               </div>
             </div>
             <div style={{ textAlign:'right', flexShrink:0 }}>
@@ -232,10 +231,9 @@ export default function Board() {
                   </svg>
                   wazz
                 </span>
-                <span className="aawazz-badge">Official SaaS Product</span>
               </div>
               <div className="aawazz-slogan">
-                Aawazz — say it your way, <span className="aawazz-highlight">script to sound</span> made for creators.
+                Aawazz, say it your way, <span className="aawazz-highlight">script to sound</span> made for creators.
               </div>
             </div>
             <div style={{ textAlign:'right', flexShrink:0 }}>

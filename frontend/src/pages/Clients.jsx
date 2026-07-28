@@ -208,10 +208,10 @@ export default function Clients() {
             </div>
             <div className="divider" />
             <div className="form-row">
-              <div><div className="text-muted text-sm">Email</div><div className="text-sm">{detail.email||'—'}</div></div>
-              <div><div className="text-muted text-sm">Phone</div><div className="text-sm">{detail.phone||'—'}</div></div>
+              <div><div className="text-muted text-sm">Email</div><div className="text-sm">{detail.email||'N/A'}</div></div>
+              <div><div className="text-muted text-sm">Phone</div><div className="text-sm">{detail.phone||'N/A'}</div></div>
             </div>
-            <div><div className="text-muted text-sm">Project</div><div className="text-sm">{detail.project||'—'}</div></div>
+            <div><div className="text-muted text-sm">Project</div><div className="text-sm">{detail.project||'N/A'}</div></div>
             {detail.notes && <div><div className="text-muted text-sm">Notes</div><div className="text-sm" style={{ whiteSpace:'pre-wrap' }}>{detail.notes}</div></div>}
           </>
         )}
