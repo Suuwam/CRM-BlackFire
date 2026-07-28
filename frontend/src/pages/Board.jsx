@@ -197,6 +197,29 @@ export default function Board() {
           </button>
         </div>
 
+        {/* Dedicated Blackfire AI Header Banner */}
+        {project === 'blackfire' && (
+          <div className="blackfire-banner">
+            <div>
+              <div className="blackfire-logo-wrap">
+                <span className="blackfire-logo-text">
+                  <svg className="blackfire-flame-svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 23c-4.97 0-9-3.58-9-8 0-3.08 1.87-6.26 4.36-8.8.44-.45 1.18-.13 1.15.5-.1 1.76.35 3.3 1.49 4.3 1.14 1 2.5 1.5 2.5 3 0 1.1-.9 2-2 2 .55 1.1 1.6 2 3 2s2.45-.9 3-2c-1.1 0-2-.9-2-2 0-1.5 1.36-2 2.5-3 1.14-1 1.59-2.54 1.49-4.3-.03-.63.71-.95 1.15-.5C21.13 8.74 23 11.92 23 15c0 4.42-4.03 8-9 8z"/>
+                  </svg>
+                  Blackfire AI
+                </span>
+                <span className="blackfire-badge">Core Engine & AI Platform</span>
+              </div>
+              <div className="blackfire-slogan">
+                Blackfire AI — ignite intelligence, <span className="blackfire-highlight">from concept to launch</span>.
+              </div>
+            </div>
+            <div style={{ textAlign:'right', flexShrink:0 }}>
+              <span className="text-sm" style={{ opacity:.85, fontWeight:550 }}>Venture & AI Engine</span>
+            </div>
+          </div>
+        )}
+
         {/* Dedicated Aawazz Header Banner */}
         {isAawazz && (
           <div className="aawazz-banner">
@@ -249,12 +272,15 @@ export default function Board() {
                         </div>
                       )}
 
-                      <div className="k-card-title">{t.title}</div>
-                      {t.description && <div className="k-card-desc">{t.description}</div>}
+                      <div>
+                        <div className="k-card-title">{t.title}</div>
+                        {t.description && <div className="k-card-desc">{t.description}</div>}
+                      </div>
+
                       <div className="k-card-foot" style={{ alignItems: 'flex-start' }}>
-                        <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                        <div style={{ display:'flex', flexDirection:'column', gap:6, flex:1 }}>
                           <div className="k-card-tags">
-                            {(t.tags||[]).map(tg => <span key={tg} className="k-tag" style={isAawazz ? { background: '#eff6ff', color: '#1d4ed8' } : {}}>{tg}</span>)}
+                            {(t.tags||[]).map(tg => <span key={tg} className="k-tag" style={isAawazz ? { background: '#eff6ff', color: '#1d4ed8', borderColor: '#bfdbfe' } : {}}>{tg}</span>)}
                           </div>
                           <div style={{ display:'flex', gap:8, fontSize:11, flexWrap: 'wrap' }}>
                             {t.assignee && <span className="text-muted" style={{ fontWeight: 500 }}>By: {t.assignee}</span>}
@@ -265,15 +291,16 @@ export default function Board() {
                             )}
                           </div>
                         </div>
-                        <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink: 0, marginLeft: 8 }}>
+                        <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink: 0 }}>
                           <span className={`text-sm priority-${t.priority}`} style={{ fontWeight:600, textTransform:'capitalize' }}>{t.priority}</span>
                         </div>
                       </div>
-                      <div style={{ display:'flex', gap:4, flexWrap: 'nowrap', marginTop: 10, paddingBottom: 2, overflowX: 'auto' }}>
-                        {t.column !== 'done' && <button className="cal-ev-action-btn" style={{ fontSize:10, padding:'3px 6px', background: '#d1fae5', color: '#065f46', borderColor: '#a7f3d0' }} onClick={(e) => { e.stopPropagation(); markTaskDone(t._id); }}>Done</button>}
-                        {t.column !== 'cancelled' && <button className="cal-ev-action-btn" style={{ fontSize:10, padding:'3px 6px', background: '#fef3c7', color: '#92400e', borderColor: '#fde68a' }} onClick={(e) => { e.stopPropagation(); cancelTask(t._id); }}>Cancel</button>}
-                        <button className="cal-ev-action-btn" style={{ fontSize:10, padding:'3px 6px', background: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd' }} onClick={(e) => { e.stopPropagation(); openEdit(t); }}>Edit</button>
-                        <button className="cal-ev-action-btn" style={{ fontSize:10, padding:'3px 6px', background: '#fee2e2', color: '#991b1b', borderColor: '#fecaca' }} onClick={(e) => { e.stopPropagation(); del(t._id); }}>Delete</button>
+
+                      <div className="k-card-actions">
+                        {t.column !== 'done' && <button className="k-card-btn k-card-btn--done" onClick={(e) => { e.stopPropagation(); markTaskDone(t._id); }}>Done</button>}
+                        {t.column !== 'cancelled' && <button className="k-card-btn k-card-btn--cancel" onClick={(e) => { e.stopPropagation(); cancelTask(t._id); }}>Cancel</button>}
+                        <button className="k-card-btn k-card-btn--edit" onClick={(e) => { e.stopPropagation(); openEdit(t); }}>Edit</button>
+                        <button className="k-card-btn k-card-btn--delete" onClick={(e) => { e.stopPropagation(); del(t._id); }}>Delete</button>
                       </div>
                     </div>
                   ))}
