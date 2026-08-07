@@ -103,6 +103,7 @@ router.post('/apply', applyLimiter, async (req, res) => {
     });
 
     // Save application to database (password will be pre-save hashed)
+    const verificationCodeExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes from now
     const application = await AccountApplication.create({
       name,
       email,
@@ -110,6 +111,7 @@ router.post('/apply', applyLimiter, async (req, res) => {
       password,
       note,
       verificationCode,
+      verificationCodeExpiry,
       isEmailVerified: false
     });
 
@@ -123,7 +125,7 @@ router.post('/apply', applyLimiter, async (req, res) => {
         <h2 style="margin:0 0 12px;color:#111">Email Verification</h2>
         <p>Please use the following 6-digit code to complete your Blackfire CRM account application:</p>
         <div style="font-size:32px;font-weight:bold;letter-spacing:8px;margin:24px 0;padding:16px 24px;background:#f4f4f5;border-radius:8px;display:inline-block;color:#111">${verificationCode}</div>
-        <p style="color:#555;font-size:13px">This code does not expire. If you did not request this, you can safely ignore this email.</p>
+        <p style="color:#555;font-size:13px">This code expires in <strong>5 minutes</strong>. If you did not request this, you can safely ignore this email.</p>
       </div>
     `;
 
@@ -195,6 +197,13 @@ router.post('/apply/verify', async (req, res) => {
 
     if (app.verificationCode !== code) {
       return res.status(400).json({ error: 'Invalid verification code.' });
+    }
+
+    // Check if code has expired (5 minutes)
+    if (app.verificationCodeExpiry && new Date() > app.verificationCodeExpiry) {
+      // Delete the expired application so they can re-apply
+      await AccountApplication.deleteOne({ _id: app._id });
+      return res.status(400).json({ error: 'Verification code has expired. Please submit a new application.' });
     }
 
     app.isEmailVerified = true;

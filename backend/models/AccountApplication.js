@@ -9,6 +9,7 @@ const accountApplicationSchema = new mongoose.Schema({
   note: { type: String, default: '' },
   status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
   verificationCode: { type: String },
+  verificationCodeExpiry: { type: Date },
   isEmailVerified: { type: Boolean, default: false },
   reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   reviewedAt: { type: Date },
