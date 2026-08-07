@@ -155,7 +155,7 @@ export default function Email() {
       <div className="page-head">
         <div><h1>Email Automation</h1><p>Templates with client variable substitution</p></div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={() => { setBulkOpen(true); setBulkResults(null); setBulkSelected([]); }}>⚡ Bulk Send</button>
+          <button className="btn btn-secondary" onClick={() => { setBulkOpen(true); setBulkResults(null); setBulkSelected([]); }}>Bulk Send</button>
           <button className="btn btn-primary" onClick={openAdd}>+ New Template</button>
         </div>
       </div>

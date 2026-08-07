@@ -88,6 +88,16 @@ export default function Sidebar({ user, onLogout, routeLoading }) {
             ))}
           </>
         )}
+
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="sb-item sb-item-logout"
+            title="Logout of session"
+          >
+            Logout
+          </button>
+        )}
       </nav>
 
       <div className="sb-footer" style={{ display:'flex', flexDirection:'column', gap:6 }}>

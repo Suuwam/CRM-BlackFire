@@ -195,13 +195,15 @@ export default function Board() {
 
   return (
     <>
-      <div className="page-head">
+      <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
         <div><h1>Project Board</h1><p>Task tracking with color coding & cover image attachments</p></div>
+        <button className="btn btn-secondary btn-sm board-fullscreen-btn" onClick={() => setIsFullscreen(!isFullscreen)}>
+          {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+        </button>
       </div>
       <div className={`page-body ${isFullscreen ? 'board-fullscreen' : ''}`}>
         {/* Project tabs */}
-        <div className="board-tabs" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-          <div style={{ display: 'flex', gap: 8 }}>
+        <div className="board-tabs" style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%', overflowX: 'auto' }}>
           {PROJECTS.map(p => (
             <button key={p.id} className={`board-tab${project===p.id?' active':''}`} onClick={() => setProject(p.id)}
               style={project===p.id && p.id==='aawazz' ? { background: '#2563eb', borderColor: '#2563eb' } : {}}>
@@ -213,10 +215,6 @@ export default function Board() {
               {p.label}
             </button>
           ))}
-          </div>
-          <button className="btn btn-secondary btn-sm" onClick={() => setIsFullscreen(!isFullscreen)}>
-            {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-          </button>
         </div>
 
         {/* Dedicated Blackfire AI Header Banner */}
