@@ -628,9 +628,18 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
   transition: color .3s ease, box-shadow .3s ease, border-color .3s ease, background .3s ease;
 }
 .auth-page-root .ignite:hover {
-  color: #000000; background: #ffffff; border-color: #ffffff;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: #ffffff;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.15);
 }
-.auth-page-root .ignite:active { transform: scale(0.985); }
+.auth-page-root .ignite:active {
+  transform: scale(0.98);
+  color: #000000;
+  background: #ffffff;
+  border-color: #ffffff;
+  transition: none;
+}
 .auth-page-root .ignite.loading .label { opacity: 0; }
 .auth-page-root .ignite .spinner {
   position: absolute; left: 50%; top: 50%;
