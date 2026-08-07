@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Toast from './components/Toast';
+import SearchPalette from './components/SearchPalette';
 import Dashboard from './pages/Dashboard';
 import Clients from './pages/Clients';
 import Calendar from './pages/Calendar';
@@ -14,16 +15,39 @@ import Accounts from './pages/Accounts';
 import { ToastProvider } from './components/Toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
+// Apply saved theme on initial load (before React renders)
+(function initTheme() {
+  const theme = localStorage.getItem('theme') || 'light';
+  const root = document.documentElement;
+  root.classList.remove('dark', 'theme-ocean', 'theme-dusk');
+  if (theme === 'dark')  root.classList.add('dark');
+  if (theme === 'ocean') root.classList.add('theme-ocean');
+  if (theme === 'dusk')  root.classList.add('theme-dusk');
+})();
+
 function AppShell() {
   const { user, loading, login, logout } = useAuth();
   const location = useLocation();
   const [routeLoading, setRouteLoading] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
     setRouteLoading(true);
     const timer = setTimeout(() => setRouteLoading(false), 400);
     return () => clearTimeout(timer);
   }, [location.pathname]);
+
+  // Global Cmd+K / Ctrl+K shortcut
+  useEffect(() => {
+    function handleKey(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen(open => !open);
+      }
+    }
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, []);
 
   if (loading) {
     return (
@@ -48,7 +72,12 @@ function AppShell() {
   return (
     <ToastProvider>
       <div className="layout">
-        <Sidebar user={user} onLogout={logout} routeLoading={routeLoading} />
+        <Sidebar
+          user={user}
+          onLogout={logout}
+          routeLoading={routeLoading}
+          onSearchOpen={() => setSearchOpen(true)}
+        />
         <div className="main" style={{ position: 'relative' }}>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -63,6 +92,8 @@ function AppShell() {
         </div>
         <Toast />
       </div>
+      {/* Global Search Palette — always mounted, toggled by Cmd+K */}
+      <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
     </ToastProvider>
   );
 }

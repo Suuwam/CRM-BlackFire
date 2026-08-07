@@ -8,7 +8,9 @@ const clientSchema = new mongoose.Schema({
   status:  { type: String, enum: ['Active', 'Prospect', 'Inactive'], default: 'Active' },
   project: { type: String, trim: true, default: '' },
   notes:   { type: String, default: '' },
-  photo:   { type: String, default: null },  // filename in /uploads
+  photo:          { type: String, default: null },  // filename in /uploads or Cloudinary URL
+  revenue:        { type: Number, default: 0 },        // actual revenue received
+  contractValue:  { type: Number, default: 0 },        // total contract / deal value
 }, { timestamps: true });
 
 module.exports = mongoose.model('Client', clientSchema);

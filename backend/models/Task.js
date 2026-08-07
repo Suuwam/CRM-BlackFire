@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 // column:  'backlog' | 'todo' | 'inprogress' | 'qa' | 'done'
 const taskSchema = new mongoose.Schema({
   project:     { type: String, enum: ['blackfire', 'aawazz'], required: true },
-  column:      { type: String, enum: ['backlog','todo','inprogress','qa','done'], default: 'backlog' },
+  column:      { type: String, enum: ['backlog','todo','inprogress','qa','done','cancelled'], default: 'backlog' },
   title:       { type: String, required: true, trim: true },
   description: { type: String, default: '' },
   priority:    { type: String, enum: ['low','medium','high'], default: 'medium' },
@@ -27,6 +27,13 @@ const taskSchema = new mongoose.Schema({
   image:   { type: String, default: '' },
   color:   { type: String, default: 'blue' },
   order:   { type: Number, default: 0 },
+  // Task comments / discussion thread
+  comments: [{
+    text:       { type: String, required: true },
+    authorName: { type: String, default: '' },
+    authorId:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    createdAt:  { type: Date, default: Date.now },
+  }],
 }, { timestamps: true });
 
 module.exports = mongoose.model('Task', taskSchema);

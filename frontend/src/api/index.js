@@ -107,4 +107,6 @@ export const tasksApi = {
   },
   move: (id, column) => api.patch(`/tasks/${id}/move`, { column }),
   delete: (id) => api.delete(`/tasks/${id}`),
+  addComment: (id, text) => api.post(`/tasks/${id}/comments`, { text }),
+  deleteComment: (id, commentId) => api.delete(`/tasks/${id}/comments/${commentId}`),
 };

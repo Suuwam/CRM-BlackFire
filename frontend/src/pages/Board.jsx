@@ -60,6 +60,10 @@ export default function Board() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [imageFile, setImageFile] = useState(null);
   const [assigneeSearch, setAssigneeSearch] = useState('');
+  // Comments state for task detail view
+  const [commentText, setCommentText] = useState('');
+  const [commentSaving, setCommentSaving] = useState(false);
+  const [detailComments, setDetailComments] = useState([]);
   const dragId = useRef(null);
   const toast = useToast();
 
@@ -106,6 +110,12 @@ export default function Board() {
         assignees,
       }); setEditCol(t.column); setEditing(t._id); setImageFile(null); setModal(true);
     }
+  }
+
+  function openViewTask(t) {
+    setViewingTask(t);
+    setDetailComments(t.comments || []);
+    setCommentText('');
   }
 
   const [saving, setSaving] = useState(false);
@@ -282,7 +292,7 @@ export default function Board() {
                 >
                   {ct.map(t => (
                     <div key={t._id} className={`k-card card-color-${t.color || 'blue'}`} draggable
-                      onDragStart={() => onDragStart(t._id)} onClick={() => setViewingTask(t)}>
+                      onDragStart={() => onDragStart(t._id)} onClick={() => openViewTask(t)}>
 
                       {/* Display Task Cover Picture */}
                       {t.image && (
@@ -426,7 +436,7 @@ export default function Board() {
         <div className="form-group"><label>Card Cover Picture</label><input type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0] || null)} /></div>
       </Modal>
 
-      <Modal open={!!viewingTask} onClose={() => setViewingTask(null)} title="Task Details" footer={<button className="btn btn-secondary" onClick={() => setViewingTask(null)}>Close</button>}>
+      <Modal open={!!viewingTask} onClose={() => { setViewingTask(null); setDetailComments([]); setCommentText(''); }} title="Task Details" footer={<button className="btn btn-secondary" onClick={() => { setViewingTask(null); setDetailComments([]); setCommentText(''); }}>Close</button>}>
         {viewingTask && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {viewingTask.image && (
@@ -474,6 +484,93 @@ export default function Board() {
                 </div>
               </div>
             )}
+
+            {/* ── Comments / Discussion Thread ── */}
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 4 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                Discussion ({detailComments.length})
+              </div>
+
+              {/* Comment thread */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 180, overflowY: 'auto', marginBottom: 10, padding: '2px 0' }}>
+                {detailComments.length === 0 && (
+                  <div style={{ fontSize: 12, color: 'var(--text3)', padding: '10px 0', textAlign: 'center' }}>No comments yet. Start the discussion below.</div>
+                )}
+                {detailComments.map((c, i) => (
+                  <div key={c._id || i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--surface2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--text2)', flexShrink: 0 }}>
+                      {(c.authorName || '?')[0].toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, background: 'var(--surface2)', borderRadius: 8, padding: '8px 12px', border: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{c.authorName || 'Unknown'}</span>
+                        <span style={{ fontSize: 10, color: 'var(--text3)' }}>{new Date(c.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                        {user?._id && (String(user._id) === String(c.authorId) || user.role === 'admin') && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                await tasksApi.deleteComment(viewingTask._id, c._id);
+                                setDetailComments(prev => prev.filter(cm => cm._id !== c._id));
+                                mutate(swrKey);
+                              } catch { toast('Failed to delete comment', 'error'); }
+                            }}
+                            style={{ marginLeft: 'auto', fontSize: 10, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', opacity: 0.7 }}
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>{c.text}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add comment input */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                <textarea
+                  value={commentText}
+                  onChange={e => setCommentText(e.target.value)}
+                  placeholder="Add a comment..."
+                  rows={2}
+                  style={{ flex: 1, resize: 'none', fontSize: 13, borderRadius: 8, padding: '8px 10px', minHeight: 60 }}
+                  onKeyDown={async e => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                      e.preventDefault();
+                      if (!commentText.trim() || commentSaving) return;
+                      setCommentSaving(true);
+                      try {
+                        const res = await tasksApi.addComment(viewingTask._id, commentText);
+                        setDetailComments(prev => [...prev, res.data]);
+                        setCommentText('');
+                        mutate(swrKey);
+                      } catch { toast('Failed to post comment', 'error'); }
+                      finally { setCommentSaving(false); }
+                    }
+                  }}
+                />
+                <button
+                  className="btn btn-primary btn-sm"
+                  disabled={!commentText.trim() || commentSaving}
+                  onClick={async () => {
+                    if (!commentText.trim() || commentSaving) return;
+                    setCommentSaving(true);
+                    try {
+                      const res = await tasksApi.addComment(viewingTask._id, commentText);
+                      setDetailComments(prev => [...prev, res.data]);
+                      setCommentText('');
+                      mutate(swrKey);
+                    } catch { toast('Failed to post comment', 'error'); }
+                    finally { setCommentSaving(false); }
+                  }}
+                  style={{ alignSelf: 'flex-end', height: 36 }}
+                >
+                  {commentSaving ? '...' : 'Post'}
+                </button>
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>⌘↵ to post</div>
+            </div>
           </div>
         )}
       </Modal>

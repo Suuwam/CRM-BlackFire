@@ -4,7 +4,7 @@ import { clientsApi, fetcher } from '../api';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 
-const EMPTY = { name: '', company: '', email: '', phone: '', status: 'Active', project: '', notes: '' };
+const EMPTY = { name: '', company: '', email: '', phone: '', status: 'Active', project: '', notes: '', revenue: '', contractValue: '' };
 
 // --- Draft cache helpers for Clients ---
 const CLIENT_DRAFT_PREFIX = 'crm_client_draft_';
@@ -56,7 +56,7 @@ export default function Clients() {
       setForm(draft.form); setEditing(c._id); setImageFile(null); setModal(true);
       toast('Restored unsaved edits', 'info');
     } else {
-      setForm({ name:c.name,company:c.company,email:c.email,phone:c.phone,status:c.status,project:c.project,notes:c.notes }); setEditing(c._id); setImageFile(null); setModal(true);
+      setForm({ name:c.name,company:c.company,email:c.email,phone:c.phone,status:c.status,project:c.project,notes:c.notes,revenue:c.revenue||'',contractValue:c.contractValue||'' }); setEditing(c._id); setImageFile(null); setModal(true);
     }
   }
 
@@ -152,7 +152,16 @@ export default function Clients() {
               </div>
               <div className="text-sm text-muted truncate">{c.email}</div>
               <div className="client-foot">
-                <span className={`tag status-${c.status}`}>{c.status}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span className={`tag status-${c.status}`}>{c.status}</span>
+                  {(c.revenue > 0 || c.contractValue > 0) && (
+                    <span style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 600 }}>
+                      {c.contractValue > 0 ? `$${c.contractValue.toLocaleString()} contract` : ''}
+                      {c.contractValue > 0 && c.revenue > 0 ? ' · ' : ''}
+                      {c.revenue > 0 ? `$${c.revenue.toLocaleString()} earned` : ''}
+                    </span>
+                  )}
+                </div>
                 <div style={{ display:'flex', gap:4 }}>
                   <button className="btn btn-sm btn-secondary" onClick={e => { e.stopPropagation(); openEdit(c); }}>Edit</button>
                   <button className="btn btn-sm btn-danger" onClick={e => { e.stopPropagation(); del(c._id); }}>Delete</button>
@@ -188,6 +197,10 @@ export default function Clients() {
           <div className="form-group"><label>Project</label><input value={form.project} onChange={e => setForm(f => ({...f, project:e.target.value}))} placeholder="Current project" /></div>
         </div>
         <div className="form-group"><label>Notes</label><textarea value={form.notes} onChange={e => setForm(f => ({...f, notes:e.target.value}))} placeholder="Any notes about this client..." /></div>
+        <div className="form-row">
+          <div className="form-group"><label>Revenue Earned ($)</label><input type="number" min="0" value={form.revenue} onChange={e => setForm(f => ({...f, revenue: e.target.value}))} placeholder="0" /></div>
+          <div className="form-group"><label>Contract Value ($)</label><input type="number" min="0" value={form.contractValue} onChange={e => setForm(f => ({...f, contractValue: e.target.value}))} placeholder="0" /></div>
+        </div>
         <div className="form-group"><label>Upload Image (optional)</label><input type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0] || null)} /></div>
       </Modal>
 

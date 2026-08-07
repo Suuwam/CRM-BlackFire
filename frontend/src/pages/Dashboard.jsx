@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import useSWR from 'swr';
-import { fetcher } from '../api';
+import useSWR, { mutate } from 'swr';
+import { fetcher, tasksApi } from '../api';
 import SocialIcon from '../components/SocialIcon';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../components/Toast';
 
 // Helper to calculate Donut Arc paths
 function getDonutPath(cx, cy, radius, innerRadius, startAngle, endAngle) {
@@ -475,16 +476,117 @@ function AssignedTaskBarChart({ tasks = [] }) {
   );
 }
 
+// Sprint Velocity Chart — 14-day task creation vs completion SVG area chart
+function SprintVelocityChart({ activities = [] }) {
+  const [hoverDay, setHoverDay] = useState(null);
+
+  const days = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    days.push(d.toISOString().slice(0, 10));
+  }
+
+  const data = days.map(day => {
+    const created   = activities.filter(a => a.action === 'created'  && (a.createdAt || '').slice(0, 10) === day).length;
+    const completed = activities.filter(a => a.action === 'moved' && a.toColumn === 'done' && (a.createdAt || '').slice(0, 10) === day).length;
+    return { day, created, completed };
+  });
+
+  const maxVal = Math.max(...data.map(d => Math.max(d.created, d.completed)), 4);
+  const W = 460; const H = 130;
+  const PAD = { t: 14, r: 10, b: 24, l: 28 };
+  const chartW = W - PAD.l - PAD.r;
+  const chartH = H - PAD.t - PAD.b;
+
+  function xPos(i) { return PAD.l + (i / Math.max(data.length - 1, 1)) * chartW; }
+  function yPos(v) { return PAD.t + chartH - (v / maxVal) * chartH; }
+
+  function makeLine(key) {
+    return data.map((d, i) => `${xPos(i)},${yPos(d[key])}`).join(' ');
+  }
+  function makeArea(key) {
+    if (!data.length) return '';
+    const pts = data.map((d, i) => `${xPos(i)} ${yPos(d[key])}`).join(' L ');
+    const bottom = PAD.t + chartH;
+    return `M ${xPos(0)} ${bottom} L ${pts} L ${xPos(data.length - 1)} ${bottom} Z`;
+  }
+
+  return (
+    <div className="chart-card" style={{ gridColumn: '1 / -1' }}>
+      <div className="chart-header">
+        <div>
+          <div className="chart-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+            Sprint Velocity — Last 14 Days
+          </div>
+          <div className="chart-sub">Daily tasks created vs completed</div>
+        </div>
+        <div style={{ display: 'flex', gap: 14, fontSize: 11, alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ width: 20, height: 3, background: '#f97316', display: 'inline-block', borderRadius: 2 }} />
+            <span style={{ fontWeight: 600, color: 'var(--text2)' }}>Created</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ width: 20, height: 3, background: '#10b981', display: 'inline-block', borderRadius: 2 }} />
+            <span style={{ fontWeight: 600, color: 'var(--text2)' }}>Completed</span>
+          </div>
+        </div>
+      </div>
+      <div className="chart-body" style={{ padding: '4px 0 0', justifyContent: 'flex-start', overflowX: 'auto', minHeight: 150, position: 'relative', width: '100%' }}>
+        <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block', minWidth: 260, overflow: 'visible' }}>
+          {[0, 0.25, 0.5, 0.75, 1].map((frac, i) => (
+            <line key={i} x1={PAD.l} y1={PAD.t + chartH * frac} x2={W - PAD.r} y2={PAD.t + chartH * frac}
+              stroke="var(--border)" strokeWidth="0.8" strokeDasharray="3 3" />
+          ))}
+          {[maxVal, Math.round(maxVal / 2), 0].map((v, i) => (
+            <text key={i} x={PAD.l - 4} y={yPos(v) + 4} fontSize="8" fill="var(--text3)" textAnchor="end" fontFamily="Inter,sans-serif">{v}</text>
+          ))}
+          <path d={makeArea('created')}   fill="rgba(249,115,22,0.09)" />
+          <path d={makeArea('completed')} fill="rgba(16,185,129,0.10)" />
+          <polyline points={makeLine('created')}   fill="none" stroke="#f97316" strokeWidth="2" strokeLinejoin="round" />
+          <polyline points={makeLine('completed')} fill="none" stroke="#10b981" strokeWidth="2" strokeLinejoin="round" />
+          {data.map((d, i) => (
+            <g key={i}>
+              <rect x={xPos(i) - 12} y={PAD.t} width={24} height={chartH} fill="transparent"
+                onMouseEnter={() => setHoverDay(i)} onMouseLeave={() => setHoverDay(null)}
+                style={{ cursor: 'crosshair' }}
+              />
+              {hoverDay === i && <line x1={xPos(i)} y1={PAD.t} x2={xPos(i)} y2={PAD.t + chartH} stroke="var(--border2)" strokeWidth="1" strokeDasharray="4 2" />}
+              <circle cx={xPos(i)} cy={yPos(d.created)}   r={hoverDay === i ? 4 : 2.5} fill="#f97316" style={{ transition: 'r 0.12s' }} />
+              <circle cx={xPos(i)} cy={yPos(d.completed)} r={hoverDay === i ? 4 : 2.5} fill="#10b981" style={{ transition: 'r 0.12s' }} />
+            </g>
+          ))}
+          {data.map((d, i) => i % 2 === 0 && (
+            <text key={i} x={xPos(i)} y={H - 4} fontSize="7.5" fill="var(--text3)" textAnchor="middle" fontFamily="Inter,sans-serif">{d.day.slice(5)}</text>
+          ))}
+        </svg>
+        {hoverDay !== null && (
+          <div style={{ position: 'absolute', top: 14, right: 14, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: 'var(--shadow-md)', pointerEvents: 'none', zIndex: 10 }}>
+            <div style={{ fontWeight: 700, marginBottom: 4, color: 'var(--text)' }}>{data[hoverDay]?.day}</div>
+            <div style={{ color: '#f97316', fontWeight: 600 }}>Created: {data[hoverDay]?.created}</div>
+            <div style={{ color: '#10b981', fontWeight: 600 }}>Completed: {data[hoverDay]?.completed}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
   const [focusUserId, setFocusUserId] = useState('');
 
   const { data: clients = [] } = useSWR('/clients', fetcher, { revalidateOnFocus: false });
   const { data: allEvents = [] } = useSWR('/events', fetcher, { revalidateOnFocus: false });
-  const { data: tasks = [] } = useSWR('/tasks', fetcher, { revalidateOnFocus: false });
+  const { data: tasks = [], mutate: mutateTasks } = useSWR('/tasks', fetcher, { revalidateOnFocus: false });
   const { data: users = [] } = useSWR('/users', fetcher, { revalidateOnFocus: false });
   const { data: activities = [] } = useSWR('/activity?days=50', fetcher, { revalidateOnFocus: false });
+  const { data: sprintActivities = [] } = useSWR('/activity?days=14', fetcher, { revalidateOnFocus: false });
 
   useEffect(() => {
     if (!focusUserId && user?._id) setFocusUserId(String(user._id));
@@ -511,6 +613,20 @@ export default function Dashboard() {
   const inProgress = tasks.filter(t => t.column === 'inprogress').length;
   const completed = tasks.filter(t => t.column === 'done').length;
   const completionRate = tasks.length > 0 ? Math.round((completed / tasks.length) * 100) : 0;
+  const totalContractValue = clients.reduce((sum, c) => sum + (Number(c.contractValue) || 0), 0);
+  const totalRevenue = clients.reduce((sum, c) => sum + (Number(c.revenue) || 0), 0);
+
+  async function quickDoneTask(taskId) {
+    mutateTasks(prev => (prev || []).map(t => t._id === taskId ? { ...t, column: 'done' } : t), false);
+    toast('Task marked as done', 'success');
+    try {
+      await tasksApi.move(taskId, 'done');
+      mutateTasks();
+    } catch {
+      toast('Error updating task', 'error');
+      mutateTasks();
+    }
+  }
   const focusUser = users.find(u => String(u._id) === String(focusUserId)) || user;
   const assignedTasks = tasks.filter(t => {
     const taskAssigneeId = String(t.assigneeId || '');
@@ -560,6 +676,15 @@ export default function Dashboard() {
                 <div className="stat-value">{completionRate}%</div>
                 <div className="stat-sub">{completed} of {tasks.length} features done</div>
               </div>
+              {totalContractValue > 0 && (
+                <div className="stat-card">
+                  <div className="stat-label">Portfolio Value</div>
+                  <div className="stat-value" style={{ fontSize: totalContractValue >= 1000000 ? '1.4rem' : undefined }}>
+                    ${totalContractValue >= 1000 ? `${(totalContractValue / 1000).toFixed(1)}k` : totalContractValue.toLocaleString()}
+                  </div>
+                  <div className="stat-sub">${totalRevenue >= 1000 ? `${(totalRevenue / 1000).toFixed(1)}k` : totalRevenue.toLocaleString()} earned</div>
+                </div>
+              )}
               {totalOverdue > 0 && (
                 <div className="stat-card stat-card--overdue">
                   <div className="stat-label">Overdue Items</div>
@@ -578,6 +703,11 @@ export default function Dashboard() {
             {/* Assignee Workload Chart */}
             <div style={{ marginTop: 24 }}>
               <AssigneeWorkloadChart tasks={tasks} users={users} />
+            </div>
+
+            {/* Sprint Velocity Chart — 14-day area chart */}
+            <div className="charts-grid" style={{ marginTop: 24 }}>
+              <SprintVelocityChart activities={sprintActivities} />
             </div>
 
             <div style={{ marginTop: 24 }}>
@@ -704,21 +834,43 @@ export default function Dashboard() {
               <div className="assigned-list">
                 {assignedTasks.length === 0 && <div className="empty" style={{ padding: '24px 0' }}>No tasks assigned.</div>}
                 {assignedTasks.map(task => (
-                  <div 
-                    key={task._id} 
-                    className="assigned-item" 
-                    style={{ cursor: 'pointer' }} 
-                    onClick={() => navigate(`/board?project=${task.project || 'blackfire'}`)}
+                  <div
+                    key={task._id}
+                    className="assigned-item"
+                    style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
                     title="Click to view task on board"
                   >
-                    <div className="assigned-title">{task.title}</div>
-                    <div className="assigned-meta">
-                      <span style={{ textTransform: 'capitalize' }}>{task.project}</span>
-                      <span>•</span>
-                      <span style={{ textTransform: 'capitalize' }}>{task.column}</span>
-                      <span>•</span>
-                      <span>{task.assigneeName || task.assignee || 'Unassigned'}</span>
+                    <div style={{ flex: 1 }} onClick={() => navigate(`/board?project=${task.project || 'blackfire'}`)}>
+                      <div className="assigned-title" style={{ textDecoration: task.column === 'done' ? 'line-through' : 'none', opacity: task.column === 'done' ? 0.55 : 1 }}>{task.title}</div>
+                      <div className="assigned-meta">
+                        <span style={{ textTransform: 'capitalize' }}>{task.project}</span>
+                        <span>•</span>
+                        <span style={{ textTransform: 'capitalize' }}>{task.column}</span>
+                        <span>•</span>
+                        <span>{task.assigneeName || task.assignee || 'Unassigned'}</span>
+                      </div>
                     </div>
+                    {task.column !== 'done' && (
+                      <button
+                        aria-label="Quick-done"
+                        title="Mark as done"
+                        onClick={e => { e.stopPropagation(); quickDoneTask(task._id); }}
+                        style={{
+                          flexShrink: 0, width: 26, height: 26, borderRadius: '50%',
+                          border: '1.5px solid #10b981', background: 'transparent',
+                          color: '#10b981', fontSize: 14, lineHeight: 1,
+                          cursor: 'pointer', display: 'flex', alignItems: 'center',
+                          justifyContent: 'center', transition: 'background 0.15s, color 0.15s'
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#10b981'; e.currentTarget.style.color = '#fff'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#10b981'; }}
+                      >
+                        ✓
+                      </button>
+                    )}
+                    {task.column === 'done' && (
+                      <span style={{ flexShrink: 0, width: 26, height: 26, borderRadius: '50%', background: '#10b981', color: '#fff', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✓</span>
+                    )}
                   </div>
                 ))}
               </div>

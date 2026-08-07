@@ -250,4 +250,49 @@ router.delete('/:id', requireSessionUser, writeLimiter, async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
+// POST add comment to task
+router.post('/:id/comments', requireSessionUser, writeLimiter, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text?.trim()) return res.status(400).json({ error: 'Comment text required' });
+    const comment = {
+      text: text.trim(),
+      authorName: req.sessionUser.name || 'Unknown',
+      authorId: req.sessionUser._id || null,
+      createdAt: new Date(),
+    };
+    const updated = await Task.findByIdAndUpdate(
+      req.params.id,
+      { $push: { comments: comment } },
+      { new: true }
+    );
+    if (!updated) return res.status(404).json({ error: 'Task not found' });
+    await recordActivity({
+      action: 'commented',
+      targetType: 'task',
+      targetId: updated._id,
+      targetName: updated.title,
+      project: updated.project,
+      actorId: req.sessionUser._id,
+      actorName: req.sessionUser.name,
+      summary: `${req.sessionUser.name} commented on ${updated.title}`,
+    });
+    // Return the last comment that was just added
+    res.status(201).json(updated.comments[updated.comments.length - 1]);
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// DELETE a comment from a task
+router.delete('/:id/comments/:commentId', requireSessionUser, writeLimiter, async (req, res) => {
+  try {
+    const updated = await Task.findByIdAndUpdate(
+      req.params.id,
+      { $pull: { comments: { _id: req.params.commentId } } },
+      { new: true }
+    );
+    if (!updated) return res.status(404).json({ error: 'Task not found' });
+    res.json({ ok: true });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
 module.exports = router;
