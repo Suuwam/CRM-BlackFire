@@ -16,6 +16,10 @@
     "swr": "^2.4.2"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/ios": "^8.5.0",
     "@vitejs/plugin-react": "^4.2.1",
     "vite": "^5.0.8"
   }
