@@ -644,14 +644,15 @@ export default function Dashboard() {
 
             <div className="card" style={{ marginTop: 24 }}>
               <div className="section-title" style={{ marginBottom: 14 }}>Backlog, last 50 days</div>
-              <div className="activity-list" style={{ maxHeight: 420 }}>
+              <div className="activity-list" style={{ maxHeight: 450 }}>
                 {activityBacklog.length === 0 && <div className="empty" style={{ padding: '24px 0' }}>No recent activity.</div>}
                 {activityBacklog.map(item => {
-                  const summaryText = item.summary || [
+                  const detailedSentence = item.summary || [
                     item.actorName || 'System',
                     item.action,
                     item.targetName ? `"${item.targetName}"` : '',
-                    item.fromColumn && item.toColumn ? `from ${item.fromColumn} to ${item.toColumn}` : item.toColumn ? `to ${item.toColumn}` : ''
+                    item.fromColumn && item.toColumn ? `from ${item.fromColumn} to ${item.toColumn}` : item.toColumn ? `to ${item.toColumn}` : '',
+                    item.assigneeName ? `(assigned to ${item.assigneeName})` : ''
                   ].filter(Boolean).join(' ');
 
                   return (
@@ -663,14 +664,12 @@ export default function Dashboard() {
                         </div>
                         <span className="activity-date">{new Date(item.createdAt).toLocaleString(undefined, { month: 'numeric', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
-                      {item.targetName && <div className="activity-title">{item.targetName}</div>}
-                      <div className="activity-summary">{summaryText}</div>
-                      <div className="activity-meta">
-                        <span className="activity-actor">By {item.actorName || 'System'}</span>
-                        {item.assigneeName && <span className="activity-assignee">→ {item.assigneeName}</span>}
-                        {item.fromColumn && item.toColumn && (
-                          <span className="activity-flow">({item.fromColumn} → {item.toColumn})</span>
-                        )}
+                      <div className="activity-sentence" style={{ fontSize: 13.5, fontWeight: 550, color: 'var(--text)', marginTop: 8, lineHeight: 1.45 }}>
+                        {detailedSentence}
+                      </div>
+                      <div className="activity-meta" style={{ marginTop: 6, fontSize: 11, color: 'var(--text3)', display: 'flex', gap: 12 }}>
+                        <span>By: {item.actorName || 'System'}</span>
+                        {item.assigneeName && <span>Assigned to: {item.assigneeName}</span>}
                       </div>
                     </div>
                   );
