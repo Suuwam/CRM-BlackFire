@@ -644,21 +644,37 @@ export default function Dashboard() {
 
             <div className="card" style={{ marginTop: 24 }}>
               <div className="section-title" style={{ marginBottom: 14 }}>Backlog, last 50 days</div>
-              <div className="activity-list" style={{ maxHeight: 350 }}>
+              <div className="activity-list" style={{ maxHeight: 420 }}>
                 {activityBacklog.length === 0 && <div className="empty" style={{ padding: '24px 0' }}>No recent activity.</div>}
-                {activityBacklog.map(item => (
-                  <div key={item._id} className="activity-item">
-                    <div className="activity-top">
-                      <span className="activity-action">{item.action}</span>
-                      <span className="activity-date">{new Date(item.createdAt).toLocaleDateString()}</span>
+                {activityBacklog.map(item => {
+                  const summaryText = item.summary || [
+                    item.actorName || 'System',
+                    item.action,
+                    item.targetName ? `"${item.targetName}"` : '',
+                    item.fromColumn && item.toColumn ? `from ${item.fromColumn} to ${item.toColumn}` : item.toColumn ? `to ${item.toColumn}` : ''
+                  ].filter(Boolean).join(' ');
+
+                  return (
+                    <div key={item._id} className="activity-item">
+                      <div className="activity-top">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span className={`activity-badge badge-${item.action}`}>{item.action}</span>
+                          {item.project && <span className="activity-project-tag">{item.project}</span>}
+                        </div>
+                        <span className="activity-date">{new Date(item.createdAt).toLocaleString(undefined, { month: 'numeric', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                      {item.targetName && <div className="activity-title">{item.targetName}</div>}
+                      <div className="activity-summary">{summaryText}</div>
+                      <div className="activity-meta">
+                        <span className="activity-actor">👤 {item.actorName || 'System'}</span>
+                        {item.assigneeName && <span className="activity-assignee">➔ 🎯 {item.assigneeName}</span>}
+                        {item.fromColumn && item.toColumn && (
+                          <span className="activity-flow">📍 {item.fromColumn} ➔ {item.toColumn}</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="activity-summary">{item.summary}</div>
-                    <div className="activity-meta">
-                      <span>{item.actorName || 'System'}</span>
-                      {item.assigneeName && <span>→ {item.assigneeName}</span>}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
