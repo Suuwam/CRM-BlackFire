@@ -49,6 +49,7 @@ export default function Calendar() {
   const [form, setForm]   = useState(EMPTY_EV);
   const [editing, setEditing] = useState(null);
   const [imageFile, setImageFile] = useState(null);
+  const [assigneeSearch, setAssigneeSearch] = useState('');
   const fileInputRef = useRef(null);
   const toast = useToast();
 
@@ -481,36 +482,54 @@ export default function Calendar() {
           <div className="form-group"><label>Time</label><input type="time" value={form.time} onChange={e => setForm(f=>({...f,time:e.target.value}))} /></div>
         </div>
 
-        {/* Multi-assignee task picker */}
+        {/* Multi-assignee task picker with search */}
         <div className="form-group">
-          <label>Assign task to (select multiple)</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 160, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}>
-            {users.map(u => {
-              const isChecked = (form.assignees || []).some(a => String(a.userId) === String(u._id));
-              return (
-                <label key={u._id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '4px 0' }}>
-                  <input type="checkbox" style={{ accentColor: 'var(--accent)', width: 14, height: 14 }}
-                    checked={isChecked}
-                    onChange={() => {
-                      setForm(f => {
-                        const existing = f.assignees || [];
-                        if (isChecked) return { ...f, assignees: existing.filter(a => String(a.userId) !== String(u._id)) };
-                        return { ...f, assignees: [...existing, { userId: u._id, name: u.name, email: u.email }] };
-                      });
-                    }}
-                  />
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{u.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text3)' }}>{u.email}</div>
-                  </div>
-                </label>
-              );
-            })}
-            {users.length === 0 && <div style={{ fontSize: 12, color: 'var(--text3)' }}>No accounts found</div>}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <label style={{ margin: 0 }}>Assign task to (select multiple)</label>
+            <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+              {users.length} account{users.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <input 
+            type="text" 
+            placeholder="Search accounts by name or email..." 
+            value={assigneeSearch} 
+            onChange={e => setAssigneeSearch(e.target.value)}
+            style={{ marginBottom: 8, padding: '6px 10px', fontSize: 12 }}
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}>
+            {users
+              .filter(u => 
+                (u.name || '').toLowerCase().includes(assigneeSearch.toLowerCase()) ||
+                (u.email || '').toLowerCase().includes(assigneeSearch.toLowerCase()) ||
+                (u.username || '').toLowerCase().includes(assigneeSearch.toLowerCase())
+              )
+              .map(u => {
+                const isChecked = (form.assignees || []).some(a => String(a.userId) === String(u._id));
+                return (
+                  <label key={u._id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '4px 0' }}>
+                    <input type="checkbox" style={{ accentColor: 'var(--accent)', width: 14, height: 14 }}
+                      checked={isChecked}
+                      onChange={() => {
+                        setForm(f => {
+                          const existing = f.assignees || [];
+                          if (isChecked) return { ...f, assignees: existing.filter(a => String(a.userId) !== String(u._id)) };
+                          return { ...f, assignees: [...existing, { userId: u._id, name: u.name, email: u.email }] };
+                        });
+                      }}
+                    />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{u.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text3)' }}>{u.email}</div>
+                    </div>
+                  </label>
+                );
+              })}
+            {users.length === 0 && <div style={{ fontSize: 12, color: 'var(--text3)', padding: '8px 0' }}>No accounts found</div>}
           </div>
           {(form.assignees || []).length > 0 && (
             <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text3)' }}>
-              Assigned to: {form.assignees.map(a => a.name).join(', ')}
+              Assigned to ({form.assignees.length}): {form.assignees.map(a => a.name).join(', ')}
             </div>
           )}
         </div>
