@@ -127,10 +127,11 @@ function TaskPieChart({ tasks = [], clients = [] }) {
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minWidth: 150 }}>
+            <div className="pie-legend-container" style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minWidth: 130 }}>
               {slices.map((s, i) => (
                 <div
                   key={s.id || i}
+                  className="pie-legend-item"
                   onMouseEnter={() => setHoveredIdx(i)}
                   onMouseLeave={() => setHoveredIdx(null)}
                   style={{
@@ -142,16 +143,19 @@ function TaskPieChart({ tasks = [], clients = [] }) {
                     borderRadius: 6,
                     background: hoveredIdx === i ? 'var(--surface2)' : 'transparent',
                     cursor: 'pointer',
-                    transition: 'all 0.15s'
+                    transition: 'all 0.15s',
+                    width: '100%',
+                    minWidth: 0,
+                    boxSizing: 'border-box'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
                     <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-                    <span style={{ fontWeight: 550, color: 'var(--text)' }}>{s.label}</span>
+                    <span className="pie-legend-label" style={{ fontWeight: 550, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
                   </div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 'auto' }}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 'auto', flexShrink: 0 }}>
                     <span style={{ fontWeight: 700, color: 'var(--text)' }}>{s.value}</span>
-                    <span style={{ fontSize: 10, color: 'var(--text3)', width: 36, textAlign: 'right' }}>{s.percentage}%</span>
+                    <span style={{ fontSize: 10, color: 'var(--text3)', minWidth: 32, textAlign: 'right' }}>{s.percentage}%</span>
                   </div>
                 </div>
               ))}
@@ -194,7 +198,7 @@ function PriorityBarChart({ tasks = [] }) {
           </div>
           <div className="chart-sub">Blackfire AI vs Aawazz Product breakdown</div>
         </div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 11 }}>
+        <div className="priority-chart-legend" style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 11, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ width: 10, height: 10, borderRadius: 3, background: '#f97316' }} />
             <span style={{ fontWeight: 600, color: 'var(--text2)' }}>Blackfire AI</span>
@@ -206,7 +210,7 @@ function PriorityBarChart({ tasks = [] }) {
         </div>
       </div>
 
-      <div className="chart-body" style={{ flexDirection: 'column', justifyContent: 'flex-end', padding: '10px 0 0' }}>
+      <div className="chart-body" style={{ flexDirection: 'column', justifyContent: 'flex-end', padding: '10px 0 0', width: '100%', overflowX: 'hidden' }}>
         <div style={{ width: '100%', height: 170, position: 'relative', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
           {/* Grid background lines */}
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', pointerEvents: 'none', opacity: 0.15 }}>
@@ -220,14 +224,14 @@ function PriorityBarChart({ tasks = [] }) {
             const awHeight = (d.aawazz / maxVal) * 130;
 
             return (
-              <div key={d.priority} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flex: 1, zIndex: 2 }}>
+              <div key={d.priority} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flex: 1, zIndex: 2, minWidth: 0 }}>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', height: 130 }}>
                   {/* Blackfire bar */}
                   <div
                     onMouseEnter={() => setActiveHover({ group: d.priority, type: 'Blackfire', val: d.blackfire })}
                     onMouseLeave={() => setActiveHover(null)}
                     style={{
-                      width: 26,
+                      width: 22,
                       height: Math.max(bfHeight, 6),
                       background: '#f97316',
                       borderRadius: '4px 4px 0 0',
@@ -249,7 +253,7 @@ function PriorityBarChart({ tasks = [] }) {
                     onMouseEnter={() => setActiveHover({ group: d.priority, type: 'Aawazz', val: d.aawazz })}
                     onMouseLeave={() => setActiveHover(null)}
                     style={{
-                      width: 26,
+                      width: 22,
                       height: Math.max(awHeight, 6),
                       background: '#3b82f6',
                       borderRadius: '4px 4px 0 0',
@@ -266,7 +270,7 @@ function PriorityBarChart({ tasks = [] }) {
                     )}
                   </div>
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 650, color: 'var(--text2)' }}>{d.priority} Priority</span>
+                <span className="priority-label" style={{ fontSize: 11, fontWeight: 650, color: 'var(--text2)', textAlign: 'center', wordBreak: 'break-word' }}>{d.priority}</span>
               </div>
             );
           })}
@@ -337,14 +341,15 @@ function AssigneeWorkloadChart({ tasks = [], users = [] }) {
                   border: '1px solid var(--border)',
                   transition: 'all 0.15s ease',
                   width: '100%',
+                  minWidth: 0,
                   boxSizing: 'border-box'
                 }}
               >
                 <div style={{ width: 10, height: 10, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
-                <div style={{ width: 110, fontSize: 12, fontWeight: 650, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                <div className="workload-name" style={{ fontSize: 12, fontWeight: 650, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
                   {d.name}
                 </div>
-                <div style={{ flex: 1, height: 10, background: 'var(--border)', borderRadius: 99, overflow: 'hidden', minWidth: 50 }}>
+                <div style={{ flex: 1, height: 10, background: 'var(--border)', borderRadius: 99, overflow: 'hidden', minWidth: 30 }}>
                   <div style={{
                     height: '100%',
                     width: `${barW}%`,
@@ -354,7 +359,7 @@ function AssigneeWorkloadChart({ tasks = [], users = [] }) {
                     boxShadow: `0 0 6px ${d.color}66`
                   }} />
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 40, justifyContent: 'flex-end', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 30, justifyContent: 'flex-end', flexShrink: 0 }}>
                   <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>{d.total}</span>
                 </div>
               </div>
@@ -402,7 +407,7 @@ function AssignedTaskBarChart({ tasks = [] }) {
   const maxVal = Math.max(...items.map(i => i.count), 1);
 
   return (
-    <div className="assigned-chart-card" style={{ marginTop: 12, marginBottom: 16, padding: '14px', background: 'var(--surface2)', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)' }}>
+    <div className="assigned-chart-card" style={{ marginTop: 12, marginBottom: 16, padding: '14px', background: 'var(--surface2)', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
@@ -438,14 +443,17 @@ function AssignedTaskBarChart({ tasks = [] }) {
                 borderRadius: 4,
                 background: isHov ? 'var(--surface)' : 'transparent',
                 transition: 'background 0.15s ease',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                width: '100%',
+                minWidth: 0,
+                boxSizing: 'border-box'
               }}
             >
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
-              <span style={{ width: 85, fontWeight: 600, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
+              <span className="assigned-chart-label" style={{ fontWeight: 600, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
                 {item.label}
               </span>
-              <div style={{ flex: 1, height: 8, background: 'var(--border)', borderRadius: 99, overflow: 'hidden', position: 'relative' }}>
+              <div style={{ flex: 1, height: 8, background: 'var(--border)', borderRadius: 99, overflow: 'hidden', position: 'relative', minWidth: 25 }}>
                 <div style={{
                   height: '100%',
                   width: `${barW}%`,
@@ -454,7 +462,7 @@ function AssignedTaskBarChart({ tasks = [] }) {
                   transition: 'width 0.35s ease'
                 }} />
               </div>
-              <div style={{ display: 'flex', gap: 4, alignItems: 'center', minWidth: 42, justifyContent: 'flex-end', flexShrink: 0 }}>
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center', minWidth: 38, justifyContent: 'flex-end', flexShrink: 0 }}>
                 <span style={{ fontWeight: 750, color: 'var(--text)' }}>{item.count}</span>
                 <span style={{ fontSize: 9.5, color: 'var(--text3)' }}>({pct}%)</span>
               </div>
