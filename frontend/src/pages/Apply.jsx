@@ -52,10 +52,10 @@ export default function Apply() {
         password: form.password,
         note: form.note.trim()
       });
-      if (typeof toast === 'function') toast('Verification code sent to your email', 'success');
+      toast('Verification code sent to your email', 'success');
       setStep(2);
     } catch (error) {
-      setErrorMsg(error?.response?.data?.error || (typeof error?.response?.data === 'string' ? error.response.data : null) || 'Failed to submit application. Please try again.');
+      setErrorMsg(error?.response?.data?.error || 'Failed to submit application. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -76,10 +76,10 @@ export default function Apply() {
         email: form.email.trim().toLowerCase(),
         code: code.trim()
       });
-      if (typeof toast === 'function') toast('Email verified! Your request is now pending admin approval.', 'success');
+      toast('Email verified! Your request is now pending admin approval.', 'success');
       navigate('/');
     } catch (error) {
-      setErrorMsg(error?.response?.data?.error || (typeof error?.response?.data === 'string' ? error.response.data : null) || 'Verification failed. Please check the code.');
+      setErrorMsg(error?.response?.data?.error || 'Verification failed. Please check the code.');
     } finally {
       setLoading(false);
     }
@@ -91,17 +91,7 @@ export default function Apply() {
     setCode(val);
     if (val.length === 6) {
       // Small delay so user sees full code before submission
-      setTimeout(() => {
-        if (verifyFormRef.current && typeof verifyFormRef.current.requestSubmit === 'function') {
-          try {
-            verifyFormRef.current.requestSubmit();
-          } catch {
-            handleVerify();
-          }
-        } else {
-          handleVerify();
-        }
-      }, 200);
+      setTimeout(() => verifyFormRef.current?.requestSubmit(), 200);
     }
   }
 
@@ -111,7 +101,7 @@ export default function Apply() {
 
       <div className="stage" style={{ width: '100%', maxWidth: 420 }}>
         <svg className="sigil" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M32 4C32 4 20 18 20 32C20 42 25 48 25 48C22 44 22 38 25 34C25 40 29 44 32 46C29 40 30 34 34 30C33 36 37 40 41 42C38 38 38 32 41 27C42 33 46 36 46 42C46 51 40 60 32 60C22 60 14 52 14 40C14 24 32 4 32 4Z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+          <path d="M32 4C32 4 20 18 20 32C20 42 25 48 25 48C22 44 22 38 25 34C25 40 29 44 32 46C29 40 30 34 34 30C33 36 37 40 41 42C38 38 38 32 41 27C42 33 46 36 46 42C46 51 40 60 32 60C22 60 14 52 14 40C14 24 32 4 32 4Z" stroke="currentColor" strokeWidth="1.5" fill="none" />
         </svg>
 
         <h1 className="wordmark">Black Fire
@@ -238,7 +228,7 @@ export default function Apply() {
               <h2 className="auth-card-title" style={{ fontSize: '16px', marginBottom: '6px', textAlign: 'center' }}>Email Verification</h2>
               <p style={{ fontSize: '12px', color: 'var(--text3)', textAlign: 'center', marginBottom: '20px' }}>
                 A 6-digit code was sent to <strong style={{ color: 'var(--text)' }}>{form.email}</strong>.
-                <br/>
+                <br />
                 <span style={{ fontSize: '10px', color: '#555', marginTop: 4, display: 'block' }}>Enter the code below — it will submit automatically.</span>
               </p>
 

@@ -38,6 +38,7 @@ export const usersApi = {
   delete: (id) => api.delete(`/users/${id}`),
   listApplications: () => api.get('/users/applications'),
   approveApplication: (id) => api.post(`/users/applications/${id}/approve`),
+  approveAllApplications: () => api.post('/users/applications/approve-all'),
   rejectApplication: (id) => api.post(`/users/applications/${id}/reject`),
 };
 

@@ -106,40 +106,91 @@ router.get('/applications', requireAdmin, async (req, res) => {
   }
 });
 
+router.post('/applications/approve-all', requireAdmin, writeLimiter, async (req, res) => {
+  try {
+    const apps = await AccountApplication.find({
+      status: { $in: ['pending', 'rejected'] }
+    });
+
+    let count = 0;
+    for (const app of apps) {
+      let userExists = await User.findOne({
+        $or: [
+          { username: app.username },
+          { email: app.email }
+        ]
+      });
+
+      if (!userExists) {
+        let username = app.username;
+        const takenUsername = await User.findOne({ username });
+        if (takenUsername) {
+          username = app.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+        }
+
+        await User.create({
+          name: app.name,
+          username,
+          email: app.email,
+          password: app.password,
+          role: 'member',
+          active: true
+        });
+      }
+
+      app.status = 'approved';
+      app.isEmailVerified = true;
+      app.reviewedBy = req.sessionUser._id;
+      app.reviewedAt = new Date();
+      await app.save();
+
+      await recordActivity({
+        action: 'approved',
+        targetType: 'application',
+        targetId: app._id,
+        targetName: app.username,
+        actorId: req.sessionUser._id,
+        actorName: req.sessionUser.name,
+        summary: `${req.sessionUser.name} approved account application for ${app.username}`,
+      });
+
+      count++;
+    }
+
+    res.json({ ok: true, count });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.post('/applications/:id/approve', requireAdmin, writeLimiter, async (req, res) => {
   try {
     const app = await AccountApplication.findById(req.params.id);
     if (!app) {
       return res.status(404).json({ error: 'Application not found' });
     }
-    if (app.status !== 'pending') {
-      return res.status(400).json({ error: `Application is already ${app.status}` });
+    if (app.status === 'approved') {
+      return res.status(400).json({ error: 'Application is already approved' });
     }
 
     // Check if user already exists
-    const userExists = await User.findOne({
-      $or: [
-        { username: app.username },
-        { email: app.email }
-      ]
-    });
-    if (userExists) {
-      app.status = 'rejected';
-      app.reviewedBy = req.sessionUser._id;
-      app.reviewedAt = new Date();
-      await app.save();
-      return res.status(400).json({ error: 'Username or email already exists. Application rejected.' });
-    }
+    let userExists = await User.findOne({ email: app.email });
+    if (!userExists) {
+      let username = app.username;
+      const takenUsername = await User.findOne({ username });
+      if (takenUsername) {
+        username = app.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+      }
 
-    // Create user
-    const user = await User.create({
-      name: app.name,
-      username: app.username,
-      email: app.email,
-      password: app.password, // already hashed
-      role: 'member',
-      active: true
-    });
+      userExists = await User.create({
+        name: app.name,
+        username,
+        email: app.email,
+        password: app.password, // already hashed
+        role: 'member',
+        active: true
+      });
+    }
 
     app.status = 'approved';
     app.reviewedBy = req.sessionUser._id;
@@ -156,7 +207,7 @@ router.post('/applications/:id/approve', requireAdmin, writeLimiter, async (req,
       summary: `${req.sessionUser.name} approved account application for ${app.username}`,
     });
 
-    res.json({ ok: true, user: sanitizeUser(user) });
+    res.json({ ok: true, user: sanitizeUser(userExists) });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -167,9 +218,6 @@ router.post('/applications/:id/reject', requireAdmin, writeLimiter, async (req, 
     const app = await AccountApplication.findById(req.params.id);
     if (!app) {
       return res.status(404).json({ error: 'Application not found' });
-    }
-    if (app.status !== 'pending') {
-      return res.status(400).json({ error: `Application is already ${app.status}` });
     }
 
     app.status = 'rejected';

@@ -24,8 +24,7 @@ export function ToastProvider({ children }) {
 }
 
 export function useToast() {
-  const ctx = useContext(ToastCtx);
-  return ctx || (() => {});
+  return useContext(ToastCtx);
 }
 
 export default function Toast() { return null; }

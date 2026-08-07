@@ -95,10 +95,21 @@ export default function Accounts() {
     }
   }
 
+  async function handleApproveAll() {
+    try {
+      const res = await usersApi.approveAllApplications();
+      toast(`Approved all ${res.data?.count || ''} account requests`, 'success');
+      mutate('/users');
+      mutate('/users/applications');
+    } catch (error) {
+      toast(error?.response?.data?.error || 'Failed to approve all applications', 'error');
+    }
+  }
+
   async function handleReject(appId) {
     try {
       await usersApi.rejectApplication(appId);
-      toast('Application rejected successfully', 'info');
+      toast('Application rejected', 'info');
       mutate('/users');
       mutate('/users/applications');
     } catch (error) {
@@ -106,7 +117,7 @@ export default function Accounts() {
     }
   }
 
-  const pendingApps = applications.filter(a => a.status === 'pending');
+  const pendingApps = applications.filter(a => a.status === 'pending' || a.status === 'rejected');
 
   return (
     <>
@@ -116,10 +127,22 @@ export default function Accounts() {
       </div>
 
       <div className="page-body">
-        {/* Pending Applications Section */}
+        {/* Account Requests Section */}
         <div style={{ marginBottom: 32 }}>
-          <div className="section-title" style={{ fontSize: '14px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '16px' }}>
-            Pending Account Requests ({pendingApps.length})
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <div className="section-title" style={{ fontSize: '14px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Account Requests ({pendingApps.length})
+            </div>
+            {pendingApps.length > 0 && (
+              <button
+                type="button"
+                className="btn btn-sm btn-primary"
+                style={{ background: '#16a34a', borderColor: '#16a34a', color: '#fff', fontSize: '12px', padding: '4px 12px' }}
+                onClick={handleApproveAll}
+              >
+                ✓ Approve All ({pendingApps.length})
+              </button>
+            )}
           </div>
           {pendingApps.length === 0 ? (
             <div className="card empty" style={{ padding: '32px', textAlign: 'center', background: 'var(--surface)', color: 'var(--text3)' }}>
@@ -129,7 +152,7 @@ export default function Accounts() {
           ) : (
             <div className="accounts-grid">
               {pendingApps.map(app => (
-                <div className="account-card" key={app._id} style={{ borderLeft: '4px solid var(--accent)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div className="account-card" key={app._id} style={{ borderLeft: app.status === 'rejected' ? '4px solid #ef4444' : '4px solid var(--accent)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <div>
                     <div className="account-top">
                       <div>
@@ -138,7 +161,9 @@ export default function Accounts() {
                           @{app.username} · {app.email}
                         </div>
                       </div>
-                      <span className="tag tag-amber" style={{ textTransform: 'uppercase', fontSize: '10px' }}>Pending</span>
+                      <span className={`tag ${app.status === 'rejected' ? 'tag-gray' : 'tag-amber'}`} style={{ textTransform: 'uppercase', fontSize: '10px' }}>
+                        {app.status}
+                      </span>
                     </div>
 
                     {app.note && (
@@ -151,8 +176,10 @@ export default function Accounts() {
                   <div className="client-foot" style={{ marginTop: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div className="text-sm text-muted" style={{ fontSize: '11px' }}>Applied {new Date(app.createdAt).toLocaleDateString()}</div>
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      <button className="btn btn-sm btn-primary" style={{ background: '#16a34a', borderColor: '#16a34a', color: '#fff' }} onClick={() => handleApprove(app._id)}>Approve</button>
-                      <button className="btn btn-sm btn-danger" onClick={() => handleReject(app._id)}>Reject</button>
+                      <button type="button" className="btn btn-sm btn-primary" style={{ background: '#16a34a', borderColor: '#16a34a', color: '#fff' }} onClick={() => handleApprove(app._id)}>Approve</button>
+                      {app.status !== 'rejected' && (
+                        <button type="button" className="btn btn-sm btn-danger" onClick={() => handleReject(app._id)}>Reject</button>
+                      )}
                     </div>
                   </div>
                 </div>

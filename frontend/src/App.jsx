@@ -52,15 +52,13 @@ function AppShell() {
         <div className="main" style={{ position: 'relative' }}>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard"  element={<Dashboard />} />
-            <Route path="/clients"    element={<Clients />} />
-            <Route path="/calendar"   element={<Calendar />} />
-            <Route path="/email"      element={<Email />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/clients" element={<Clients />} />
+            <Route path="/calendar" element={<Calendar />} />
+            <Route path="/email" element={<Email />} />
             <Route path="/references" element={<References />} />
-            <Route path="/board"      element={<Board />} />
-            <Route path="/accounts"   element={<Accounts />} />
-            <Route path="/apply"      element={<Apply />} />
-            <Route path="*"           element={<Navigate to="/dashboard" replace />} />
+            <Route path="/board" element={<Board />} />
+            <Route path="/accounts" element={<Accounts />} />
           </Routes>
         </div>
         <Toast />
