@@ -1,11 +1,9 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import useSWR, { mutate } from 'swr';
 import { eventsApi, clientsApi, fetcher } from '../api';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 import SocialIcon, { PLATFORMS } from '../components/SocialIcon';
-import { useAuth } from '../context/AuthContext';
 
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -23,7 +21,7 @@ const COLORS = [
 
 const COLOR_MAP = COLORS.reduce((acc, c) => ({ ...acc, [c.id]: c }), {});
 
-const EMPTY_EV = { title:'', date:'', time:'', clientId:'', notes:'', color:'blue', platforms:[], status:'scheduled' };
+const EMPTY_EV = { title:'', date:'', time:'', assignees:[], notes:'', color:'blue', platforms:[], status:'scheduled' };
 
 // --- Draft cache helpers for Calendar events ---
 const CAL_DRAFT_PREFIX = 'crm_cal_draft_';
@@ -43,10 +41,6 @@ function loadCalDraft(id) {
 function clearCalDraft(id) { try { sessionStorage.removeItem(getCalDraftKey(id)); } catch {} }
 
 export default function Calendar() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [focusUserId, setFocusUserId] = useState('');
-
   const today = new Date();
   const [year, setYear]   = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
@@ -61,25 +55,7 @@ export default function Calendar() {
   const pad = String(month + 1).padStart(2, '0');
   const eventsKey = `/events?month=${year}-${pad}`;
   const { data: events = [] } = useSWR(eventsKey, fetcher, { keepPreviousData: true, revalidateOnFocus: false });
-  const { data: clients = [] } = useSWR('/clients', fetcher, { revalidateOnFocus: false });
-  const { data: tasks = [] } = useSWR('/tasks', fetcher, { revalidateOnFocus: false });
   const { data: users = [] } = useSWR('/users', fetcher, { revalidateOnFocus: false });
-
-  useEffect(() => {
-    if (!focusUserId && user?._id) setFocusUserId(String(user._id));
-  }, [focusUserId, user]);
-
-  function tasksFor(dStr) {
-    return tasks.filter(t => {
-      if (!t.dueDate || t.dueDate !== dStr) return false;
-      if (!focusUserId) return true;
-      const isAssignee = (t.assignees || []).some(a => String(a.userId) === focusUserId) ||
-                         String(t.assigneeId) === focusUserId ||
-                         t.assigneeName === user?.name ||
-                         t.assignee === user?.name;
-      return isAssignee;
-    });
-  }
 
   // Auto-save form to sessionStorage while modal is open
   useEffect(() => {
@@ -142,7 +118,7 @@ export default function Calendar() {
         title: ev.title,
         date: ev.date,
         time: ev.time||'',
-        clientId: ev.clientId?._id||ev.clientId||'',
+        assignees: ev.assignees?.length ? ev.assignees : (ev.assigneeName ? [{ name: ev.assigneeName }] : []),
         notes: ev.notes||'',
         color: ev.color||'blue',
         platforms: ev.platforms||[],
@@ -169,7 +145,11 @@ export default function Calendar() {
     if (!form.title.trim() || !form.date) return toast('Title and date required', 'error');
     setSaving(true);
     try {
-      const payload = { ...form, clientId: form.clientId || null };
+      const firstAssignee = form.assignees?.[0];
+      const payload = { 
+        ...form, 
+        assigneeName: form.assignees?.map(a => a.name).join(', ') || firstAssignee?.name || '' 
+      };
       let savedEv;
       if (editing) {
         mutate(eventsKey, events.map(e => e._id === editing ? { ...e, ...payload } : e), false);
@@ -228,22 +208,13 @@ export default function Calendar() {
 
   const selEvents = sel ? eventsFor(sel) : [];
   const selDate   = sel ? dateStr(sel) : '';
-  const selTasks  = sel ? tasksFor(selDate) : [];
-
-  const focusUserTasks = tasks.filter(t => {
-    if (!focusUserId) return true;
-    return (t.assignees || []).some(a => String(a.userId) === focusUserId) ||
-           String(t.assigneeId) === focusUserId ||
-           t.assigneeName === user?.name ||
-           t.assignee === user?.name;
-  });
 
   const weekRows = Math.ceil(cells.length / 7);
 
   return (
     <>
       <div className="page-head">
-        <div><h1>Calendar & Content Scheduler</h1><p>Social media post tracking & assigned task calendar visualization</p></div>
+        <div><h1>Calendar & Content Scheduler</h1><p>Social media post tracking with vector SVG platform logos & custom day color coding</p></div>
       </div>
       <div className="page-body cal-page-body">
         <div className="cal-container">
@@ -254,17 +225,7 @@ export default function Calendar() {
                 <h2 className="cal-month-title">{MONTHS[month]}</h2>
                 <span className="cal-year-badge">{year}</span>
               </div>
-              <div className="cal-header-right" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {user?.role === 'admin' && (
-                  <select 
-                    value={focusUserId} 
-                    onChange={e => setFocusUserId(e.target.value)}
-                    style={{ padding: '5px 10px', fontSize: 12, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}
-                  >
-                    <option value="">All Accounts</option>
-                    {users.map(u => <option key={u._id} value={u._id}>{u.name} ({u.username})</option>)}
-                  </select>
-                )}
+              <div className="cal-header-right">
                 <button className="cal-nav-btn" onClick={prevMonth} aria-label="Previous month">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
                 </button>
@@ -294,7 +255,6 @@ export default function Calendar() {
                 }
                 const evs = eventsFor(cell.day);
                 const ds  = dateStr(cell.day);
-                const dayTks = tasksFor(ds);
                 const isToday = ds === todayStr;
                 const isSel   = sel === cell.day;
 
@@ -311,11 +271,7 @@ export default function Calendar() {
                     
                     <div className="cal-cell-head">
                       <span className={`cal-cell-num${isToday ? ' cal-cell-num--today' : ''}`}>{cell.day}</span>
-                      {(evs.length > 0 || dayTks.length > 0) && (
-                        <span className="text-xs text-muted cal-ev-count-label" style={{ fontWeight:600 }}>
-                          {evs.length > 0 ? `${evs.length} ev ` : ''}{dayTks.length > 0 ? `${dayTks.length} tk` : ''}
-                        </span>
-                      )}
+                      {evs.length > 0 && <span className="text-xs text-muted cal-ev-count-label" style={{ fontWeight:600 }}>{evs.length} ev</span>}
                     </div>
 
                     {/* Mobile: single colored dot. Desktop: full chips */}
@@ -328,7 +284,7 @@ export default function Calendar() {
                           aria-label={`${evs.length} event${evs.length > 1 ? 's' : ''}`}
                         />
                       )}
-                      {/* Desktop event chips */}
+                      {/* Desktop chips */}
                       {evs.slice(0, 2).map(ev => {
                         const c = COLOR_MAP[ev.color] || COLOR_MAP.blue;
                         return (
@@ -339,19 +295,7 @@ export default function Calendar() {
                           </div>
                         );
                       })}
-                      {/* Desktop task chips */}
-                      {dayTks.slice(0, 2).map(tk => (
-                        <div 
-                          key={tk._id} 
-                          className="cal-chip" 
-                          style={{ background: '#eff6ff', color: '#1e40af', borderLeft: '2px solid #2563eb', cursor: 'pointer' }}
-                          onClick={(e) => { e.stopPropagation(); navigate(`/board?project=${tk.project || 'blackfire'}`); }}
-                          title={`Task: ${tk.title} (Click to view)`}
-                        >
-                          <span className="cal-chip-title">Task: {tk.title}</span>
-                        </div>
-                      ))}
-                      {(evs.length + dayTks.length) > 2 && <div className="cal-chip-overflow">+{evs.length + dayTks.length - 2} more</div>}
+                      {evs.length > 2 && <div className="cal-chip-overflow">+{evs.length - 2} more</div>}
                     </div>
 
                     {/* Social Media SVG Vector Platforms Row */}
@@ -393,7 +337,7 @@ export default function Calendar() {
                 </div>
                 {sel && (
                   <span className="cal-sp-count">
-                    {selEvents.length} event(s), {selTasks.length} task(s)
+                    {selEvents.length} event/post{selEvents.length !== 1 ? 's' : ''}
                   </span>
                 )}
               </div>
@@ -410,15 +354,15 @@ export default function Calendar() {
                   <div className="cal-sp-empty-icon">
                     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                   </div>
-                  <p>Pick a date to view events, posts & assigned tasks</p>
+                  <p>Pick a date to view events & scheduled posts</p>
                 </div>
               )}
-              {sel && selEvents.length === 0 && selTasks.length === 0 && (
+              {sel && selEvents.length === 0 && (
                 <div className="cal-sp-empty">
                   <div className="cal-sp-empty-icon">
                     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
                   </div>
-                  <p>No posts, events, or tasks on this day</p>
+                  <p>No posts or events on this day</p>
                   <button className="cal-sp-add-first" onClick={() => openAdd(selDate)}>Schedule a post</button>
                 </div>
               )}
@@ -459,10 +403,10 @@ export default function Calendar() {
                           {ev.time}
                         </span>
                       )}
-                      {ev.clientId?.name && (
+                      {((ev.assignees && ev.assignees.length > 0) || ev.assigneeName) && (
                         <span className="cal-ev-meta-item">
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                          {ev.clientId.name}
+                          To: {ev.assignees?.length ? ev.assignees.map(a => a.name).join(', ') : ev.assigneeName}
                         </span>
                       )}
                       <span className={`cal-ev-status ${ev.status === 'done' ? 'status-done' : ev.status === 'cancelled' ? 'status-cancelled' : ''}`} style={ev.status === 'scheduled' ? { background: c.bg, color: c.text } : {}}>{ev.status}</span>
@@ -490,66 +434,6 @@ export default function Calendar() {
                   </div>
                 );
               })}
-
-              {/* Tasks due on selected date */}
-              {selTasks.length > 0 && (
-                <div style={{ marginTop: 18 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text2)', marginBottom: 8 }}>
-                    Assigned Tasks Due ({selTasks.length})
-                  </div>
-                  {selTasks.map(tk => (
-                    <div 
-                      key={tk._id} 
-                      className="assigned-item" 
-                      style={{ cursor: 'pointer', marginBottom: 8, padding: 10, background: 'var(--surface2)', borderRadius: 6, border: '1px solid var(--border)' }}
-                      onClick={() => navigate(`/board?project=${tk.project || 'blackfire'}`)}
-                      title="Click to view task on project board"
-                    >
-                      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{tk.title}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text3)', display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                        <span style={{ textTransform: 'capitalize' }}>Project: {tk.project}</span>
-                        <span>•</span>
-                        <span style={{ textTransform: 'capitalize' }}>Status: {tk.column}</span>
-                        <span>•</span>
-                        <span>Assignee: {tk.assigneeName || tk.assignee || 'Unassigned'}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* All Assigned Tasks for the Focused User */}
-              <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text2)', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>All Assigned Tasks</span>
-                  <span className="badge" style={{ fontSize: 11, padding: '2px 8px', background: 'var(--accent)', color: '#fff', borderRadius: 10 }}>{focusUserTasks.length}</span>
-                </div>
-                {focusUserTasks.length === 0 && <div className="text-sm text-muted">No assigned tasks found.</div>}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto' }}>
-                  {focusUserTasks.map(tk => (
-                    <div 
-                      key={tk._id} 
-                      className="assigned-item" 
-                      style={{ cursor: 'pointer', padding: 8, background: 'var(--surface)', borderRadius: 6, border: '1px solid var(--border)' }}
-                      onClick={() => navigate(`/board?project=${tk.project || 'blackfire'}`)}
-                      title="Click to view task on project board"
-                    >
-                      <div style={{ fontWeight: 600, fontSize: 12.5, color: 'var(--text)' }}>{tk.title}</div>
-                      <div style={{ fontSize: 10.5, color: 'var(--text3)', display: 'flex', gap: 6, marginTop: 3 }}>
-                        <span style={{ textTransform: 'capitalize' }}>{tk.project}</span>
-                        <span>•</span>
-                        <span style={{ textTransform: 'capitalize' }}>{tk.column}</span>
-                        {tk.dueDate && (
-                          <>
-                            <span>•</span>
-                            <span>Due: {tk.dueDate}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -597,18 +481,45 @@ export default function Calendar() {
           <div className="form-group"><label>Time</label><input type="time" value={form.time} onChange={e => setForm(f=>({...f,time:e.target.value}))} /></div>
         </div>
 
-        <div className="form-row">
-          <div className="form-group"><label>Client</label>
-            <select value={form.clientId} onChange={e => setForm(f=>({...f,clientId:e.target.value}))}>
-              <option value="">No client</option>
-              {clients.map(c => <option key={c._id} value={c._id}>{c.name} ({c.company})</option>)}
-            </select>
+        {/* Multi-assignee task picker */}
+        <div className="form-group">
+          <label>Assign task to (select multiple)</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 160, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}>
+            {users.map(u => {
+              const isChecked = (form.assignees || []).some(a => String(a.userId) === String(u._id));
+              return (
+                <label key={u._id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '4px 0' }}>
+                  <input type="checkbox" style={{ accentColor: 'var(--accent)', width: 14, height: 14 }}
+                    checked={isChecked}
+                    onChange={() => {
+                      setForm(f => {
+                        const existing = f.assignees || [];
+                        if (isChecked) return { ...f, assignees: existing.filter(a => String(a.userId) !== String(u._id)) };
+                        return { ...f, assignees: [...existing, { userId: u._id, name: u.name, email: u.email }] };
+                      });
+                    }}
+                  />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{u.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text3)' }}>{u.email}</div>
+                  </div>
+                </label>
+              );
+            })}
+            {users.length === 0 && <div style={{ fontSize: 12, color: 'var(--text3)' }}>No accounts found</div>}
           </div>
-          <div className="form-group"><label>Status</label>
-            <select value={form.status} onChange={e => setForm(f=>({...f,status:e.target.value}))}>
-              <option value="scheduled">Scheduled</option><option value="done">Done</option><option value="cancelled">Cancelled</option>
-            </select>
-          </div>
+          {(form.assignees || []).length > 0 && (
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text3)' }}>
+              Assigned to: {form.assignees.map(a => a.name).join(', ')}
+            </div>
+          )}
+        </div>
+
+        <div className="form-group">
+          <label>Status</label>
+          <select value={form.status} onChange={e => setForm(f=>({...f,status:e.target.value}))}>
+            <option value="scheduled">Scheduled</option><option value="done">Done</option><option value="cancelled">Cancelled</option>
+          </select>
         </div>
 
         <div className="form-group"><label>Event Picture</label>

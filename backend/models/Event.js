@@ -5,6 +5,12 @@ const eventSchema = new mongoose.Schema({
   date:      { type: String, required: true },   // YYYY-MM-DD
   time:      { type: String, default: '' },
   clientId:  { type: mongoose.Schema.Types.ObjectId, ref: 'Client', default: null },
+  assignees: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    name: String,
+    email: String
+  }],
+  assigneeName: { type: String, default: '' },
   notes:     { type: String, default: '' },
   color:     { type: String, default: 'blue' },
   platforms: [{ type: String }],
