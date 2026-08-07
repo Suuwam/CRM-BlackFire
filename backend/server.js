@@ -8,18 +8,24 @@ const app = express();
 
 // Middleware
 app.use(cors({ origin: true, credentials: true }));
+app.options('*', cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Mongo DB connection handling for serverless & local
-let isConnected = 0;
+let cachedConnection = null;
+
 async function connectDB() {
   if (mongoose.connection.readyState >= 1) return;
   if (!process.env.MONGO_URI) {
-    console.error('MONGO_URI is missing');
-    return;
+    throw new Error('MONGO_URI environment variable is missing in server environment');
   }
-  await mongoose.connect(process.env.MONGO_URI);
+  if (!cachedConnection) {
+    cachedConnection = await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 4000,
+    });
+  }
+  return cachedConnection;
 }
 
 app.use(async (req, res, next) => {
@@ -28,7 +34,7 @@ app.use(async (req, res, next) => {
     next();
   } catch (err) {
     console.error('MongoDB Connection Error:', err);
-    res.status(500).json({ error: 'Database connection failed' });
+    res.status(500).json({ error: `Database connection failed: ${err.message}` });
   }
 });
 
