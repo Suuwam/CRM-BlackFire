@@ -742,22 +742,24 @@ button:active, .btn:active, .sb-item:active, .client-card:active, .board-tab:act
   @keyframes slideSheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
   /* Page Layout & Headings */
-  .page-head { flex-direction: column; align-items: flex-start; padding: 20px 20px 14px; gap: 12px; }
-  .page-head h1 { font-size: 19px; }
+  .page-head { flex-direction: column; align-items: flex-start; padding: 16px 16px 12px; gap: 10px; }
+  .page-head h1 { font-size: 18px; }
   .page-head button, .page-head .btn { width: 100%; justify-content: center; } 
-  .page-body { padding: 16px 20px 24px; }
+  .page-body { padding: 12px 14px 24px; overflow-x: hidden; width: 100%; }
 
-  /* Grids & Cards */
-  .stats-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
-  .stat-card { padding: 16px; }
+  /* Grids & Cards - Single Element per Row on Mobile */
+  .stats-grid { grid-template-columns: 1fr !important; gap: 12px; width: 100%; }
+  .charts-grid { grid-template-columns: 1fr !important; gap: 16px; width: 100%; }
+  .stat-card { padding: 14px; width: 100%; box-sizing: border-box; }
+  .chart-card { padding: 16px 14px; width: 100%; box-sizing: border-box; overflow: hidden; }
   .auth-login-card { width: 100% !important; }
   .email-layout { grid-template-columns: 1fr; gap: 16px; }
-  .dash-grid { grid-template-columns: 1fr; gap: 16px; }
-  .dash-side { position: static; max-width: none; justify-self: stretch; }
+  .dash-grid { grid-template-columns: 1fr !important; gap: 16px; width: 100%; max-width: 100%; overflow: hidden; }
+  .dash-side { position: static; max-width: 100%; width: 100%; justify-self: stretch; }
   .assigned-list { max-height: none; }
   .activity-list { max-height: none; }
   .form-row { grid-template-columns: 1fr; gap: 12px; }
-  .card { padding: 16px; }
+  .card { padding: 14px; width: 100%; box-sizing: border-box; overflow: hidden; }
 
   /* Calendar Refinement */
   .cal-container { grid-template-columns: 1fr; min-height: auto; }

@@ -315,9 +315,9 @@ function AssigneeWorkloadChart({ tasks = [], users = [] }) {
         </div>
       </div>
 
-      <div className="chart-body" style={{ flexDirection: 'column', gap: 10, padding: '8px 0' }}>
+      <div className="chart-body" style={{ flexDirection: 'column', gap: 10, padding: '10px 0', alignItems: 'stretch', width: '100%', minHeight: 'auto' }}>
         {data.length === 0 ? (
-          <div className="text-muted text-sm" style={{ padding: '40px 0', textAlign: 'center' }}>No assignments found</div>
+          <div className="text-muted text-sm" style={{ padding: '30px 0', textAlign: 'center' }}>No assignments found</div>
         ) : (
           data.map((d, i) => {
             const barW = (d.total / maxVal) * 100;
@@ -331,32 +331,31 @@ function AssigneeWorkloadChart({ tasks = [], users = [] }) {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 10,
-                  padding: '5px 8px',
+                  padding: '8px 10px',
                   borderRadius: 8,
-                  background: isHov ? 'var(--surface2)' : 'transparent',
-                  transition: 'background 0.15s',
-                  cursor: 'default',
+                  background: isHov ? 'var(--surface2)' : 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  transition: 'all 0.15s ease',
+                  width: '100%',
+                  boxSizing: 'border-box'
                 }}
               >
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
-                <div style={{ width: 90, fontSize: 12, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>{d.name}</div>
-                <div style={{ flex: 1, height: 10, background: 'var(--surface2)', borderRadius: 99, overflow: 'hidden' }}>
+                <div style={{ width: 10, height: 10, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
+                <div style={{ width: 110, fontSize: 12, fontWeight: 650, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  {d.name}
+                </div>
+                <div style={{ flex: 1, height: 10, background: 'var(--border)', borderRadius: 99, overflow: 'hidden', minWidth: 50 }}>
                   <div style={{
                     height: '100%',
                     width: `${barW}%`,
                     background: d.color,
                     borderRadius: 99,
-                    transition: 'width 0.3s ease',
-                    opacity: hoveredIdx === null || isHov ? 1 : 0.5,
+                    transition: 'width 0.4s ease',
+                    boxShadow: `0 0 6px ${d.color}66`
                   }} />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: 52, flexShrink: 0 }}>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{d.total}</span>
-                  {isHov && (
-                    <span style={{ fontSize: 9, color: 'var(--text3)', marginTop: 2, whiteSpace: 'nowrap' }}>
-                      {d.inProgress} active · {d.done} done
-                    </span>
-                  )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 40, justifyContent: 'flex-end', flexShrink: 0 }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>{d.total}</span>
                 </div>
               </div>
             );
