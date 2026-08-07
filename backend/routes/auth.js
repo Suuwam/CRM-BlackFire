@@ -8,7 +8,7 @@ const { sendMail } = require('../utils/mailer');
 const { rateLimit } = require('../utils/rateLimit');
 const { verifyPassword, isBcryptHash } = require('../utils/password');
 
-const loginLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 8, prefix: 'auth-login', message: 'Too many login attempts. Please try again later.' });
+const loginLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 10, prefix: 'auth-login', message: 'Too many login attempts. Please try again later.' });
 const applyLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 3, prefix: 'auth-apply', message: 'Too many account requests. Please try again later.' });
 
 router.post('/login', loginLimiter, async (req, res) => {
