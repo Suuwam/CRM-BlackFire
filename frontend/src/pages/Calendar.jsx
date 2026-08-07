@@ -267,10 +267,20 @@ export default function Calendar() {
                     
                     <div className="cal-cell-head">
                       <span className={`cal-cell-num${isToday ? ' cal-cell-num--today' : ''}`}>{cell.day}</span>
-                      {evs.length > 0 && <span className="text-xs text-muted" style={{ fontWeight:600 }}>{evs.length} ev</span>}
+                      {evs.length > 0 && <span className="text-xs text-muted cal-ev-count-label" style={{ fontWeight:600 }}>{evs.length} ev</span>}
                     </div>
 
+                    {/* Mobile: single colored dot. Desktop: full chips */}
                     <div className="cal-cell-events">
+                      {/* Mobile dot — one filled circle showing the dominant event color */}
+                      {evs.length > 0 && dayAccent && (
+                        <span
+                          className="cal-mobile-dot"
+                          style={{ background: dayAccent.hex }}
+                          aria-label={`${evs.length} event${evs.length > 1 ? 's' : ''}`}
+                        />
+                      )}
+                      {/* Desktop chips */}
                       {evs.slice(0, 2).map(ev => {
                         const c = COLOR_MAP[ev.color] || COLOR_MAP.blue;
                         return (

@@ -1,8 +1,16 @@
 const router = require('express').Router();
 const multer = require('multer');
+const mongoose = require('mongoose');
 const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
 const Client = require('../models/Client');
+const { requireSessionUser } = require('../utils/session');
+const { rateLimit } = require('../utils/rateLimit');
+
+// All client routes require a logged-in session
+router.use(requireSessionUser);
+
+const writeLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, prefix: 'clients-write', message: 'Too many client updates. Please slow down.' });
 
 // Configure Cloudinary
 cloudinary.config({
@@ -11,11 +19,24 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Memory storage for Vercel serverless compatibility
+// Memory storage — image/MIME type filter
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+      return cb(new Error('Only image files are allowed'));
+    }
+    cb(null, true);
+  }
 });
+
+function validateId(req, res, next) {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid ID format' });
+  }
+  next();
+}
 
 // GET all
 router.get('/', async (_, res) => {
@@ -24,25 +45,25 @@ router.get('/', async (_, res) => {
 });
 
 // GET one
-router.get('/:id', async (req, res) => {
+router.get('/:id', validateId, async (req, res) => {
   try { res.json(await Client.findById(req.params.id)); }
   catch (e) { res.status(404).json({ error: 'Not found' }); }
 });
 
 // POST create
-router.post('/', async (req, res) => {
+router.post('/', writeLimiter, async (req, res) => {
   try { res.status(201).json(await Client.create(req.body)); }
   catch (e) { res.status(400).json({ error: e.message }); }
 });
 
 // PUT update
-router.put('/:id', async (req, res) => {
+router.put('/:id', validateId, writeLimiter, async (req, res) => {
   try { res.json(await Client.findByIdAndUpdate(req.params.id, req.body, { new: true })); }
   catch (e) { res.status(400).json({ error: e.message }); }
 });
 
 // PATCH upload photo
-router.patch('/:id/photo', upload.single('photo'), async (req, res) => {
+router.patch('/:id/photo', validateId, upload.single('photo'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
@@ -70,7 +91,7 @@ router.patch('/:id/photo', upload.single('photo'), async (req, res) => {
 });
 
 // DELETE
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', validateId, writeLimiter, async (req, res) => {
   try { await Client.findByIdAndDelete(req.params.id); res.json({ ok: true }); }
   catch (e) { res.status(400).json({ error: e.message }); }
 });

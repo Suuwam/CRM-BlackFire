@@ -223,6 +223,7 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
 .card-color-gray   { border-left: 4px solid #71717a !important; }
 
 .cal-chip-overflow { font-size: 10px; color: var(--text3); font-weight: 600; padding-left: 2px; }
+.cal-mobile-dot { display: none; } /* Hidden on desktop, shown only on mobile via media query */
 
 /* Side Panel */
 .cal-side-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; display: flex; flex-direction: column; }
@@ -790,8 +791,14 @@ button:active, .btn:active, .sb-item:active, .client-card:active, .board-tab:act
   .cal-cell { aspect-ratio: auto; min-height: 54px; padding: 4px; justify-content: flex-start; }
   .cal-cell-head { margin-bottom: 2px; justify-content: center; }
   .cal-cell-num { font-size: 12px; width: 22px; height: 22px; }
-  .cal-cell-events { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 2px; align-items: center; overflow: visible; }
-  .cal-chip { padding: 0; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; border: none; font-size: 0; color: transparent; min-height: 0; }
+  /* Hide the "ev" count label on mobile */
+  .cal-ev-count-label { display: none !important; }
+  /* Calendar event area: just show the dot on mobile */
+  .cal-cell-events { flex-direction: row; justify-content: center; align-items: center; overflow: visible; gap: 0; padding: 2px 0; }
+  /* Show single colored dot on mobile */
+  .cal-mobile-dot { display: inline-block !important; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  /* Hide desktop chips on mobile */
+  .cal-chip { display: none !important; }
   .cal-chip-time, .cal-chip-title, .cal-chip-overflow { display: none; } 
   .cal-cell-platforms { display: none; }
 

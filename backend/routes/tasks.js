@@ -9,7 +9,13 @@ const { recordActivity } = require('../utils/activity');
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+      return cb(new Error('Only image files are allowed'));
+    }
+    cb(null, true);
+  }
 });
 
 const writeLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, prefix: 'tasks-write', message: 'Too many task updates. Please slow down.' });
