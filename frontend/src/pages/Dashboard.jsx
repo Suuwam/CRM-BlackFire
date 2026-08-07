@@ -367,6 +367,106 @@ function AssigneeWorkloadChart({ tasks = [], users = [] }) {
   );
 }
 
+function AssignedTaskBarChart({ tasks = [] }) {
+  const [metric, setMetric] = useState('status'); // 'status' or 'priority'
+  const [hoveredId, setHoveredId] = useState(null);
+
+  const totalAssigned = tasks.length;
+  if (totalAssigned === 0) return null;
+
+  let items = [];
+  if (metric === 'status') {
+    const statuses = [
+      { id: 'backlog', label: 'Backlog', color: '#3b82f6' },
+      { id: 'todo', label: 'To Do', color: '#8b5cf6' },
+      { id: 'inprogress', label: 'In Progress', color: '#f59e0b' },
+      { id: 'qa', label: 'QA / Review', color: '#06b6d4' },
+      { id: 'done', label: 'Done', color: '#10b981' },
+      { id: 'cancelled', label: 'Cancelled', color: '#6b7280' },
+    ];
+    items = statuses.map(s => ({
+      ...s,
+      count: tasks.filter(t => (t.column || 'backlog') === s.id).length
+    }));
+  } else {
+    const priorities = [
+      { id: 'high', label: 'High Priority', color: '#ef4444' },
+      { id: 'medium', label: 'Medium Priority', color: '#f59e0b' },
+      { id: 'low', label: 'Low Priority', color: '#10b981' },
+    ];
+    items = priorities.map(p => ({
+      ...p,
+      count: tasks.filter(t => (t.priority || 'medium') === p.id).length
+    }));
+  }
+
+  const maxVal = Math.max(...items.map(i => i.count), 1);
+
+  return (
+    <div className="assigned-chart-card" style={{ marginTop: 12, marginBottom: 16, padding: '14px', background: 'var(--surface2)', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"/>
+            <line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+          </svg>
+          Assigned Tasks Chart
+        </div>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <button className={`btn btn-sm ${metric === 'status' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMetric('status')} style={{ fontSize: 10, padding: '2px 7px' }}>Status</button>
+          <button className={`btn btn-sm ${metric === 'priority' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMetric('priority')} style={{ fontSize: 10, padding: '2px 7px' }}>Priority</button>
+        </div>
+      </div>
+
+      <div className="assigned-scroll-segment" style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowX: 'auto', maxHeight: 180 }}>
+        {items.map(item => {
+          const barW = (item.count / maxVal) * 100;
+          const isHov = hoveredId === item.id;
+          const pct = totalAssigned > 0 ? Math.round((item.count / totalAssigned) * 100) : 0;
+
+          return (
+            <div
+              key={item.id}
+              onMouseEnter={() => setHoveredId(item.id)}
+              onMouseLeave={() => setHoveredId(null)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: 11,
+                padding: '3px 4px',
+                borderRadius: 4,
+                background: isHov ? 'var(--surface)' : 'transparent',
+                transition: 'background 0.15s ease',
+                cursor: 'pointer'
+              }}
+            >
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
+              <span style={{ width: 85, fontWeight: 600, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                {item.label}
+              </span>
+              <div style={{ flex: 1, height: 8, background: 'var(--border)', borderRadius: 99, overflow: 'hidden', position: 'relative' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${barW}%`,
+                  background: item.color,
+                  borderRadius: 99,
+                  transition: 'width 0.35s ease'
+                }} />
+              </div>
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center', minWidth: 42, justifyContent: 'flex-end', flexShrink: 0 }}>
+                <span style={{ fontWeight: 750, color: 'var(--text)' }}>{item.count}</span>
+                <span style={{ fontSize: 9.5, color: 'var(--text3)' }}>({pct}%)</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [focusUserId, setFocusUserId] = useState('');
@@ -555,18 +655,23 @@ export default function Dashboard() {
               <div className="assigned-person-meta">{focusUser?.email || 'No email on file'}</div>
             </div>
 
-            <div className="assigned-list">
-              {assignedTasks.length === 0 && <div className="empty" style={{ padding: '24px 0' }}>No tasks assigned.</div>}
-              {assignedTasks.map(task => (
-                <div key={task._id} className="assigned-item">
-                  <div className="assigned-title">{task.title}</div>
-                  <div className="assigned-meta">
-                    <span>{task.project}</span>
-                    <span>{task.column}</span>
-                    <span>{task.assignedByName || 'System'}</span>
+            {/* Assigned Task Bar Chart */}
+            <AssignedTaskBarChart tasks={assignedTasks} />
+
+            <div className="assigned-scroll-segment">
+              <div className="assigned-list">
+                {assignedTasks.length === 0 && <div className="empty" style={{ padding: '24px 0' }}>No tasks assigned.</div>}
+                {assignedTasks.map(task => (
+                  <div key={task._id} className="assigned-item">
+                    <div className="assigned-title">{task.title}</div>
+                    <div className="assigned-meta">
+                      <span>{task.project}</span>
+                      <span>{task.column}</span>
+                      <span>{task.assignedByName || 'System'}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
 
             <div style={{ margin: '32px 0 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
