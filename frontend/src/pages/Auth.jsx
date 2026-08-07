@@ -1,7 +1,10 @@
 import { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export default function Auth({ onLogin }) {
-  const [pw, setPw]               = useState('');
+  const navigate = useNavigate();
+  const [username, setUsername]    = useState('');
+  const [password, setPassword]    = useState('');
   const [visible, setVisible]     = useState(false);
   const [loading, setLoading]     = useState(false);
   const [errorMsg, setErrorMsg]   = useState('');
@@ -18,9 +21,9 @@ export default function Auth({ onLogin }) {
 
   function handleSubmit(e) {
     e.preventDefault();
-    if (!pw.trim()) {
+    if (!username.trim() || !password.trim()) {
       triggerShake();
-      setErrorMsg('The gate needs a word to burn.');
+      setErrorMsg('Both username and password are required.');
       setShowError(true);
       return;
     }
@@ -28,18 +31,13 @@ export default function Auth({ onLogin }) {
     setShowError(false);
     setLoading(true);
 
-    setTimeout(() => {
-      const val = pw.trim().toLowerCase();
-      if (val === 'blackfire' || val === 'aawazz') {
-        sessionStorage.setItem('crm_auth', 'true');
-        onLogin();
-      } else {
+    onLogin({ username, password })
+      .catch(() => {
         setLoading(false);
         triggerShake();
-        setErrorMsg('The flame does not recognize this word.');
+        setErrorMsg('Invalid account credentials.');
         setShowError(true);
-      }
-    }, 1000);
+      });
   }
 
   return (
@@ -56,30 +54,52 @@ export default function Auth({ onLogin }) {
         </h1>
         <p className="tagline">The gate remembers only one thing.</p>
 
-        <form onSubmit={handleSubmit} autoComplete="off">
-          <label className="field-label" htmlFor="pw">Passphrase</label>
+        <form className="auth-card auth-login-card" onSubmit={handleSubmit} autoComplete="off">
+          <label className="field-label" htmlFor="username">Account Login</label>
           <div className={`field${focused ? ' focused' : ''}${shake ? ' shake' : ''}`} ref={fieldWrapRef}>
             <div className="field-inner">
               <svg className="flame-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M12 2c0 0-5 5.5-5 10a5 5 0 0 0 10 0c0-1.7-.7-3-1.5-4.2.3 2 -1 3.4-1 3.4.5-2-1-4-2.5-6-1 1.6-.5 3-1.5 4C10 8 12 5 12 2z"/>
               </svg>
               <input
-                type={visible ? 'text' : 'password'}
-                id="pw"
+                type="text"
+                id="username"
                 className="pw"
-                placeholder="Enter the ember-word"
+                placeholder="Username"
                 spellCheck="false"
-                value={pw}
-                onChange={e => setPw(e.target.value)}
+                autoComplete="off"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
                 onFocus={() => setFocused(true)}
                 onBlur={() => setFocused(false)}
                 autoFocus
               />
+            </div>
+          </div>
+
+          <div className={`field${focused ? ' focused' : ''}${shake ? ' shake' : ''}`} style={{ marginTop: 12 }}>
+            <div className="field-inner">
+              <svg className="flame-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M12 2c0 0-5 5.5-5 10a5 5 0 0 0 10 0c0-1.7-.7-3-1.5-4.2.3 2 -1 3.4-1 3.4.5-2-1-4-2.5-6-1 1.6-.5 3-1.5 4C10 8 12 5 12 2z"/>
+              </svg>
+              <input
+                type={visible ? 'text' : 'password'}
+                className="pw"
+                placeholder="Password"
+                spellCheck="false"
+                autoComplete="new-password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+              />
               <button
                 type="button"
                 className="eye-btn"
-                onClick={() => setVisible(!visible)}
-                aria-label="Toggle passphrase visibility"
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => setVisible(v => !v)}
+                aria-label="Toggle password visibility"
+                title={visible ? 'Hide password' : 'Show password'}
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d={visible
@@ -92,8 +112,6 @@ export default function Auth({ onLogin }) {
             </div>
           </div>
 
-
-
           <div className={`error-msg${showError ? ' show' : ''}`}>
             {errorMsg}
           </div>
@@ -102,9 +120,14 @@ export default function Auth({ onLogin }) {
             <span className="label">Ignite Access</span>
             <span className="spinner"></span>
           </button>
+          <button
+            type="button"
+            className="apply-toggle-btn"
+            onClick={() => navigate('/apply')}
+          >
+            Apply for account
+          </button>
         </form>
-
-        <p className="footer-note">Locked out? <a href="#" onClick={e => e.preventDefault()}>Whisper to the embers</a></p>
       </div>
     </div>
   );

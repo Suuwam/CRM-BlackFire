@@ -2,7 +2,44 @@ import axios from 'axios';
 
 const api = axios.create({ baseURL: '/api' });
 
+api.interceptors.request.use(config => {
+  try {
+    const raw = sessionStorage.getItem('crm_session_user');
+    if (raw) {
+      const user = JSON.parse(raw);
+      if (user?._id) config.headers['x-session-user'] = user._id;
+    }
+  } catch {}
+  return config;
+});
+
 export const fetcher = url => api.get(url).then(res => res.data);
+
+export const authApi = {
+  login: (data) => api.post('/auth/login', data),
+  apply: (data) => api.post('/auth/apply', data),
+  verify: (data) => api.post('/auth/apply/verify', data),
+  me: () => api.get('/auth/me'),
+};
+
+export const activityApi = {
+  list: (days = 50) => api.get('/activity', { params: { days } }),
+};
+
+export const emailApi = {
+  send: (data) => api.post('/email/send', data),
+  bulk: (data) => api.post('/email/bulk', data),
+};
+
+export const usersApi = {
+  list: () => api.get('/users'),
+  create: (data) => api.post('/users', data),
+  update: (id, data) => api.put(`/users/${id}`, data),
+  delete: (id) => api.delete(`/users/${id}`),
+  listApplications: () => api.get('/users/applications'),
+  approveApplication: (id) => api.post(`/users/applications/${id}/approve`),
+  rejectApplication: (id) => api.post(`/users/applications/${id}/reject`),
+};
 
 export const clientsApi = {
   list: () => api.get('/clients'),

@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '../api';
 import SocialIcon from '../components/SocialIcon';
+import { useAuth } from '../context/AuthContext';
 
 // Helper to calculate Donut Arc paths
 function getDonutPath(cx, cy, radius, innerRadius, startAngle, endAngle) {
@@ -276,12 +276,110 @@ function PriorityBarChart({ tasks = [] }) {
   );
 }
 
+function AssigneeWorkloadChart({ tasks = [], users = [] }) {
+  const [hoveredIdx, setHoveredIdx] = useState(null);
+
+  // Build per-user task count from users list first, then fall back to assigneeName from tasks
+  const allNames = new Set();
+  users.forEach(u => u.name && allNames.add(u.name));
+  tasks.forEach(t => (t.assigneeName || t.assignee) && allNames.add(t.assigneeName || t.assignee));
+
+  const palette = ['#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#06b6d4', '#ec4899', '#6b7280'];
+
+  const data = Array.from(allNames)
+    .map((name, i) => ({
+      name,
+      total: tasks.filter(t => (t.assigneeName || t.assignee) === name).length,
+      inProgress: tasks.filter(t => (t.assigneeName || t.assignee) === name && t.column === 'inprogress').length,
+      done: tasks.filter(t => (t.assigneeName || t.assignee) === name && t.column === 'done').length,
+      color: palette[i % palette.length],
+    }))
+    .filter(d => d.total > 0)
+    .sort((a, b) => b.total - a.total);
+
+  const maxVal = Math.max(...data.map(d => d.total), 1);
+
+  return (
+    <div className="chart-card">
+      <div className="chart-header">
+        <div>
+          <div className="chart-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/>
+              <path d="M16 11l2 2 4-4"/>
+            </svg>
+            Assignee Workload
+          </div>
+          <div className="chart-sub">Tasks assigned per team member</div>
+        </div>
+      </div>
+
+      <div className="chart-body" style={{ flexDirection: 'column', gap: 10, padding: '8px 0' }}>
+        {data.length === 0 ? (
+          <div className="text-muted text-sm" style={{ padding: '40px 0', textAlign: 'center' }}>No assignments found</div>
+        ) : (
+          data.map((d, i) => {
+            const barW = (d.total / maxVal) * 100;
+            const isHov = hoveredIdx === i;
+            return (
+              <div
+                key={d.name}
+                onMouseEnter={() => setHoveredIdx(i)}
+                onMouseLeave={() => setHoveredIdx(null)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '5px 8px',
+                  borderRadius: 8,
+                  background: isHov ? 'var(--surface2)' : 'transparent',
+                  transition: 'background 0.15s',
+                  cursor: 'default',
+                }}
+              >
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
+                <div style={{ width: 90, fontSize: 12, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>{d.name}</div>
+                <div style={{ flex: 1, height: 10, background: 'var(--surface2)', borderRadius: 99, overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${barW}%`,
+                    background: d.color,
+                    borderRadius: 99,
+                    transition: 'width 0.3s ease',
+                    opacity: hoveredIdx === null || isHov ? 1 : 0.5,
+                  }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: 52, flexShrink: 0 }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{d.total}</span>
+                  {isHov && (
+                    <span style={{ fontSize: 9, color: 'var(--text3)', marginTop: 2, whiteSpace: 'nowrap' }}>
+                      {d.inProgress} active · {d.done} done
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
-  const nav = useNavigate();
+  const { user } = useAuth();
+  const [focusUserId, setFocusUserId] = useState('');
 
   const { data: clients = [] } = useSWR('/clients', fetcher, { revalidateOnFocus: false });
   const { data: allEvents = [] } = useSWR('/events', fetcher, { revalidateOnFocus: false });
   const { data: tasks = [] } = useSWR('/tasks', fetcher, { revalidateOnFocus: false });
+  const { data: users = [] } = useSWR('/users', fetcher, { revalidateOnFocus: false });
+  const { data: activities = [] } = useSWR('/activity?days=50', fetcher, { revalidateOnFocus: false });
+
+  useEffect(() => {
+    if (!focusUserId && user?._id) setFocusUserId(String(user._id));
+  }, [focusUserId, user]);
 
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = allEvents
@@ -304,6 +402,16 @@ export default function Dashboard() {
   const inProgress = tasks.filter(t => t.column === 'inprogress').length;
   const completed = tasks.filter(t => t.column === 'done').length;
   const completionRate = tasks.length > 0 ? Math.round((completed / tasks.length) * 100) : 0;
+  const focusUser = users.find(u => String(u._id) === String(focusUserId)) || user;
+  const assignedTasks = tasks.filter(t => {
+    const taskAssigneeId = String(t.assigneeId || '');
+    const taskAssigneeName = t.assigneeName || t.assignee || '';
+    if (focusUser?._id && taskAssigneeId && taskAssigneeId === String(focusUser._id)) return true;
+    if (focusUser?.email && t.assigneeEmail && t.assigneeEmail === focusUser.email) return true;
+    if (focusUser?.name && taskAssigneeName && taskAssigneeName === focusUser.name) return true;
+    return false;
+  });
+  const activityBacklog = activities.slice(0, 12);
 
   function fmtDate(d) {
     const dt = new Date(d + 'T00:00:00');
@@ -319,106 +427,171 @@ export default function Dashboard() {
         </div>
       </div>
       <div className="page-body">
-        {/* Metric Cards (KPIs) */}
-        <div className="stats-grid" style={{ marginBottom: 24 }}>
-          <div className="stat-card">
-            <div className="stat-label">Total Clients</div>
-            <div className="stat-value">{clients.length}</div>
-            <div className="stat-sub">{active} active · {prospect} prospects</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Upcoming Schedule & Posts</div>
-            <div className="stat-value">{upcoming.length}</div>
-            <div className="stat-sub">Next 30 days</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Product Tasks In Progress</div>
-            <div className="stat-value">{inProgress}</div>
-            <div className="stat-sub">Active workflow</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Feature Completion Rate</div>
-            <div className="stat-value">{completionRate}%</div>
-            <div className="stat-sub">{completed} of {tasks.length} features done</div>
-          </div>
-          {totalOverdue > 0 && (
-            <div className="stat-card stat-card--overdue">
-              <div className="stat-label">Overdue Items</div>
-              <div className="stat-value" style={{ color: '#ef4444' }}>{totalOverdue}</div>
-              <div className="stat-sub">{overdueEvents.length} event{overdueEvents.length !== 1 ? 's' : ''} · {overdueTasks.length} task{overdueTasks.length !== 1 ? 's' : ''}</div>
-            </div>
-          )}
-        </div>
-
-        {/* Visual Charts Grid (Pie Chart + Bar Chart) */}
-        <div className="charts-grid">
-          <TaskPieChart tasks={tasks} clients={clients} />
-          <PriorityBarChart tasks={tasks} />
-        </div>
-
-        <div style={{ marginTop: 24 }}>
-          {/* Upcoming Schedule */}
+        <div className="dash-grid">
           <div>
-            <div className="section-title">Upcoming Schedule & Social Posts</div>
-            <div className="upcoming-list">
-              {upcoming.length === 0 && <p className="text-muted text-sm">No upcoming events scheduled.</p>}
-              {upcoming.map(ev => (
-                <div key={ev._id} className="upcoming-item">
-                  <div className={`up-dot`} style={{ background: ev.color === 'blue' ? '#3b82f6' : ev.color === 'green' ? '#10b981' : ev.color === 'amber' ? '#f59e0b' : ev.color === 'purple' ? '#8b5cf6' : ev.color === 'red' ? '#ef4444' : ev.color === 'pink' ? '#ec4899' : '#71717a' }} />
-                  <div className="up-info">
-                    <div className="up-title">{ev.title}</div>
-                    <div className="up-meta">
-                      {ev.clientId?.name && <span>{ev.clientId.name}</span>}
-                      {ev.time && <span>{ev.time}</span>}
-                      {/* Official SVG Vector Icons */}
-                      {(ev.platforms || []).map(pId => (
-                        <span key={pId} style={{ display:'inline-flex', alignItems:'center', marginLeft:4 }} title={pId}>
-                          <SocialIcon id={pId} size={12} />
-                        </span>
-                      ))}
+            {/* Metric Cards (KPIs) */}
+            <div className="stats-grid" style={{ marginBottom: 24 }}>
+              <div className="stat-card">
+                <div className="stat-label">Total Clients</div>
+                <div className="stat-value">{clients.length}</div>
+                <div className="stat-sub">{active} active · {prospect} prospects</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Upcoming Schedule & Posts</div>
+                <div className="stat-value">{upcoming.length}</div>
+                <div className="stat-sub">Next 30 days</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Product Tasks In Progress</div>
+                <div className="stat-value">{inProgress}</div>
+                <div className="stat-sub">Active workflow</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Feature Completion Rate</div>
+                <div className="stat-value">{completionRate}%</div>
+                <div className="stat-sub">{completed} of {tasks.length} features done</div>
+              </div>
+              {totalOverdue > 0 && (
+                <div className="stat-card stat-card--overdue">
+                  <div className="stat-label">Overdue Items</div>
+                  <div className="stat-value" style={{ color: '#ef4444' }}>{totalOverdue}</div>
+                  <div className="stat-sub">{overdueEvents.length} event{overdueEvents.length !== 1 ? 's' : ''} · {overdueTasks.length} task{overdueTasks.length !== 1 ? 's' : ''}</div>
+                </div>
+              )}
+            </div>
+
+            {/* Visual Charts Grid (Pie Chart + Bar Chart) */}
+            <div className="charts-grid">
+              <TaskPieChart tasks={tasks} clients={clients} />
+              <PriorityBarChart tasks={tasks} />
+            </div>
+
+            {/* Assignee Workload Chart */}
+            <div style={{ marginTop: 24 }}>
+              <AssigneeWorkloadChart tasks={tasks} users={users} />
+            </div>
+
+            <div style={{ marginTop: 24 }}>
+              {/* Upcoming Schedule */}
+              <div>
+                <div className="section-title">Upcoming Schedule & Social Posts</div>
+                <div className="upcoming-list">
+                  {upcoming.length === 0 && <p className="text-muted text-sm">No upcoming events scheduled.</p>}
+                  {upcoming.map(ev => (
+                    <div key={ev._id} className="upcoming-item">
+                      <div className={`up-dot`} style={{ background: ev.color === 'blue' ? '#3b82f6' : ev.color === 'green' ? '#10b981' : ev.color === 'amber' ? '#f59e0b' : ev.color === 'purple' ? '#8b5cf6' : ev.color === 'red' ? '#ef4444' : ev.color === 'pink' ? '#ec4899' : '#71717a' }} />
+                      <div className="up-info">
+                        <div className="up-title">{ev.title}</div>
+                        <div className="up-meta">
+                          {ev.clientId?.name && <span>{ev.clientId.name}</span>}
+                          {ev.time && <span>{ev.time}</span>}
+                          {(ev.platforms || []).map(pId => (
+                            <span key={pId} style={{ display:'inline-flex', alignItems:'center', marginLeft:4 }} title={pId}>
+                              <SocialIcon id={pId} size={12} />
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="up-date">{fmtDate(ev.date)}</div>
                     </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Overdue Items */}
+              {totalOverdue > 0 && (
+                <div style={{ marginTop: 24 }}>
+                  <div className="section-title" style={{ color: '#ef4444' }}>⚠ Overdue Items</div>
+                  <div className="upcoming-list">
+                    {overdueEvents.map(ev => (
+                      <div key={ev._id} className="upcoming-item overdue-item">
+                        <div className="up-dot" style={{ background: '#ef4444' }} />
+                        <div className="up-info">
+                          <div className="up-title">{ev.title}</div>
+                          <div className="up-meta">
+                            {ev.clientId?.name && <span>{ev.clientId.name}</span>}
+                            <span className="overdue-badge">Overdue</span>
+                          </div>
+                        </div>
+                        <div className="up-date" style={{ color: '#ef4444' }}>{fmtDate(ev.date)}</div>
+                      </div>
+                    ))}
+                    {overdueTasks.map(t => (
+                      <div key={t._id} className="upcoming-item overdue-item">
+                        <div className="up-dot" style={{ background: '#ef4444' }} />
+                        <div className="up-info">
+                          <div className="up-title">{t.title}</div>
+                          <div className="up-meta">
+                            <span>Task</span>
+                            {t.assigneeName && <span>{t.assigneeName}</span>}
+                            <span className="overdue-badge">Overdue</span>
+                          </div>
+                        </div>
+                        <div className="up-date" style={{ color: '#ef4444' }}>{fmtDate(t.dueDate)}</div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="up-date">{fmtDate(ev.date)}</div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <aside className="dash-side card">
+            <div className="section-title" style={{ marginBottom: 10 }}>Assigned To Person</div>
+            <div className="text-sm text-muted" style={{ marginBottom: 12 }}>
+              {user?.role === 'admin' ? 'Inspect tasks for any account.' : 'These are your current assignments.'}
+            </div>
+            {user?.role === 'admin' && (
+              <div className="form-group" style={{ marginBottom: 14 }}>
+                <label>Account</label>
+                <select value={focusUserId} onChange={e => setFocusUserId(e.target.value)}>
+                  {users.map(u => <option key={u._id} value={u._id}>{u.name} ({u.username})</option>)}
+                </select>
+              </div>
+            )}
+
+            <div className="assigned-person">
+              <div className="assigned-person-name">{focusUser?.name || 'Unassigned'}</div>
+              <div className="assigned-person-meta">{focusUser?.email || 'No email on file'}</div>
+            </div>
+
+            <div className="assigned-list">
+              {assignedTasks.length === 0 && <div className="empty" style={{ padding: '24px 0' }}>No tasks assigned.</div>}
+              {assignedTasks.map(task => (
+                <div key={task._id} className="assigned-item">
+                  <div className="assigned-title">{task.title}</div>
+                  <div className="assigned-meta">
+                    <span>{task.project}</span>
+                    <span>{task.column}</span>
+                    <span>{task.assignedByName || 'System'}</span>
+                  </div>
                 </div>
               ))}
             </div>
-          </div>
 
-          {/* Overdue Items */}
-          {totalOverdue > 0 && (
-            <div style={{ marginTop: 24 }}>
-              <div className="section-title" style={{ color: '#ef4444' }}>⚠ Overdue Items</div>
-              <div className="upcoming-list">
-                {overdueEvents.map(ev => (
-                  <div key={ev._id} className="upcoming-item overdue-item">
-                    <div className="up-dot" style={{ background: '#ef4444' }} />
-                    <div className="up-info">
-                      <div className="up-title">{ev.title}</div>
-                      <div className="up-meta">
-                        {ev.clientId?.name && <span>{ev.clientId.name}</span>}
-                        <span className="overdue-badge">Overdue</span>
-                      </div>
-                    </div>
-                    <div className="up-date" style={{ color: '#ef4444' }}>{fmtDate(ev.date)}</div>
-                  </div>
-                ))}
-                {overdueTasks.map(t => (
-                  <div key={t._id} className="upcoming-item overdue-item">
-                    <div className="up-dot" style={{ background: '#ef4444' }} />
-                    <div className="up-info">
-                      <div className="up-title">{t.title}</div>
-                      <div className="up-meta">
-                        <span>Task</span>
-                        {t.assignee && <span>{t.assignee}</span>}
-                        <span className="overdue-badge">Overdue</span>
-                      </div>
-                    </div>
-                    <div className="up-date" style={{ color: '#ef4444' }}>{fmtDate(t.dueDate)}</div>
-                  </div>
-                ))}
-              </div>
+            <div style={{ margin: '32px 0 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--text3)', flexShrink: 0 }}>Activity Log</span>
+              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
             </div>
-          )}
+            <div className="section-title" style={{ marginBottom: 10 }}>Backlog, last 50 days</div>
+            <div className="activity-list">
+              {activityBacklog.length === 0 && <div className="empty" style={{ padding: '24px 0' }}>No recent activity.</div>}
+              {activityBacklog.map(item => (
+                <div key={item._id} className="activity-item">
+                  <div className="activity-top">
+                    <span className="activity-action">{item.action}</span>
+                    <span className="activity-date">{new Date(item.createdAt).toLocaleDateString()}</span>
+                  </div>
+                  <div className="activity-summary">{item.summary}</div>
+                  <div className="activity-meta">
+                    <span>{item.actorName || 'System'}</span>
+                    {item.assigneeName && <span>→ {item.assigneeName}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </aside>
         </div>
       </div>
     </>

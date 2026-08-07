@@ -34,10 +34,14 @@ app.use(async (req, res, next) => {
 
 // Routes
 app.use('/api/clients', require('./routes/clients'));
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/users', require('./routes/users'));
+app.use('/api/activity', require('./routes/activity'));
 app.use('/api/events', require('./routes/events'));
 app.use('/api/templates', require('./routes/templates'));
 app.use('/api/references', require('./routes/references'));
 app.use('/api/tasks', require('./routes/tasks'));
+app.use('/api/email', require('./routes/email'));
 
 // Health check
 app.get('/api/health', (_, res) => res.json({ status: 'ok' }));

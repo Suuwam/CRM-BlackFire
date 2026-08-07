@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Toast from './components/Toast';
@@ -9,13 +9,13 @@ import Email from './pages/Email';
 import References from './pages/References';
 import Board from './pages/Board';
 import Auth from './pages/Auth';
+import Apply from './pages/Apply';
+import Accounts from './pages/Accounts';
 import { ToastProvider } from './components/Toast';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
-export default function App() {
-  const [authenticated, setAuthenticated] = useState(() => {
-    return sessionStorage.getItem('crm_auth') === 'true';
-  });
-
+function AppShell() {
+  const { user, loading, login, logout } = useAuth();
   const location = useLocation();
   const [routeLoading, setRouteLoading] = useState(false);
 
@@ -25,15 +25,21 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [location.pathname]);
 
-  function handleLogout() {
-    sessionStorage.removeItem('crm_auth');
-    setAuthenticated(false);
+  if (loading) {
+    return (
+      <div className="intentional-loader">
+        <div className="spinner-large" />
+      </div>
+    );
   }
 
-  if (!authenticated) {
+  if (!user) {
     return (
       <ToastProvider>
-        <Auth onLogin={() => setAuthenticated(true)} />
+        <Routes>
+          <Route path="/apply" element={<Apply />} />
+          <Route path="*" element={<Auth onLogin={login} />} />
+        </Routes>
         <Toast />
       </ToastProvider>
     );
@@ -42,7 +48,7 @@ export default function App() {
   return (
     <ToastProvider>
       <div className="layout">
-        <Sidebar onLogout={handleLogout} routeLoading={routeLoading} />
+        <Sidebar user={user} onLogout={logout} routeLoading={routeLoading} />
         <div className="main" style={{ position: 'relative' }}>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -52,10 +58,19 @@ export default function App() {
             <Route path="/email"      element={<Email />} />
             <Route path="/references" element={<References />} />
             <Route path="/board"      element={<Board />} />
+            <Route path="/accounts"   element={<Accounts />} />
           </Routes>
         </div>
         <Toast />
       </div>
     </ToastProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppShell />
+    </AuthProvider>
   );
 }

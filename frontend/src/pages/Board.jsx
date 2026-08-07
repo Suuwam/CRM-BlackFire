@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import useSWR, { mutate } from 'swr';
 import { tasksApi, fetcher } from '../api';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
+import { useAuth } from '../context/AuthContext';
 
 const PROJECTS = [
   { id: 'blackfire', label: 'Blackfire AI', color: '#18181b', dot: '#18181b' },
@@ -28,7 +29,7 @@ const COLORS = [
   { id: 'gray',   hex: '#71717a' },
 ];
 
-const EMPTY_TASK = { title:'', description:'', priority:'medium', color:'blue', tags:'', assignee:'', dueDate:'' };
+const EMPTY_TASK = { title:'', description:'', priority:'medium', color:'blue', tags:'', dueDate:'', assignees:[] };
 
 // --- Draft cache helpers for Board tasks ---
 const DRAFT_KEY_PREFIX = 'crm_board_draft_';
@@ -49,6 +50,7 @@ function loadDraft(taskId) {
 function clearDraft(taskId) { try { sessionStorage.removeItem(getDraftKey(taskId)); } catch {} }
 
 export default function Board() {
+  const { user } = useAuth();
   const [project, setProject] = useState('aawazz');
   const [modal, setModal]     = useState(false);
   const [form, setForm]       = useState(EMPTY_TASK);
@@ -66,6 +68,7 @@ export default function Board() {
     keepPreviousData: true,
     revalidateOnFocus: false,
   });
+  const { data: users = [] } = useSWR('/users', fetcher, { revalidateOnFocus: false });
 
   // Auto-save form to sessionStorage on every change while modal is open
   useEffect(() => {
@@ -83,11 +86,24 @@ export default function Board() {
   }
   function openEdit(t) {
     const draft = loadDraft(t._id);
-    if (draft && draft.form.title.trim()) {
+    if (draft?.form?.title?.trim()) {
       setForm(draft.form); setEditCol(draft.col || t.column); setEditing(t._id); setImageFile(null); setModal(true);
       toast('Restored unsaved edits', 'info');
     } else {
-      setForm({ title:t.title, description:t.description||'', priority:t.priority||'medium', color:t.color||'blue', tags:(t.tags||[]).join(', '), assignee:t.assignee||'', dueDate:t.dueDate||'' }); setEditCol(t.column); setEditing(t._id); setImageFile(null); setModal(true);
+      // Build assignees[] from existing task data
+      let assignees = t.assignees?.length ? t.assignees : [];
+      if (!assignees.length && (t.assigneeName || t.assignee)) {
+        assignees = [{ userId: t.assigneeId || null, name: t.assigneeName || t.assignee || '', email: t.assigneeEmail || '' }];
+      }
+      setForm({
+        title: t.title,
+        description: t.description || '',
+        priority: t.priority || 'medium',
+        color: t.color || 'blue',
+        tags: (t.tags || []).join(', '),
+        dueDate: t.dueDate || '',
+        assignees,
+      }); setEditCol(t.column); setEditing(t._id); setImageFile(null); setModal(true);
     }
   }
 
@@ -97,35 +113,39 @@ export default function Board() {
     if (saving) return;
     if (!form.title.trim()) return toast('Title required', 'error');
     setSaving(true);
-    const data = { ...form, tags: form.tags.split(',').map(t=>t.trim()).filter(Boolean), column: editCol, project };
+    // Build legacy single-assignee fields from first assignee for compat
+    const firstAssignee = form.assignees?.[0] || null;
+    const data = {
+      ...form,
+      assignee:      firstAssignee?.name  || '',
+      assigneeId:    firstAssignee?.userId || null,
+      assigneeName:  firstAssignee?.name  || '',
+      assigneeEmail: firstAssignee?.email || '',
+      assignees: form.assignees || [],
+      tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
+      column: editCol,
+      project,
+    };
     try {
       let savedTask;
       if (editing) {
-        // Optimistic: update local cache immediately
         mutate(swrKey, tasks.map(t => t._id === editing ? { ...t, ...data } : t), false);
         const res = await tasksApi.update(editing, data);
         savedTask = res.data;
       } else {
         const res = await tasksApi.create(data);
         savedTask = res.data;
-        // Optimistic: add to cache
         mutate(swrKey, [...tasks, savedTask], false);
       }
-
-      if (imageFile && savedTask?._id) {
-        await tasksApi.uploadImage(savedTask._id, imageFile);
-      }
-
+      if (imageFile && savedTask?._id) await tasksApi.uploadImage(savedTask._id, imageFile);
       clearDraft(editing); toast('Task saved', 'success'); setModal(false); setImageFile(null);
-      mutate(swrKey); // revalidate in background
-    } catch (err) { 
-      console.error('Task save error:', err); 
+      mutate(swrKey);
+    } catch (err) {
       const errMsg = err?.response?.data?.error;
       const safeMsg = typeof errMsg === 'object' ? JSON.stringify(errMsg) : (errMsg || err.message || 'Error saving task');
-      toast(safeMsg, 'error'); 
-      mutate(swrKey); 
-    }
-    finally { setSaving(false); }
+      toast(safeMsg, 'error');
+      mutate(swrKey);
+    } finally { setSaving(false); }
   }
 
   async function del(id) {
@@ -170,6 +190,8 @@ export default function Board() {
 
   function colTasks(col) { return tasks.filter(t => t.column === col); }
   const isAawazz = project === 'aawazz';
+  const getAssigneeLabel = (task) => task.assigneeName || task.assignee || 'Unassigned';
+  const getAssignedByLabel = (task) => task.assignedByName || 'System';
 
   return (
     <>
@@ -281,7 +303,10 @@ export default function Board() {
                             {(t.tags||[]).map(tg => <span key={tg} className="k-tag" style={isAawazz ? { background: '#eff6ff', color: '#1d4ed8', borderColor: '#bfdbfe' } : {}}>{tg}</span>)}
                           </div>
                           <div style={{ display:'flex', gap:8, fontSize:11, flexWrap: 'wrap' }}>
-                            {t.assignee && <span className="text-muted" style={{ fontWeight: 500 }}>By: {t.assignee}</span>}
+                            <span className="text-muted" style={{ fontWeight: 500 }}>By: {getAssignedByLabel(t)}</span>
+                            <span className="text-muted" style={{ fontWeight: 500 }}>
+                              To: {(t.assignees?.length ? t.assignees.map(a => a.name).join(', ') : (t.assigneeName || t.assignee || 'Unassigned'))}
+                            </span>
                             {t.dueDate  && (
                               <span className="text-muted" style={{ fontWeight: 500, color: t.dueDate < new Date().toISOString().slice(0, 10) && t.column !== 'done' ? '#ef4444' : undefined }}>
                                 Due: {t.dueDate} {t.dueDate < new Date().toISOString().slice(0, 10) && t.column !== 'done' && <strong style={{color: '#ef4444'}}>(Overdue)</strong>}
@@ -344,14 +369,44 @@ export default function Board() {
             </select>
           </div>
         </div>
-        <div className="form-row">
-          <div className="form-group"><label>Assignee</label><input value={form.assignee} onChange={e => setForm(f=>({...f,assignee:e.target.value}))} placeholder="Who's responsible?" /></div>
-          <div className="form-group"><label>Due Date</label><input type="date" value={form.dueDate} onChange={e => setForm(f=>({...f,dueDate:e.target.value}))} /></div>
+        {/* Multi-assignee picker */}
+        <div className="form-group">
+          <label>Assign to (select multiple)</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}>
+            {users.map(u => {
+              const isChecked = (form.assignees || []).some(a => String(a.userId) === String(u._id));
+              return (
+                <label key={u._id} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '4px 0' }}>
+                  <input type="checkbox" style={{ accentColor: 'var(--accent)', width: 14, height: 14 }}
+                    checked={isChecked}
+                    onChange={() => {
+                      setForm(f => {
+                        const existing = f.assignees || [];
+                        if (isChecked) return { ...f, assignees: existing.filter(a => String(a.userId) !== String(u._id)) };
+                        return { ...f, assignees: [...existing, { userId: u._id, name: u.name, email: u.email }] };
+                      });
+                    }}
+                  />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{u.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text3)' }}>{u.email}</div>
+                  </div>
+                </label>
+              );
+            })}
+            {users.length === 0 && <div style={{ fontSize: 12, color: 'var(--text3)' }}>No accounts found</div>}
+          </div>
+          {(form.assignees || []).length > 0 && (
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text3)' }}>
+              Selected: {form.assignees.map(a => a.name).join(', ')}
+            </div>
+          )}
         </div>
         <div className="form-row">
           <div className="form-group"><label>Tags (comma separated)</label><input value={form.tags} onChange={e => setForm(f=>({...f,tags:e.target.value}))} placeholder="bug, feature, audio" /></div>
-          <div className="form-group"><label>Card Cover Picture</label><input type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0] || null)} /></div>
+          <div className="form-group"><label>Due Date</label><input type="date" value={form.dueDate} onChange={e => setForm(f=>({...f,dueDate:e.target.value}))} /></div>
         </div>
+        <div className="form-group"><label>Card Cover Picture</label><input type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0] || null)} /></div>
       </Modal>
 
       <Modal open={!!viewingTask} onClose={() => setViewingTask(null)} title="Task Details" footer={<button className="btn btn-secondary" onClick={() => setViewingTask(null)}>Close</button>}>
@@ -378,8 +433,16 @@ export default function Board() {
                 <div style={{ fontSize: 13 }}>{COLUMNS.find(c => c.id === viewingTask.column)?.label || viewingTask.column}</div>
               </div>
               <div>
-                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)' }}>Assignee</label>
-                <div style={{ fontSize: 13 }}>{viewingTask.assignee || 'Unassigned'}</div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)' }}>Assignees</label>
+                <div style={{ fontSize: 13 }}>
+                  {viewingTask.assignees?.length
+                    ? viewingTask.assignees.map(a => a.name).join(', ')
+                    : (viewingTask.assigneeName || viewingTask.assignee || 'Unassigned')}
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)' }}>Assigned By</label>
+                <div style={{ fontSize: 13 }}>{viewingTask.assignedByName || 'System'}</div>
               </div>
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)' }}>Due Date</label>
