@@ -16,10 +16,11 @@ let isConnected = 0;
 async function connectDB() {
   if (mongoose.connection.readyState >= 1) return;
   if (!process.env.MONGO_URI) {
-    console.error('MONGO_URI is missing');
-    return;
+    throw new Error('MONGO_URI environment variable is missing on server');
   }
-  await mongoose.connect(process.env.MONGO_URI);
+  await mongoose.connect(process.env.MONGO_URI, {
+    serverSelectionTimeoutMS: 5000,
+  });
 }
 
 app.use(async (req, res, next) => {
@@ -28,23 +29,30 @@ app.use(async (req, res, next) => {
     next();
   } catch (err) {
     console.error('MongoDB Connection Error:', err);
-    res.status(500).json({ error: 'Database connection failed' });
+    res.status(500).json({ error: `Database connection failed: ${err.message}` });
   }
 });
 
 // Routes
-app.use('/api/clients', require('./routes/clients'));
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/users', require('./routes/users'));
-app.use('/api/activity', require('./routes/activity'));
-app.use('/api/events', require('./routes/events'));
-app.use('/api/templates', require('./routes/templates'));
-app.use('/api/references', require('./routes/references'));
-app.use('/api/tasks', require('./routes/tasks'));
-app.use('/api/email', require('./routes/email'));
+const routeModules = [
+  ['/clients', require('./routes/clients')],
+  ['/auth', require('./routes/auth')],
+  ['/users', require('./routes/users')],
+  ['/activity', require('./routes/activity')],
+  ['/events', require('./routes/events')],
+  ['/templates', require('./routes/templates')],
+  ['/references', require('./routes/references')],
+  ['/tasks', require('./routes/tasks')],
+  ['/email', require('./routes/email')],
+];
+
+routeModules.forEach(([pathStr, routerModule]) => {
+  app.use(`/api${pathStr}`, routerModule);
+  app.use(pathStr, routerModule);
+});
 
 // Health check
-app.get('/api/health', (_, res) => res.json({ status: 'ok' }));
+app.get(['/api/health', '/health'], (_, res) => res.json({ status: 'ok' }));
 
 if (require.main === module) {
   const PORT = process.env.PORT || 5000;
