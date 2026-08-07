@@ -8,7 +8,7 @@ function getBaseUrl() {
     const href = window.location.href || '';
     const origin = window.location.origin || '';
     if (href.startsWith('capacitor://') || href.startsWith('file://') || origin.startsWith('capacitor://') || origin.startsWith('file://') || (origin.includes('localhost') && window.Capacitor)) {
-      return 'http://192.168.1.72:5000/api';
+      return 'https://crm-blackfire.vercel.app/api';
     }
   }
   return '/api';
