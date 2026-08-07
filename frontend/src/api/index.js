@@ -1,10 +1,22 @@
-import axios from 'axios';
+function getBaseUrl() {
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  if (typeof window !== 'undefined' && window.location) {
+    const href = window.location.href || '';
+    const origin = window.location.origin || '';
+    if (href.startsWith('capacitor://') || href.startsWith('file://') || origin.startsWith('capacitor://') || origin.startsWith('file://') || (origin.includes('localhost') && window.Capacitor)) {
+      return 'http://192.168.1.72:5000/api';
+    }
+  }
+  return '/api';
+}
 
-const api = axios.create({ baseURL: '/api' });
+const api = axios.create({ baseURL: getBaseUrl() });
 
 api.interceptors.request.use(config => {
   try {
-    const raw = sessionStorage.getItem('crm_session_user');
+    const raw = sessionStorage.getItem('crm_session_user') || localStorage.getItem('crm_session_user');
     if (raw) {
       const user = JSON.parse(raw);
       if (user?._id) config.headers['x-session-user'] = user._id;
