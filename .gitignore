@@ -9,3 +9,8 @@ build
 backend/uploads/*
 !backend/uploads/.gitkeep
 .vercel
+jdk17/
+jdk21/
+.gradle/
+frontend/android/app/build/
+frontend/android/.gradle/
