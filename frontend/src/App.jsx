@@ -59,6 +59,8 @@ function AppShell() {
             <Route path="/references" element={<References />} />
             <Route path="/board"      element={<Board />} />
             <Route path="/accounts"   element={<Accounts />} />
+            <Route path="/apply"      element={<Apply />} />
+            <Route path="*"           element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>
         <Toast />

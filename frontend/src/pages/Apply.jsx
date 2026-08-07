@@ -52,10 +52,10 @@ export default function Apply() {
         password: form.password,
         note: form.note.trim()
       });
-      toast('Verification code sent to your email', 'success');
+      if (typeof toast === 'function') toast('Verification code sent to your email', 'success');
       setStep(2);
     } catch (error) {
-      setErrorMsg(error?.response?.data?.error || 'Failed to submit application. Please try again.');
+      setErrorMsg(error?.response?.data?.error || (typeof error?.response?.data === 'string' ? error.response.data : null) || 'Failed to submit application. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -76,10 +76,10 @@ export default function Apply() {
         email: form.email.trim().toLowerCase(),
         code: code.trim()
       });
-      toast('Email verified! Your request is now pending admin approval.', 'success');
+      if (typeof toast === 'function') toast('Email verified! Your request is now pending admin approval.', 'success');
       navigate('/');
     } catch (error) {
-      setErrorMsg(error?.response?.data?.error || 'Verification failed. Please check the code.');
+      setErrorMsg(error?.response?.data?.error || (typeof error?.response?.data === 'string' ? error.response.data : null) || 'Verification failed. Please check the code.');
     } finally {
       setLoading(false);
     }
@@ -91,7 +91,17 @@ export default function Apply() {
     setCode(val);
     if (val.length === 6) {
       // Small delay so user sees full code before submission
-      setTimeout(() => verifyFormRef.current?.requestSubmit(), 200);
+      setTimeout(() => {
+        if (verifyFormRef.current && typeof verifyFormRef.current.requestSubmit === 'function') {
+          try {
+            verifyFormRef.current.requestSubmit();
+          } catch {
+            handleVerify();
+          }
+        } else {
+          handleVerify();
+        }
+      }, 200);
     }
   }
 
