@@ -641,6 +641,26 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
+
+            <div className="card" style={{ marginTop: 24 }}>
+              <div className="section-title" style={{ marginBottom: 14 }}>Backlog, last 50 days</div>
+              <div className="activity-list" style={{ maxHeight: 350 }}>
+                {activityBacklog.length === 0 && <div className="empty" style={{ padding: '24px 0' }}>No recent activity.</div>}
+                {activityBacklog.map(item => (
+                  <div key={item._id} className="activity-item">
+                    <div className="activity-top">
+                      <span className="activity-action">{item.action}</span>
+                      <span className="activity-date">{new Date(item.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <div className="activity-summary">{item.summary}</div>
+                    <div className="activity-meta">
+                      <span>{item.actorName || 'System'}</span>
+                      {item.assigneeName && <span>→ {item.assigneeName}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           <aside className="dash-side card">
@@ -679,29 +699,6 @@ export default function Dashboard() {
                   </div>
                 ))}
               </div>
-            </div>
-
-            <div style={{ margin: '32px 0 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--text3)', flexShrink: 0 }}>Activity Log</span>
-              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-            </div>
-            <div className="section-title" style={{ marginBottom: 10 }}>Backlog, last 50 days</div>
-            <div className="activity-list">
-              {activityBacklog.length === 0 && <div className="empty" style={{ padding: '24px 0' }}>No recent activity.</div>}
-              {activityBacklog.map(item => (
-                <div key={item._id} className="activity-item">
-                  <div className="activity-top">
-                    <span className="activity-action">{item.action}</span>
-                    <span className="activity-date">{new Date(item.createdAt).toLocaleDateString()}</span>
-                  </div>
-                  <div className="activity-summary">{item.summary}</div>
-                  <div className="activity-meta">
-                    <span>{item.actorName || 'System'}</span>
-                    {item.assigneeName && <span>→ {item.assigneeName}</span>}
-                  </div>
-                </div>
-              ))}
             </div>
           </aside>
         </div>
