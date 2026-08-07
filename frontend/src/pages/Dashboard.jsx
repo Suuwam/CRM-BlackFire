@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import { fetcher } from '../api';
 import SocialIcon from '../components/SocialIcon';
@@ -476,6 +477,7 @@ function AssignedTaskBarChart({ tasks = [] }) {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [focusUserId, setFocusUserId] = useState('');
 
   const { data: clients = [] } = useSWR('/clients', fetcher, { revalidateOnFocus: false });
@@ -679,9 +681,9 @@ export default function Dashboard() {
           </div>
 
           <aside className="dash-side card">
-            <div className="section-title" style={{ marginBottom: 10 }}>Assigned To Person</div>
+            <div className="section-title" style={{ marginBottom: 10 }}>Assigned Tasks</div>
             <div className="text-sm text-muted" style={{ marginBottom: 12 }}>
-              {user?.role === 'admin' ? 'Inspect tasks for any account.' : 'These are your current assignments.'}
+              {user?.role === 'admin' ? 'Inspect individual assigned tasks for any account.' : 'Your individual assigned tasks.'}
             </div>
             {user?.role === 'admin' && (
               <div className="form-group" style={{ marginBottom: 14 }}>
@@ -697,24 +699,33 @@ export default function Dashboard() {
               <div className="assigned-person-meta">{focusUser?.email || 'No email on file'}</div>
             </div>
 
-            {/* Assigned Task Bar Chart */}
-            <AssignedTaskBarChart tasks={assignedTasks} />
-
-            <div className="assigned-scroll-segment">
+            {/* Assigned Tasks List (Now placed ABOVE the chart) */}
+            <div className="assigned-scroll-segment" style={{ marginBottom: 16 }}>
               <div className="assigned-list">
                 {assignedTasks.length === 0 && <div className="empty" style={{ padding: '24px 0' }}>No tasks assigned.</div>}
                 {assignedTasks.map(task => (
-                  <div key={task._id} className="assigned-item">
+                  <div 
+                    key={task._id} 
+                    className="assigned-item" 
+                    style={{ cursor: 'pointer' }} 
+                    onClick={() => navigate(`/board?project=${task.project || 'blackfire'}`)}
+                    title="Click to view task on board"
+                  >
                     <div className="assigned-title">{task.title}</div>
                     <div className="assigned-meta">
-                      <span>{task.project}</span>
-                      <span>{task.column}</span>
-                      <span>{task.assignedByName || 'System'}</span>
+                      <span style={{ textTransform: 'capitalize' }}>{task.project}</span>
+                      <span>•</span>
+                      <span style={{ textTransform: 'capitalize' }}>{task.column}</span>
+                      <span>•</span>
+                      <span>{task.assigneeName || task.assignee || 'Unassigned'}</span>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
+
+            {/* Assigned Task Bar Chart (Now placed BELOW the assigned tasks list) */}
+            <AssignedTaskBarChart tasks={assignedTasks} />
           </aside>
         </div>
       </div>
