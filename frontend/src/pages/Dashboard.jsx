@@ -666,10 +666,10 @@ export default function Dashboard() {
                       {item.targetName && <div className="activity-title">{item.targetName}</div>}
                       <div className="activity-summary">{summaryText}</div>
                       <div className="activity-meta">
-                        <span className="activity-actor">👤 {item.actorName || 'System'}</span>
-                        {item.assigneeName && <span className="activity-assignee">➔ 🎯 {item.assigneeName}</span>}
+                        <span className="activity-actor">By {item.actorName || 'System'}</span>
+                        {item.assigneeName && <span className="activity-assignee">→ {item.assigneeName}</span>}
                         {item.fromColumn && item.toColumn && (
-                          <span className="activity-flow">📍 {item.fromColumn} ➔ {item.toColumn}</span>
+                          <span className="activity-flow">({item.fromColumn} → {item.toColumn})</span>
                         )}
                       </div>
                     </div>
