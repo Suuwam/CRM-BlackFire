@@ -1,5 +1,13 @@
 {
   "appId": "com.blackfire.crm",
   "appName": "Blackfire CRM",
-  "webDir": "dist"
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": true,
+    "overScrollMode": "never",
+    "backgroundColor": "#000000"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
 }
