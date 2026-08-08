@@ -5,18 +5,18 @@ import NotificationBell from './NotificationBell';
 const THEMES = [
   { id: 'light', label: 'Light', bg: '#f8f8f9', dot: '#18181b' },
   { id: 'dark',  label: 'Dark',  bg: '#111113', dot: '#f0f0f2' },
-  { id: 'ocean', label: 'Ocean', bg: '#0a1628', dot: '#38bdf8' },
-  { id: 'dusk',  label: 'Dusk',  bg: '#1c0a14', dot: '#fb7185' },
 ];
 
+function normalizeTheme(themeId) {
+  return themeId === 'dark' ? 'dark' : 'light';
+}
+
 function applyTheme(themeId) {
+  const id = normalizeTheme(themeId);
   const root = document.documentElement;
-  // Remove all theme classes
   root.classList.remove('dark', 'theme-ocean', 'theme-dusk');
-  if (themeId === 'dark')  root.classList.add('dark');
-  if (themeId === 'ocean') root.classList.add('theme-ocean');
-  if (themeId === 'dusk')  root.classList.add('theme-dusk');
-  localStorage.setItem('theme', themeId);
+  if (id === 'dark') root.classList.add('dark');
+  localStorage.setItem('theme', id);
 }
 
 const nav = [
@@ -36,7 +36,10 @@ const adminNav = [
 ];
 
 export default function Sidebar({ user, onLogout, routeLoading, onSearchOpen }) {
-  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('theme');
+    return saved === 'dark' ? 'dark' : 'light';
+  });
 
   // Apply theme on mount and on change
   useEffect(() => {

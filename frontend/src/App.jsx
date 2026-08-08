@@ -17,12 +17,11 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Apply saved theme on initial load (before React renders)
 (function initTheme() {
-  const theme = localStorage.getItem('theme') || 'light';
+  const theme = localStorage.getItem('theme') === 'dark' ? 'dark' : 'light';
   const root = document.documentElement;
   root.classList.remove('dark', 'theme-ocean', 'theme-dusk');
-  if (theme === 'dark')  root.classList.add('dark');
-  if (theme === 'ocean') root.classList.add('theme-ocean');
-  if (theme === 'dusk')  root.classList.add('theme-dusk');
+  if (theme === 'dark') root.classList.add('dark');
+  localStorage.setItem('theme', theme);
 })();
 
 function AppShell() {
