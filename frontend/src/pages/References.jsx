@@ -148,7 +148,11 @@ export default function References() {
       <div className="page-body">
         <div className="toolbar">
           <div className="search">
-            <span className="search-ico">🔍</span>
+            <span className="search-ico">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+            </span>
             <input placeholder="Search links & descriptions..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <div className="ref-tags" style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
@@ -171,7 +175,7 @@ export default function References() {
                 <div className="ref-title">{r.title}</div>
                 <div className="ref-url-badge">{hostname(r.url)}</div>
                 {r.description && <div className="ref-desc">{r.description}</div>}
-                {r.notes && <div className="ref-notes">💡 {r.notes}</div>}
+                {r.notes && <div className="ref-notes">Notes: {r.notes}</div>}
                 {r.tags && r.tags.length > 0 && (
                   <div className="ref-tags" style={{ marginTop: 8 }}>
                     {r.tags.map(t => <span key={t} className="ref-tag" onClick={() => setTagFilter(t)}>{t}</span>)}
@@ -180,13 +184,15 @@ export default function References() {
               </div>
               <div className="ref-foot">
                 <a href={r.url.startsWith('http') ? r.url : 'https://' + r.url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-secondary">↗ Open Link</a>
-                <button className="btn btn-sm btn-ghost" onClick={() => { navigator.clipboard.writeText(r.url); toast('Copied URL!', 'success'); }} title="Copy link">📋</button>
+                <button className="btn btn-sm btn-ghost" onClick={() => { navigator.clipboard.writeText(r.url); toast('Copied URL!', 'success'); }} title="Copy link">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                </button>
                 <button className="btn btn-sm btn-secondary" onClick={() => openEdit(r)} title="Edit link">Edit</button>
                 <button className="btn btn-sm btn-danger" onClick={() => del(r._id)} title="Delete link">Delete</button>
               </div>
             </div>
           ))}
-          {visible.length === 0 && <div className="empty"><div className="empty-ico">🔗</div><p>No reference links saved yet.</p></div>}
+          {visible.length === 0 && <div className="empty"><div className="empty-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div><p>No reference links saved yet.</p></div>}
         </div>
       </div>
 
@@ -197,7 +203,7 @@ export default function References() {
           <div style={{ display:'flex', gap:8 }}>
             <input value={form.url} onChange={e => setForm(f=>({...f,url:e.target.value}))} placeholder="https://example.com/article" style={{ flex:1 }} />
             <button type="button" className="btn btn-secondary btn-sm" onClick={handleScrape} disabled={scraping}>
-              {scraping ? 'Scraping...' : '⚡ Auto-Scrape'}
+              {scraping ? 'Scraping...' : 'Auto-Scrape'}
             </button>
           </div>
         </div>

@@ -3,6 +3,7 @@ const Client = require('../models/Client');
 const { requireSessionUser } = require('../utils/session');
 const { sendMail } = require('../utils/mailer');
 const { rateLimit } = require('../utils/rateLimit');
+const { recordActivity } = require('../utils/activity');
 
 const sendLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, prefix: 'email-send', message: 'Too many emails sent. Please slow down.' });
 
@@ -34,6 +35,17 @@ router.post('/send', requireSessionUser, sendLimiter, async (req, res) => {
     const html = `<div style="font-family:Arial,sans-serif;line-height:1.7;color:#111;max-width:600px;white-space:pre-wrap">${personalBody.replace(/\n/g,'<br/>')}</div>`;
 
     await sendMail({ to: client.email, subject: personalSubject, text: personalBody, html });
+
+    await recordActivity({
+      action: 'send_email',
+      targetType: 'email',
+      targetId: client._id,
+      targetName: client.name,
+      project: client.project || '',
+      actorId: req.sessionUser._id,
+      actorName: req.sessionUser.name,
+      summary: `Sent email to ${client.name} (${client.email}): "${personalSubject}"`,
+    });
 
     res.json({ ok: true, to: client.email });
   } catch (e) {
@@ -70,6 +82,16 @@ router.post('/bulk', requireSessionUser, sendLimiter, async (req, res) => {
 
     const sent   = results.filter(r => r.status === 'sent').length;
     const failed = results.filter(r => r.status === 'failed').length;
+
+    await recordActivity({
+      action: 'bulk_email',
+      targetType: 'email',
+      targetName: `${sent} clients`,
+      actorId: req.sessionUser._id,
+      actorName: req.sessionUser.name,
+      summary: `Sent bulk email campaign to ${sent} client(s): "${subject}"`,
+    });
+
     res.json({ ok: true, sent, failed, results });
   } catch (e) {
     res.status(500).json({ error: e.message });

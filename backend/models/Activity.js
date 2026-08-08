@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const activitySchema = new mongoose.Schema({
   action: { type: String, required: true, trim: true },
-  targetType: { type: String, enum: ['task', 'account', 'application'], default: 'task' },
+  targetType: { type: String, enum: ['task', 'account', 'application', 'email'], default: 'task' },
   targetId: { type: mongoose.Schema.Types.ObjectId, default: null },
   targetName: { type: String, default: '' },
   project: { type: String, default: '' },

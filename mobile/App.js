@@ -1,40 +1,124 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  ScrollView,
-  TextInput,
-  ActivityIndicator,
-  SafeAreaView,
-  StatusBar,
-  FlatList,
-  RefreshControl
+  StyleSheet, Text, View, TouchableOpacity, ScrollView,
+  TextInput, ActivityIndicator, SafeAreaView, StatusBar,
+  RefreshControl, Platform, AppState
 } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import * as BackgroundFetch from 'expo-background-fetch';
+import * as TaskManager from 'expo-task-manager';
+import * as Device from 'expo-device';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi, tasksApi, clientsApi, activityApi } from './src/api';
 
+// ─── Notification Handler (foreground) ────────────────────────────────────────
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
+
+const BG_TASK = 'BLACKFIRE_NOTIFY_TASK';
+const LAST_CHECKED_KEY = '@blackfire_last_checked';
+const UNREAD_COUNT_KEY = '@blackfire_unread_count';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+async function fireNotif(title, body) {
+  await Notifications.scheduleNotificationAsync({
+    content: { title, body, sound: true },
+    trigger: null,
+  });
+}
+
+// ─── Background Task ──────────────────────────────────────────────────────────
+TaskManager.defineTask(BG_TASK, async () => {
+  try {
+    const lastChecked = await AsyncStorage.getItem(LAST_CHECKED_KEY);
+    const since = lastChecked || new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+    const res = await activityApi.listSince(since);
+    const items = Array.isArray(res.data) ? res.data : [];
+
+    if (items.length > 0) {
+      await AsyncStorage.setItem(LAST_CHECKED_KEY, new Date().toISOString());
+
+      let unread = parseInt(await AsyncStorage.getItem(UNREAD_COUNT_KEY) || '0', 10);
+      unread += items.length;
+      await AsyncStorage.setItem(UNREAD_COUNT_KEY, String(unread));
+      await Notifications.setBadgeCountAsync(unread);
+
+      for (const act of items) {
+        await fireNotif('Blackfire CRM', act.summary || 'New activity logged');
+      }
+    }
+
+    return BackgroundFetch.BackgroundFetchResult.NewData;
+  } catch {
+    return BackgroundFetch.BackgroundFetchResult.Failed;
+  }
+});
+
+// ─── Register Background Fetch ────────────────────────────────────────────────
+async function registerBgFetch() {
+  try {
+    await BackgroundFetch.registerTaskAsync(BG_TASK, {
+      minimumInterval: 30,
+      stopOnTerminate: false,
+      startOnBoot: true,
+    });
+  } catch {}
+}
+
+// ─── Request Notification Permission ─────────────────────────────────────────
+async function requestNotifPermission() {
+  if (!Device.isDevice) return false;
+  const { status: existing } = await Notifications.getPermissionsAsync();
+  if (existing === 'granted') return true;
+  const { status } = await Notifications.requestPermissionsAsync();
+  return status === 'granted';
+}
+
+// ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'board', 'clients', 'activity'
+  const [activeTab, setActiveTab] = useState('dashboard');
 
-  // Auth state
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Data state
   const [tasks, setTasks] = useState([]);
   const [clients, setClients] = useState([]);
   const [activities, setActivities] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [project, setProject] = useState('blackfire'); // 'blackfire' | 'aawazz'
+  const [project, setProject] = useState('blackfire');
 
+  const appState = useRef(AppState.currentState);
+  const pollRef = useRef(null);
+
+  useEffect(() => { checkSession(); }, []);
+
+  // Foreground polling when app is visible
   useEffect(() => {
-    checkSession();
-  }, []);
+    if (!user) return;
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active' && appState.current !== 'active') {
+        pollNewActivities();
+      }
+      appState.current = next;
+    });
+    pollRef.current = setInterval(pollNewActivities, 30000);
+    return () => {
+      sub.remove();
+      clearInterval(pollRef.current);
+    };
+  }, [user]);
 
   async function checkSession() {
     try {
@@ -42,12 +126,55 @@ export default function App() {
       if (res.data?.user) {
         setUser(res.data.user);
         loadData(project);
+        await setupNotifications();
       }
-    } catch (e) {
-      setUser(null);
-    } finally {
-      setLoading(false);
+    } catch { setUser(null); }
+    finally { setLoading(false); }
+  }
+
+  async function setupNotifications() {
+    const granted = await requestNotifPermission();
+    if (!granted) return;
+    await registerBgFetch();
+    // Init lastChecked if not set
+    const existing = await AsyncStorage.getItem(LAST_CHECKED_KEY);
+    if (!existing) {
+      await AsyncStorage.setItem(LAST_CHECKED_KEY, new Date().toISOString());
     }
+    const uc = parseInt(await AsyncStorage.getItem(UNREAD_COUNT_KEY) || '0', 10);
+    setUnreadCount(uc);
+  }
+
+  async function pollNewActivities() {
+    try {
+      const lastChecked = await AsyncStorage.getItem(LAST_CHECKED_KEY);
+      const since = lastChecked || new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      const res = await activityApi.listSince(since);
+      const items = Array.isArray(res.data) ? res.data : [];
+
+      if (items.length > 0) {
+        const now = new Date().toISOString();
+        await AsyncStorage.setItem(LAST_CHECKED_KEY, now);
+
+        // Fire local notifications
+        for (const act of items) {
+          await fireNotif('Blackfire CRM', act.summary || 'New activity logged');
+        }
+
+        // Update in-app notification list
+        setNotifications(prev => [...items, ...prev].slice(0, 100));
+        const newUnread = unreadCount + items.length;
+        setUnreadCount(newUnread);
+        await AsyncStorage.setItem(UNREAD_COUNT_KEY, String(newUnread));
+        await Notifications.setBadgeCountAsync(newUnread);
+      }
+    } catch {}
+  }
+
+  async function clearUnread() {
+    setUnreadCount(0);
+    await AsyncStorage.setItem(UNREAD_COUNT_KEY, '0');
+    await Notifications.setBadgeCountAsync(0);
   }
 
   async function loadData(proj = project) {
@@ -61,38 +188,40 @@ export default function App() {
       setTasks(tRes.data || []);
       setClients(cRes.data || []);
       setActivities(aRes.data || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setRefreshing(false);
-    }
+      setNotifications((aRes.data || []).slice(0, 50));
+    } catch (e) { console.error(e); }
+    finally { setRefreshing(false); }
   }
 
   async function handleLogin() {
     if (!username.trim() || !password.trim()) {
-      setAuthError('Please enter username and password');
-      return;
+      setAuthError('Please enter username and password'); return;
     }
-    setAuthError('');
-    setAuthLoading(true);
+    setAuthError(''); setAuthLoading(true);
     try {
       const res = await authApi.login({ username: username.trim(), password });
+      if (res.data?.user?._id) {
+        await AsyncStorage.setItem('@blackfire_session_user_id', res.data.user._id);
+      }
       setUser(res.data.user);
       loadData(project);
+      await setupNotifications();
     } catch (e) {
       setAuthError(e?.response?.data?.error || 'Login failed. Check credentials.');
-    } finally {
-      setAuthLoading(false);
-    }
+    } finally { setAuthLoading(false); }
   }
 
   async function handleLogout() {
-    try {
-      await authApi.logout();
-    } catch (e) {}
-    setUser(null);
+    try { await authApi.logout(); } catch {}
+    clearInterval(pollRef.current);
+    await BackgroundFetch.unregisterTaskAsync(BG_TASK).catch(() => {});
+    await AsyncStorage.removeItem(LAST_CHECKED_KEY);
+    await AsyncStorage.removeItem(UNREAD_COUNT_KEY);
+    await AsyncStorage.removeItem('@blackfire_session_user_id');
+    setUser(null); setUnreadCount(0); setNotifications([]);
   }
 
+  // ─── Loading ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <View style={styles.centerContainer}>
@@ -102,7 +231,7 @@ export default function App() {
     );
   }
 
-  // --- LOGIN SCREEN ---
+  // ─── Login ──────────────────────────────────────────────────────────────────
   if (!user) {
     return (
       <SafeAreaView style={styles.container}>
@@ -111,49 +240,28 @@ export default function App() {
           <Text style={styles.sigil}>🔥</Text>
           <Text style={styles.brandTitle}>BLACKFIRE AI</Text>
           <Text style={styles.brandSub}>MOBILE CRM GATEWAY</Text>
-
           <View style={styles.inputGroup}>
             <Text style={styles.label}>USERNAME</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter username"
-              placeholderTextColor="#555"
-              value={username}
-              onChangeText={setUsername}
-              autoCapitalize="none"
-            />
+            <TextInput style={styles.input} placeholder="Enter username" placeholderTextColor="#555"
+              value={username} onChangeText={setUsername} autoCapitalize="none" />
           </View>
-
           <View style={styles.inputGroup}>
             <Text style={styles.label}>PASSWORD</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter password"
-              placeholderTextColor="#555"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-            />
+            <TextInput style={styles.input} placeholder="Enter password" placeholderTextColor="#555"
+              secureTextEntry value={password} onChangeText={setPassword} />
           </View>
-
           {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
-
           <TouchableOpacity style={styles.loginBtn} onPress={handleLogin} disabled={authLoading}>
-            {authLoading ? (
-              <ActivityIndicator color="#000" />
-            ) : (
-              <Text style={styles.loginBtnText}>IGNITE SESSION</Text>
-            )}
+            {authLoading ? <ActivityIndicator color="#000" /> : <Text style={styles.loginBtnText}>IGNITE SESSION</Text>}
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
-  // --- MAIN APP ---
+  // ─── Main App ───────────────────────────────────────────────────────────────
   const doneCount = tasks.filter(t => t.column === 'done').length;
   const inProgressCount = tasks.filter(t => t.column === 'inprogress').length;
-  const backlogCount = tasks.filter(t => t.column === 'backlog' || t.column === 'todo').length;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -163,18 +271,18 @@ export default function App() {
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Blackfire CRM</Text>
-          <Text style={styles.headerUser}>User: {user.name} (@{user.username})</Text>
+          <Text style={styles.headerUser}>@{user.username}</Text>
         </View>
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
           <Text style={styles.logoutBtnText}>Exit</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Main Content Area */}
-      <ScrollView
-        style={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadData(project)} tintColor="#fff" />}
-      >
+      {/* Content */}
+      <ScrollView style={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadData(project)} tintColor="#fff" />}>
+
+        {/* DASHBOARD */}
         {activeTab === 'dashboard' && (
           <View style={styles.tabContent}>
             <Text style={styles.sectionHeader}>Overview & Metrics</Text>
@@ -193,24 +301,18 @@ export default function App() {
               </View>
             </View>
 
-            {/* Project Switcher */}
             <Text style={styles.sectionHeader}>Active Project</Text>
             <View style={styles.projectSwitchRow}>
-              <TouchableOpacity
-                style={[styles.projBtn, project === 'blackfire' && styles.projBtnActive]}
-                onPress={() => { setProject('blackfire'); loadData('blackfire'); }}
-              >
+              <TouchableOpacity style={[styles.projBtn, project === 'blackfire' && styles.projBtnActive]}
+                onPress={() => { setProject('blackfire'); loadData('blackfire'); }}>
                 <Text style={styles.projBtnText}>🔥 Blackfire AI</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.projBtn, project === 'aawazz' && styles.projBtnActiveBlue]}
-                onPress={() => { setProject('aawazz'); loadData('aawazz'); }}
-              >
+              <TouchableOpacity style={[styles.projBtn, project === 'aawazz' && styles.projBtnActiveBlue]}
+                onPress={() => { setProject('aawazz'); loadData('aawazz'); }}>
                 <Text style={styles.projBtnText}>🌊 Aawazz</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Quick Activity */}
             <Text style={styles.sectionHeader}>Recent System Backlog</Text>
             {activities.slice(0, 5).map((act, i) => (
               <View key={act._id || i} style={styles.activityCard}>
@@ -222,23 +324,18 @@ export default function App() {
           </View>
         )}
 
+        {/* BOARD */}
         {activeTab === 'board' && (
           <View style={styles.tabContent}>
-            <Text style={styles.sectionHeader}>
-              Tasks ({project === 'blackfire' ? 'Blackfire AI' : 'Aawazz'})
-            </Text>
-
+            <Text style={styles.sectionHeader}>Tasks ({project === 'blackfire' ? 'Blackfire AI' : 'Aawazz'})</Text>
             {['inprogress', 'todo', 'backlog', 'done'].map(col => {
               const colTasks = tasks.filter(t => t.column === col);
               return (
                 <View key={col} style={styles.colSection}>
-                  <Text style={styles.colTitle}>
-                    {col.toUpperCase()} ({colTasks.length})
-                  </Text>
-                  {colTasks.length === 0 ? (
-                    <Text style={styles.emptyText}>No tasks in this stage</Text>
-                  ) : (
-                    colTasks.map(t => (
+                  <Text style={styles.colTitle}>{col.toUpperCase()} ({colTasks.length})</Text>
+                  {colTasks.length === 0
+                    ? <Text style={styles.emptyText}>No tasks in this stage</Text>
+                    : colTasks.map(t => (
                       <View key={t._id} style={styles.taskCard}>
                         <Text style={styles.taskTitle}>{t.title}</Text>
                         {t.description ? <Text style={styles.taskDesc}>{t.description}</Text> : null}
@@ -246,19 +343,18 @@ export default function App() {
                           <Text style={styles.taskMeta}>
                             To: {t.assignees?.map(a => a.name).join(', ') || t.assigneeName || 'Unassigned'}
                           </Text>
-                          <Text style={[styles.priorityBadge, styles[`priority_${t.priority}`]]}>
-                            {t.priority}
-                          </Text>
+                          <Text style={[styles.priorityBadge, styles[`priority_${t.priority}`]]}>{t.priority}</Text>
                         </View>
                       </View>
                     ))
-                  )}
+                  }
                 </View>
               );
             })}
           </View>
         )}
 
+        {/* CLIENTS */}
         {activeTab === 'clients' && (
           <View style={styles.tabContent}>
             <Text style={styles.sectionHeader}>Clients ({clients.length})</Text>
@@ -274,6 +370,7 @@ export default function App() {
           </View>
         )}
 
+        {/* ACTIVITY LOG */}
         {activeTab === 'activity' && (
           <View style={styles.tabContent}>
             <Text style={styles.sectionHeader}>Activity Log (Last 30 Days)</Text>
@@ -286,346 +383,151 @@ export default function App() {
             ))}
           </View>
         )}
+
+        {/* NOTIFICATIONS */}
+        {activeTab === 'notifications' && (
+          <View style={styles.tabContent}>
+            <View style={styles.notifHeader}>
+              <Text style={styles.sectionHeader}>Notifications</Text>
+              {unreadCount > 0 && (
+                <TouchableOpacity style={styles.clearBtn} onPress={clearUnread}>
+                  <Text style={styles.clearBtnText}>Mark all read</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            {notifications.length === 0
+              ? <Text style={styles.emptyText}>No notifications yet. CRM activity will appear here.</Text>
+              : notifications.map((act, i) => (
+                <View key={act._id || i} style={styles.notifCard}>
+                  <View style={styles.notifRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.notifTitle}>CRM Activity</Text>
+                      <Text style={styles.notifBody}>{act.summary}</Text>
+                      <Text style={styles.notifMeta}>
+                        {act.actorName || 'System'} · {new Date(act.createdAt).toLocaleString()}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ))
+            }
+          </View>
+        )}
       </ScrollView>
 
-      {/* Bottom Navigation Bar */}
+      {/* Bottom Nav */}
       <View style={styles.navBar}>
-        <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('dashboard')}>
-          <Text style={[styles.navIcon, activeTab === 'dashboard' && styles.navIconActive]}>📊</Text>
-          <Text style={[styles.navLabel, activeTab === 'dashboard' && styles.navLabelActive]}>Overview</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('board')}>
-          <Text style={[styles.navIcon, activeTab === 'board' && styles.navIconActive]}>📋</Text>
-          <Text style={[styles.navLabel, activeTab === 'board' && styles.navLabelActive]}>Board</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('clients')}>
-          <Text style={[styles.navIcon, activeTab === 'clients' && styles.navIconActive]}>👥</Text>
-          <Text style={[styles.navLabel, activeTab === 'clients' && styles.navLabelActive]}>Clients</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('activity')}>
-          <Text style={[styles.navIcon, activeTab === 'activity' && styles.navIconActive]}>📜</Text>
-          <Text style={[styles.navLabel, activeTab === 'activity' && styles.navLabelActive]}>Log</Text>
-        </TouchableOpacity>
+        {[
+          { key: 'dashboard', icon: '📊', label: 'Overview' },
+          { key: 'board',     icon: '📋', label: 'Board' },
+          { key: 'clients',   icon: '👥', label: 'Clients' },
+          { key: 'activity',  icon: '📜', label: 'Log' },
+          { key: 'notifications', icon: '🔔', label: 'Alerts' },
+        ].map(tab => (
+          <TouchableOpacity key={tab.key} style={styles.navItem}
+            onPress={() => { setActiveTab(tab.key); if (tab.key === 'notifications') clearUnread(); }}>
+            <View style={styles.navIconWrap}>
+              <Text style={[styles.navIcon, activeTab === tab.key && styles.navIconActive]}>{tab.icon}</Text>
+              {tab.key === 'notifications' && unreadCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={[styles.navLabel, activeTab === tab.key && styles.navLabelActive]}>{tab.label}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
     </SafeAreaView>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  centerContainer: {
-    flex: 1,
-    backgroundColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: '#888',
-    marginTop: 12,
-    fontSize: 14,
-  },
-  authBox: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 28,
-  },
-  sigil: {
-    fontSize: 44,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  brandTitle: {
-    color: '#ffffff',
-    fontSize: 26,
-    fontWeight: '900',
-    textAlign: 'center',
-    letterSpacing: 3,
-  },
-  brandSub: {
-    color: '#666666',
-    fontSize: 11,
-    textAlign: 'center',
-    letterSpacing: 4,
-    marginBottom: 36,
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    color: '#888',
-    fontSize: 10,
-    letterSpacing: 2,
-    marginBottom: 6,
-  },
-  input: {
-    backgroundColor: '#111111',
-    borderColor: '#222222',
-    borderWidth: 1,
-    borderRadius: 8,
-    color: '#ffffff',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-  },
-  errorText: {
-    color: '#ef4444',
-    fontSize: 12,
-    marginBottom: 12,
-  },
-  loginBtn: {
-    backgroundColor: '#ffffff',
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  loginBtnText: {
-    color: '#000000',
-    fontWeight: '800',
-    letterSpacing: 2,
-    fontSize: 13,
-  },
+  container: { flex: 1, backgroundColor: '#000000' },
+  centerContainer: { flex: 1, backgroundColor: '#000000', justifyContent: 'center', alignItems: 'center' },
+  loadingText: { color: '#888', marginTop: 12, fontSize: 14 },
+  authBox: { flex: 1, justifyContent: 'center', paddingHorizontal: 28 },
+  sigil: { fontSize: 44, textAlign: 'center', marginBottom: 8 },
+  brandTitle: { color: '#ffffff', fontSize: 26, fontWeight: '900', textAlign: 'center', letterSpacing: 3 },
+  brandSub: { color: '#666666', fontSize: 11, textAlign: 'center', letterSpacing: 4, marginBottom: 36 },
+  inputGroup: { marginBottom: 16 },
+  label: { color: '#888', fontSize: 10, letterSpacing: 2, marginBottom: 6 },
+  input: { backgroundColor: '#111111', borderColor: '#222222', borderWidth: 1, borderRadius: 8,
+    color: '#ffffff', paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 },
+  errorText: { color: '#ef4444', fontSize: 12, marginBottom: 12 },
+  loginBtn: { backgroundColor: '#ffffff', paddingVertical: 14, borderRadius: 8, alignItems: 'center', marginTop: 12 },
+  loginBtnText: { color: '#000000', fontWeight: '800', letterSpacing: 2, fontSize: 13 },
 
-  // Main Layout
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
-  },
-  headerTitle: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  headerUser: {
-    color: '#666',
-    fontSize: 11,
-  },
-  logoutBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 6,
-  },
-  logoutBtnText: {
-    color: '#aaa',
-    fontSize: 12,
-  },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },
+  headerTitle: { color: '#ffffff', fontSize: 18, fontWeight: '800' },
+  headerUser: { color: '#666', fontSize: 11 },
+  logoutBtn: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#1a1a1a', borderRadius: 6 },
+  logoutBtnText: { color: '#aaa', fontSize: 12 },
 
-  content: {
-    flex: 1,
-  },
-  tabContent: {
-    padding: 16,
-  },
-  sectionHeader: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '700',
-    marginTop: 12,
-    marginBottom: 10,
-  },
+  content: { flex: 1 },
+  tabContent: { padding: 16 },
+  sectionHeader: { color: '#ffffff', fontSize: 15, fontWeight: '700', marginTop: 12, marginBottom: 10 },
 
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#0c0c0c',
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-    alignItems: 'center',
-  },
-  statNumber: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  statLabel: {
-    color: '#777',
-    fontSize: 10,
-    marginTop: 2,
-  },
+  statsRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
+  statCard: { flex: 1, backgroundColor: '#0c0c0c', borderWidth: 1, borderRadius: 10, padding: 12, alignItems: 'center' },
+  statNumber: { color: '#fff', fontSize: 20, fontWeight: '800' },
+  statLabel: { color: '#777', fontSize: 10, marginTop: 2 },
 
-  projectSwitchRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  projBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    backgroundColor: '#111',
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#222',
-  },
-  projBtnActive: {
-    backgroundColor: '#18181b',
-    borderColor: '#ffffff',
-  },
-  projBtnActiveBlue: {
-    backgroundColor: '#1e3a8a',
-    borderColor: '#3b82f6',
-  },
-  projBtnText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 13,
-  },
+  projectSwitchRow: { flexDirection: 'row', gap: 10 },
+  projBtn: { flex: 1, paddingVertical: 10, backgroundColor: '#111', borderRadius: 8,
+    alignItems: 'center', borderWidth: 1, borderColor: '#222' },
+  projBtnActive: { backgroundColor: '#18181b', borderColor: '#ffffff' },
+  projBtnActiveBlue: { backgroundColor: '#1e3a8a', borderColor: '#3b82f6' },
+  projBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
 
-  activityItem: {
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#111',
-  },
-  activityText: {
-    color: '#aaa',
-    fontSize: 12,
-  },
-
-  // Board
-  colSection: {
-    marginBottom: 16,
-  },
-  colTitle: {
-    color: '#666',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  taskCard: {
-    backgroundColor: '#0d0d0d',
-    borderWidth: 1,
-    borderColor: '#222',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-  },
-  taskTitle: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  taskDesc: {
-    color: '#888',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  taskFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  taskMeta: {
-    color: '#555',
-    fontSize: 11,
-  },
-  priorityBadge: {
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
+  colSection: { marginBottom: 16 },
+  colTitle: { color: '#666', fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 8 },
+  taskCard: { backgroundColor: '#0d0d0d', borderWidth: 1, borderColor: '#222',
+    borderRadius: 8, padding: 12, marginBottom: 8 },
+  taskTitle: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  taskDesc: { color: '#888', fontSize: 12, marginTop: 4 },
+  taskFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
+  taskMeta: { color: '#555', fontSize: 11 },
+  priorityBadge: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
   priority_high: { color: '#ef4444' },
   priority_medium: { color: '#f59e0b' },
   priority_low: { color: '#10b981' },
 
-  // Clients
-  clientCard: {
-    backgroundColor: '#0d0d0d',
-    borderWidth: 1,
-    borderColor: '#222',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-  },
-  clientName: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  clientCompany: {
-    color: '#777',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  clientEmail: {
-    color: '#555',
-    fontSize: 12,
-    marginTop: 6,
-  },
+  clientCard: { backgroundColor: '#0d0d0d', borderWidth: 1, borderColor: '#222',
+    borderRadius: 8, padding: 12, marginBottom: 8 },
+  clientName: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  clientCompany: { color: '#777', fontSize: 12, marginTop: 2 },
+  clientEmail: { color: '#555', fontSize: 12, marginTop: 6 },
 
-  // Activity Log
-  activityCard: {
-    backgroundColor: '#0a0a0a',
-    borderRadius: 6,
-    padding: 10,
-    marginBottom: 6,
-    borderLeftWidth: 3,
-    borderLeftColor: '#3b82f6',
-  },
-  activityActor: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  activitySummary: {
-    color: '#aaa',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  activityDate: {
-    color: '#444',
-    fontSize: 10,
-    marginTop: 4,
-  },
+  activityCard: { backgroundColor: '#0a0a0a', borderRadius: 6, padding: 10,
+    marginBottom: 6, borderLeftWidth: 3, borderLeftColor: '#3b82f6' },
+  activityActor: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  activitySummary: { color: '#aaa', fontSize: 12, marginTop: 2 },
+  activityDate: { color: '#444', fontSize: 10, marginTop: 4 },
 
-  emptyText: {
-    color: '#444',
-    fontSize: 12,
-    fontStyle: 'italic',
-  },
+  // Notifications tab
+  notifHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  clearBtn: { paddingHorizontal: 10, paddingVertical: 4, backgroundColor: '#1a1a1a', borderRadius: 6 },
+  clearBtnText: { color: '#888', fontSize: 11 },
+  notifCard: { borderRadius: 8, padding: 12, marginBottom: 8, borderLeftWidth: 3, backgroundColor: '#0a0a0a', borderLeftColor: '#3b82f6' },
+  notifRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  notifTitle: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  notifBody: { color: '#aaa', fontSize: 12, marginTop: 2 },
+  notifMeta: { color: '#444', fontSize: 10, marginTop: 4 },
 
-  // Bottom Navigation Bar
-  navBar: {
-    flexDirection: 'row',
-    backgroundColor: '#050505',
-    borderTopWidth: 1,
-    borderTopColor: '#1a1a1a',
-    paddingVertical: 8,
-  },
-  navItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  navIcon: {
-    fontSize: 18,
-    opacity: 0.5,
-  },
-  navIconActive: {
-    opacity: 1,
-  },
-  navLabel: {
-    color: '#555',
-    fontSize: 10,
-    marginTop: 2,
-  },
-  navLabelActive: {
-    color: '#fff',
-    fontWeight: '700',
-  },
+  emptyText: { color: '#444', fontSize: 12, fontStyle: 'italic' },
+
+  navBar: { flexDirection: 'row', backgroundColor: '#050505',
+    borderTopWidth: 1, borderTopColor: '#1a1a1a', paddingVertical: 8 },
+  navItem: { flex: 1, alignItems: 'center' },
+  navIconWrap: { position: 'relative' },
+  navIcon: { fontSize: 18, opacity: 0.5 },
+  navIconActive: { opacity: 1 },
+  navLabel: { color: '#555', fontSize: 10, marginTop: 2 },
+  navLabelActive: { color: '#fff', fontWeight: '700' },
+  badge: { position: 'absolute', top: -4, right: -8, backgroundColor: '#ef4444',
+    borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
+  badgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
 });

@@ -5,11 +5,12 @@ import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 
-const PROJECTS = [
+const DEFAULT_PROJECTS = [
   { id: 'blackfire', label: 'Blackfire AI', color: '#18181b', dot: '#18181b' },
   { id: 'aawazz',   label: 'Aawazz Product', color: '#2563eb', dot: '#2563eb' },
 ];
-const COLUMNS = [
+
+const DEFAULT_COLUMNS = [
   { id: 'backlog',    label: 'Backlog' },
   { id: 'todo',       label: 'To Do' },
   { id: 'inprogress', label: 'In Progress' },
@@ -42,7 +43,6 @@ function loadDraft(taskId) {
     const raw = sessionStorage.getItem(getDraftKey(taskId));
     if (!raw) return null;
     const d = JSON.parse(raw);
-    // Expire drafts older than 24 hours
     if (Date.now() - d.ts > 86400000) { sessionStorage.removeItem(getDraftKey(taskId)); return null; }
     return d;
   } catch { return null; }
@@ -60,14 +60,30 @@ export default function Board() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [imageFile, setImageFile] = useState(null);
   const [assigneeSearch, setAssigneeSearch] = useState('');
-  // Comments state for task detail view
   const [commentText, setCommentText] = useState('');
   const [commentSaving, setCommentSaving] = useState(false);
   const [detailComments, setDetailComments] = useState([]);
   const dragId = useRef(null);
   const toast = useToast();
 
-  // SWR: cache tasks per project, revalidate in background
+  // Custom boards state
+  const [customProjects, setCustomProjects] = useState(() => {
+    try {
+      const saved = localStorage.getItem('crm_custom_boards');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const allProjects = [...DEFAULT_PROJECTS, ...customProjects];
+  const activeProject = allProjects.find(p => p.id === project) || DEFAULT_PROJECTS[0];
+  const columns = activeProject.columns || DEFAULT_COLUMNS;
+
+  // Board design settings state
+  const [designModal, setDesignModal] = useState(false);
+  const [designBoard, setDesignBoard] = useState({ id: '', label: '', color: 'blue', columns: [] });
+
   const swrKey = `/tasks?project=${project}`;
   const { data: tasks = [], isLoading } = useSWR(swrKey, fetcher, {
     keepPreviousData: true,
@@ -80,6 +96,13 @@ export default function Board() {
     if (modal) saveDraft(editing, form, editCol);
   }, [modal, form, editCol, editing]);
 
+  // Adjust default editCol when columns change
+  useEffect(() => {
+    if (columns.length > 0) {
+      setEditCol(columns[0].id);
+    }
+  }, [project]);
+
   function openAdd(col) {
     const draft = loadDraft(null);
     if (draft && draft.form.title.trim()) {
@@ -89,13 +112,15 @@ export default function Board() {
       setForm({ ...EMPTY_TASK }); setEditCol(col); setEditing(null); setImageFile(null); setModal(true);
     }
   }
+
   function openEdit(t) {
     const draft = loadDraft(t._id);
+    const hasCol = columns.some(c => c.id === t.column);
+    const targetCol = hasCol ? t.column : (columns[0]?.id || 'backlog');
     if (draft?.form?.title?.trim()) {
-      setForm(draft.form); setEditCol(draft.col || t.column); setEditing(t._id); setImageFile(null); setModal(true);
+      setForm(draft.form); setEditCol(draft.col || targetCol); setEditing(t._id); setImageFile(null); setModal(true);
       toast('Restored unsaved edits', 'info');
     } else {
-      // Build assignees[] from existing task data
       let assignees = t.assignees?.length ? t.assignees : [];
       if (!assignees.length && (t.assigneeName || t.assignee)) {
         assignees = [{ userId: t.assigneeId || null, name: t.assigneeName || t.assignee || '', email: t.assigneeEmail || '' }];
@@ -108,7 +133,7 @@ export default function Board() {
         tags: (t.tags || []).join(', '),
         dueDate: t.dueDate || '',
         assignees,
-      }); setEditCol(t.column); setEditing(t._id); setImageFile(null); setModal(true);
+      }); setEditCol(targetCol); setEditing(t._id); setImageFile(null); setModal(true);
     }
   }
 
@@ -124,7 +149,6 @@ export default function Board() {
     if (saving) return;
     if (!form.title.trim()) return toast('Title required', 'error');
     setSaving(true);
-    // Build legacy single-assignee fields from first assignee for compat
     const firstAssignee = form.assignees?.[0] || null;
     const data = {
       ...form,
@@ -160,7 +184,6 @@ export default function Board() {
   }
 
   async function del(id) {
-    // Optimistic: remove from cache immediately
     mutate(swrKey, tasks.filter(t => t._id !== id), false);
     toast('Task deleted', 'info');
     await tasksApi.delete(id);
@@ -169,7 +192,7 @@ export default function Board() {
 
   async function updateTaskColumn(id, col) {
     mutate(swrKey, tasks.map(t => t._id === id ? { ...t, column: col } : t), false);
-    toast(col === 'done' ? 'Task marked as done' : 'Task cancelled', 'success');
+    toast(col === 'done' ? 'Task marked as done' : 'Task updated', 'success');
     try {
       await tasksApi.move(id, col);
       mutate(swrKey);
@@ -182,8 +205,6 @@ export default function Board() {
   function markTaskDone(id) { updateTaskColumn(id, 'done'); }
   function cancelTask(id) { updateTaskColumn(id, 'cancelled'); }
 
-
-
   // Drag & Drop
   const [dragOver, setDragOver] = useState(null);
 
@@ -191,12 +212,124 @@ export default function Board() {
   async function onDrop(col) {
     if (!dragId.current) return;
     const id = dragId.current;
-    // Optimistic: move card in cache immediately
     mutate(swrKey, tasks.map(t => t._id === id ? { ...t, column: col } : t), false);
     dragId.current = null;
     setDragOver(null);
     await tasksApi.move(id, col);
     mutate(swrKey);
+  }
+
+  // Board design actions
+  function openAddBoard() {
+    setDesignBoard({
+      id: '',
+      label: '',
+      color: 'blue',
+      columns: [
+        { id: 'backlog', label: 'Backlog' },
+        { id: 'todo', label: 'To Do' },
+        { id: 'inprogress', label: 'In Progress' },
+        { id: 'done', label: 'Done' }
+      ]
+    });
+    setDesignModal(true);
+  }
+
+  function openEditBoard(boardId) {
+    const b = customProjects.find(p => p.id === boardId);
+    if (!b) return;
+    setDesignBoard({
+      id: b.id,
+      label: b.label,
+      color: COLORS.find(c => c.hex === b.color)?.id || 'blue',
+      columns: b.columns ? [...b.columns] : [...DEFAULT_COLUMNS]
+    });
+    setDesignModal(true);
+  }
+
+  function saveBoard() {
+    if (!designBoard.label.trim()) return toast('Board name required', 'error');
+    if (!designBoard.columns.length) return toast('At least one column is required', 'error');
+
+    let updatedCustom;
+    const colorHex = COLORS.find(c => c.id === designBoard.color)?.hex || '#3b82f6';
+    if (designBoard.id) {
+      updatedCustom = customProjects.map(p => {
+        if (p.id === designBoard.id) {
+          return {
+            ...p,
+            label: designBoard.label.trim(),
+            color: colorHex,
+            dot: colorHex,
+            columns: designBoard.columns
+          };
+        }
+        return p;
+      });
+      toast('Board layout updated', 'success');
+    } else {
+      const newId = 'board_' + Date.now();
+      const newBoard = {
+        id: newId,
+        label: designBoard.label.trim(),
+        color: colorHex,
+        dot: colorHex,
+        columns: designBoard.columns
+      };
+      updatedCustom = [...customProjects, newBoard];
+      setProject(newId);
+      toast('Board created', 'success');
+    }
+    setCustomProjects(updatedCustom);
+    localStorage.setItem('crm_custom_boards', JSON.stringify(updatedCustom));
+    setDesignModal(false);
+  }
+
+  function deleteBoard(boardId) {
+    if (!window.confirm('Are you sure you want to delete this board? Tasks will remain in the database but won\'t be visible here.')) return;
+    const updatedCustom = customProjects.filter(p => p.id !== boardId);
+    setCustomProjects(updatedCustom);
+    localStorage.setItem('crm_custom_boards', JSON.stringify(updatedCustom));
+    setProject('aawazz');
+    setDesignModal(false);
+    toast('Board deleted', 'success');
+  }
+
+  function handleColumnNameChange(index, newName) {
+    setDesignBoard(prev => {
+      const cols = [...prev.columns];
+      cols[index] = { ...cols[index], label: newName };
+      return { ...prev, columns: cols };
+    });
+  }
+
+  function addColumnToDesign() {
+    setDesignBoard(prev => {
+      const newColId = 'col_' + Date.now() + '_' + prev.columns.length;
+      return {
+        ...prev,
+        columns: [...prev.columns, { id: newColId, label: 'New Stage' }]
+      };
+    });
+  }
+
+  function removeColumnFromDesign(index) {
+    setDesignBoard(prev => {
+      const cols = prev.columns.filter((_, idx) => idx !== index);
+      return { ...prev, columns: cols };
+    });
+  }
+
+  function moveColumn(index, direction) {
+    setDesignBoard(prev => {
+      const cols = [...prev.columns];
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= cols.length) return prev;
+      const temp = cols[index];
+      cols[index] = cols[targetIndex];
+      cols[targetIndex] = temp;
+      return { ...prev, columns: cols };
+    });
   }
 
   function colTasks(col) { return tasks.filter(t => t.column === col); }
@@ -208,24 +341,39 @@ export default function Board() {
     <>
       <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
         <div><h1>Project Board</h1><p>Task tracking with color coding & cover image attachments</p></div>
-        <button className="btn btn-secondary btn-sm board-fullscreen-btn" onClick={() => setIsFullscreen(!isFullscreen)}>
-          {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {customProjects.some(p => p.id === project) && (
+            <button className="btn btn-secondary btn-sm" onClick={() => openEditBoard(project)}>
+              Design Layout
+            </button>
+          )}
+          <button className="btn btn-secondary btn-sm board-fullscreen-btn" onClick={() => setIsFullscreen(!isFullscreen)}>
+            {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+          </button>
+        </div>
       </div>
       <div className={`page-body ${isFullscreen ? 'board-fullscreen' : ''}`}>
         {/* Project tabs */}
-        <div className="board-tabs" style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%', overflowX: 'auto' }}>
-          {PROJECTS.map(p => (
+        <div className="board-tabs" style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%', overflowX: 'auto', marginBottom: 12 }}>
+          {allProjects.map(p => (
             <button key={p.id} className={`board-tab${project===p.id?' active':''}`} onClick={() => setProject(p.id)}
-              style={project===p.id && p.id==='aawazz' ? { background: '#2563eb', borderColor: '#2563eb' } : {}}>
+              style={project===p.id ? { background: p.color || '#2563eb', borderColor: p.color || '#2563eb', color: '#fff' } : {}}>
               {(project === p.id && isLoading) ? (
                 <div style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'authSpin 0.6s linear infinite' }} />
               ) : (
-                <span className="proj-dot" style={{ background: project===p.id ? '#fff' : p.dot }} />
+                <span className="proj-dot" style={{ background: project===p.id ? '#fff' : (p.dot || p.color || '#2563eb') }} />
               )}
               {p.label}
             </button>
           ))}
+          <button className="board-tab" onClick={openAddBoard}
+            style={{
+              padding: '6px 12px', background: 'var(--surface2)', border: '1px dashed var(--border)',
+              borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+              fontSize: 12.5, fontWeight: 550, color: 'var(--text2)'
+            }}>
+            <span>+</span> Add Board
+          </button>
         </div>
 
         {/* Dedicated Blackfire AI Header Banner */}
@@ -276,7 +424,7 @@ export default function Board() {
         {/* Kanban board */}
         <div className="kanban-wrapper" style={{ position: 'relative', minHeight: '50vh' }}>
           <div className="kanban">
-            {COLUMNS.map(col => {
+            {columns.map(col => {
               const ct = colTasks(col.id);
             return (
               <div key={col.id} className="col">
@@ -294,7 +442,6 @@ export default function Board() {
                     <div key={t._id} className={`k-card card-color-${t.color || 'blue'}`} draggable
                       onDragStart={() => onDragStart(t._id)} onClick={() => openViewTask(t)}>
 
-                      {/* Display Task Cover Picture */}
                       {t.image && (
                         <div className="k-card-img-wrap">
                           <img src={t.image.startsWith('data:') || t.image.startsWith('http') ? t.image : `/uploads/${t.image}`} alt={t.title} className="k-card-img" />
@@ -347,7 +494,7 @@ export default function Board() {
         </div>
       </div>
 
-      <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Task' : `Add to ${COLUMNS.find(c=>c.id===editCol)?.label}`}
+      <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Task' : `Add to ${columns.find(c=>c.id===editCol)?.label || 'Stage'}`}
         footer={<><button className="btn btn-secondary" onClick={() => setModal(false)}>Cancel</button><button className="btn btn-primary" onClick={save} disabled={saving} style={isAawazz ? { background: '#2563eb', borderColor: '#2563eb' } : {}}>{saving ? 'Saving...' : 'Save'}</button></>}>
         <div className="form-group"><label>Title *</label><input value={form.title} onChange={e => setForm(f=>({...f,title:e.target.value}))} placeholder="Task title" /></div>
         
@@ -374,7 +521,7 @@ export default function Board() {
           </div>
           <div className="form-group"><label>Column</label>
             <select value={editCol} onChange={e => setEditCol(e.target.value)}>
-              {COLUMNS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+              {columns.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
             </select>
           </div>
         </div>
@@ -457,7 +604,7 @@ export default function Board() {
               </div>
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)' }}>Column</label>
-                <div style={{ fontSize: 13 }}>{COLUMNS.find(c => c.id === viewingTask.column)?.label || viewingTask.column}</div>
+                <div style={{ fontSize: 13 }}>{columns.find(c => c.id === viewingTask.column)?.label || viewingTask.column}</div>
               </div>
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)' }}>Assignees</label>
@@ -485,14 +632,13 @@ export default function Board() {
               </div>
             )}
 
-            {/* ── Comments / Discussion Thread ── */}
+            {/* Discussion Thread */}
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 4 }}>
               <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                 Discussion ({detailComments.length})
               </div>
 
-              {/* Comment thread */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 180, overflowY: 'auto', marginBottom: 10, padding: '2px 0' }}>
                 {detailComments.length === 0 && (
                   <div style={{ fontSize: 12, color: 'var(--text3)', padding: '10px 0', textAlign: 'center' }}>No comments yet. Start the discussion below.</div>
@@ -527,7 +673,6 @@ export default function Board() {
                 ))}
               </div>
 
-              {/* Add comment input */}
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
                 <textarea
                   value={commentText}
@@ -569,10 +714,65 @@ export default function Board() {
                   {commentSaving ? '...' : 'Post'}
                 </button>
               </div>
-              <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>⌘↵ to post</div>
+              <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>Ctrl+Enter to post</div>
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Board Design Modal */}
+      <Modal open={designModal} onClose={() => setDesignModal(false)} title={designBoard.id ? 'Edit Board Layout' : 'Create New Board'}
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+            {designBoard.id ? (
+              <button className="btn btn-danger" onClick={() => deleteBoard(designBoard.id)}>Delete Board</button>
+            ) : <div />}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-secondary" onClick={() => setDesignModal(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={saveBoard}>Save Board</button>
+            </div>
+          </div>
+        }
+      >
+        <div className="form-group">
+          <label>Board Name *</label>
+          <input value={designBoard.label} onChange={e => setDesignBoard(b => ({ ...b, label: e.target.value }))} placeholder="e.g. Design Team, Marketing" />
+        </div>
+
+        <div className="form-group">
+          <label>Accent Color</label>
+          <div className="color-picker-row">
+            {COLORS.map(c => (
+              <div key={c.id}
+                className={`color-dot-opt${designBoard.color === c.id ? ' selected' : ''}`}
+                style={{ background: c.hex }}
+                title={c.id}
+                onClick={() => setDesignBoard(b => ({ ...b, color: c.id }))} />
+            ))}
+          </div>
+        </div>
+
+        <div className="form-group">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <label style={{ margin: 0 }}>Columns / Stages</label>
+            <button className="btn btn-secondary btn-sm" onClick={addColumnToDesign} style={{ padding: '4px 10px', fontSize: 11.5 }}>+ Add Stage</button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 240, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: '10px' }}>
+            {designBoard.columns.map((col, idx) => (
+              <div key={col.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input value={col.label} onChange={e => handleColumnNameChange(idx, e.target.value)} placeholder="Stage Name" style={{ flex: 1, padding: '6px 10px', fontSize: 13 }} />
+                
+                <button className="btn btn-secondary btn-sm" onClick={() => moveColumn(idx, -1)} disabled={idx === 0} style={{ padding: '4px 8px', fontSize: 11 }}>Up</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => moveColumn(idx, 1)} disabled={idx === designBoard.columns.length - 1} style={{ padding: '4px 8px', fontSize: 11 }}>Down</button>
+                
+                <button className="btn btn-danger btn-sm" onClick={() => removeColumnFromDesign(idx)} disabled={designBoard.columns.length <= 1} style={{ padding: '4px 8px', fontSize: 11 }}>Remove</button>
+              </div>
+            ))}
+            {designBoard.columns.length === 0 && (
+              <div style={{ fontSize: 12, color: 'var(--text3)', textAlign: 'center', padding: '12px 0' }}>No stages defined. Click "+ Add Stage" above.</div>
+            )}
+          </div>
+        </div>
       </Modal>
     </>
   );
