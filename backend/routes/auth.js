@@ -256,4 +256,76 @@ router.get('/me', async (req, res) => {
   }
 });
 
+router.post('/google', async (req, res) => {
+  try {
+    await ensureBootstrapAdmin();
+    const { id_token } = req.body || {};
+    if (!id_token) {
+      return res.status(400).json({ error: 'Google token is required' });
+    }
+
+    const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(id_token)}`);
+    if (!googleRes.ok) {
+      return res.status(401).json({ error: 'Invalid Google token' });
+    }
+    const googleData = await googleRes.json();
+
+    if (googleData.error_description) {
+      return res.status(401).json({ error: googleData.error_description });
+    }
+
+    const googleClientId = process.env.GOOGLE_CLIENT_ID;
+    if (googleClientId && googleData.aud !== googleClientId) {
+      return res.status(401).json({ error: 'Invalid token audience' });
+    }
+
+    const googleId = String(googleData.sub || '');
+    const email = String(googleData.email || '').toLowerCase();
+    const name = String(googleData.name || googleData.email || '').trim();
+
+    if (!googleId || !email) {
+      return res.status(400).json({ error: 'Incomplete Google profile data' });
+    }
+
+    let user = await User.findOne({ googleId });
+    if (!user) {
+      user = await User.findOne({ email });
+      if (user) {
+        user.googleId = googleId;
+        await user.save();
+      }
+    }
+    if (!user) {
+      const baseUsername = email.split('@')[0] || `user_${googleId.slice(-6)}`;
+      let desiredUsername = baseUsername;
+      let counter = 1;
+      while (await User.findOne({ username: desiredUsername.toLowerCase() })) {
+        desiredUsername = `${baseUsername}${counter}`;
+        counter++;
+      }
+
+      user = await User.create({
+        name: name || desiredUsername,
+        email,
+        username: desiredUsername,
+        password: await hashPassword(Math.random().toString(36) + Date.now().toString(36)),
+        googleId,
+        role: 'member',
+      });
+    }
+
+    if (user.googleId !== googleId) {
+      return res.status(409).json({ error: 'This Google account is linked to another Blackfire account. Please sign in with the original method.' });
+    }
+
+    if (!user.active) {
+      return res.status(403).json({ error: 'Account is inactive' });
+    }
+
+    res.json({ user: sanitizeUser(user) });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

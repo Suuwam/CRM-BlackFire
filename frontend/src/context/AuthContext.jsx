@@ -56,6 +56,15 @@ export function AuthProvider({ children }) {
     return nextUser;
   }
 
+  async function googleLogin(idToken) {
+    const res = await authApi.google({ id_token: idToken });
+    const nextUser = res.data.user;
+    setUser(nextUser);
+    sessionStorage.setItem('crm_session_user', JSON.stringify(nextUser));
+    localStorage.setItem('crm_session_user', JSON.stringify(nextUser));
+    return nextUser;
+  }
+
   function logout() {
     sessionStorage.removeItem('crm_session_user');
     localStorage.removeItem('crm_session_user');
@@ -63,7 +72,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, setUser }}>
+    <AuthContext.Provider value={{ user, loading, login, googleLogin, logout, setUser }}>
       {children}
     </AuthContext.Provider>
   );

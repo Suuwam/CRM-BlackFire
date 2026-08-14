@@ -25,7 +25,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 })();
 
 function AppShell() {
-  const { user, loading, login, logout } = useAuth();
+  const { user, loading, login, googleLogin, logout } = useAuth();
   const location = useLocation();
   const [routeLoading, setRouteLoading] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -61,7 +61,7 @@ function AppShell() {
       <ToastProvider>
         <Routes>
           <Route path="/apply" element={<Apply />} />
-          <Route path="*" element={<Auth onLogin={login} />} />
+          <Route path="*" element={<Auth onLogin={login} onGoogleLogin={googleLogin} />} />
         </Routes>
         <Toast />
       </ToastProvider>

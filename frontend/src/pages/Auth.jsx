@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-export default function Auth({ onLogin }) {
+export default function Auth({ onLogin, onGoogleLogin }) {
   const navigate = useNavigate();
   const [username, setUsername]    = useState('');
   const [password, setPassword]    = useState('');
@@ -11,8 +11,56 @@ export default function Auth({ onLogin }) {
   const [showError, setShowError] = useState(false);
   const [focused, setFocused]     = useState(false);
   const [shake, setShake]         = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const fieldWrapRef = useRef(null);
+  const googleButtonRef = useRef(null);
+  const googleCallbackRef = useRef(null);
+
+  googleCallbackRef.current = (response) => {
+    const idToken = response?.credential;
+    if (!idToken) return;
+    setShowError(false);
+    setGoogleLoading(true);
+    onGoogleLogin(idToken).catch((err) => {
+      setErrorMsg(err?.response?.data?.error || 'Google sign-in failed. Please try again.');
+      setShowError(true);
+    }).finally(() => setGoogleLoading(false));
+  };
+
+  useEffect(() => {
+    if (window.google?.accounts?.id) {
+      if (googleButtonRef.current) {
+        window.google.accounts.id.renderButton(googleButtonRef.current, {
+          theme: 'outline',
+          size: 'large',
+          width: googleButtonRef.current.offsetWidth || 320,
+        });
+      }
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      if (window.google?.accounts?.id && googleCallbackRef.current) {
+        window.google.accounts.id.initialize({
+          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+          callback: googleCallbackRef.current,
+        });
+        if (googleButtonRef.current) {
+          window.google.accounts.id.renderButton(googleButtonRef.current, {
+            theme: 'outline',
+            size: 'large',
+            width: googleButtonRef.current.offsetWidth || 320,
+          });
+        }
+      }
+    };
+    document.head.appendChild(script);
+  }, []);
 
   function triggerShake() {
     setShake(true);
@@ -116,7 +164,7 @@ export default function Auth({ onLogin }) {
             {errorMsg}
           </div>
 
-          <button type="submit" className={`ignite${loading ? ' loading' : ''}`} disabled={loading}>
+          <button type="submit" className={`ignite${loading || googleLoading ? ' loading' : ''}`} disabled={loading || googleLoading}>
             <span className="label">Ignite Access</span>
             <span className="spinner"></span>
           </button>
@@ -128,6 +176,15 @@ export default function Auth({ onLogin }) {
             Apply for account
           </button>
         </form>
+
+        <div className="google-signin-wrapper">
+          <div ref={googleButtonRef} className="google-button-container"></div>
+          {googleLoading && (
+            <div className="google-loading-overlay">
+              <div className="spinner"></div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
