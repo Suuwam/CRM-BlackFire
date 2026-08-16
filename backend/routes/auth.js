@@ -50,13 +50,11 @@ router.post('/apply', applyLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Name, email, username, and password are required' });
     }
 
-    // Validate email pattern
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ error: 'Please enter a valid email address.' });
     }
 
-    // Validate password: minimum 8 characters, containing at least one letter and one number
     if (password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters long.' });
     }
@@ -66,7 +64,6 @@ router.post('/apply', applyLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Password must contain at least one letter and one number.' });
     }
 
-    // Check if user already exists
     const userExists = await User.findOne({
       $or: [
         { username: desiredUsername.toLowerCase() },
@@ -77,7 +74,6 @@ router.post('/apply', applyLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Username or email already exists' });
     }
 
-    // Check if pending/verified application already exists
     const appExists = await AccountApplication.findOne({
       $or: [
         { username: desiredUsername.toLowerCase() },
@@ -90,10 +86,7 @@ router.post('/apply', applyLimiter, async (req, res) => {
       return res.status(400).json({ error: 'An application is already pending for this username or email' });
     }
 
-    // Generate 6-digit verification code
     const verificationCode = String(Math.floor(100000 + Math.random() * 900000));
-
-    // Delete any previous unverified application for the same email/username to avoid duplicates
     await AccountApplication.deleteMany({
       $or: [
         { username: desiredUsername.toLowerCase() },
@@ -102,8 +95,7 @@ router.post('/apply', applyLimiter, async (req, res) => {
       isEmailVerified: false
     });
 
-    // Save application to database (password will be pre-save hashed)
-    const verificationCodeExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes from now
+    const verificationCodeExpiry = new Date(Date.now() + 5 * 60 * 1000);
     const application = await AccountApplication.create({
       name,
       email,
@@ -117,7 +109,6 @@ router.post('/apply', applyLimiter, async (req, res) => {
 
     console.log(`\n🔥 [VERIFICATION CODE] Email: ${email} -> Code: ${verificationCode}\n`);
 
-    // 1. Send verification code to applicant
     const verifySubject = `Verify your email for Blackfire CRM`;
     const verifyText = `Your 6-digit email verification code is: ${verificationCode}`;
     const verifyHtml = `
@@ -135,7 +126,6 @@ router.post('/apply', applyLimiter, async (req, res) => {
       console.error('Verification mail failed:', mailErr);
     }
 
-    // 2. Notify admin immediately of new application (even before verification)
     const adminRecipient = process.env.ACCOUNT_REQUEST_TO || process.env.ADMIN_EMAIL || 'admin@blackfire.local';
     const adminSubject = `[Blackfire CRM] New account request from ${name}`;
     const adminText = [
@@ -143,7 +133,7 @@ router.post('/apply', applyLimiter, async (req, res) => {
       '',
       `Name: ${name}`,
       `Email: ${email}`,
-      `Username: ${desiredUsername}`,
+      `Username: @${desiredUsername}`,
       `Note: ${note || 'None'}`,
       '',
       'The applicant must verify their email before their request appears in the admin panel.',
@@ -156,11 +146,12 @@ router.post('/apply', applyLimiter, async (req, res) => {
           <tr><td style="padding:6px 0;color:#555;width:90px">Name</td><td style="padding:6px 0;font-weight:600">${name}</td></tr>
           <tr><td style="padding:6px 0;color:#555">Email</td><td style="padding:6px 0;font-weight:600">${email}</td></tr>
           <tr><td style="padding:6px 0;color:#555">Username</td><td style="padding:6px 0;font-weight:600">@${desiredUsername}</td></tr>
-          <tr><td style="padding:6px 0;color:#555">Note</td><td style="padding:6px 0">${note || '—'}</td></tr>
+          <tr><td style="padding:6px 0;color:#555">Note</td><td style="padding:6px 0;font-weight:600">${note || '—'}</td></tr>
         </table>
         <p style="margin-top:20px;font-size:12px;color:#888">Once verified, this request will appear in your Accounts panel for approval or rejection.</p>
       </div>
     `;
+
     try {
       await sendMail({ to: adminRecipient, subject: adminSubject, text: adminText, html: adminHtml });
     } catch (mailErr) {
@@ -199,9 +190,7 @@ router.post('/apply/verify', async (req, res) => {
       return res.status(400).json({ error: 'Invalid verification code.' });
     }
 
-    // Check if code has expired (5 minutes)
     if (app.verificationCodeExpiry && new Date() > app.verificationCodeExpiry) {
-      // Delete the expired application so they can re-apply
       await AccountApplication.deleteOne({ _id: app._id });
       return res.status(400).json({ error: 'Verification code has expired. Please submit a new application.' });
     }
@@ -210,7 +199,6 @@ router.post('/apply/verify', async (req, res) => {
     app.verificationCode = undefined;
     await app.save();
 
-    // Notify admin of the verified request
     const recipient = process.env.ACCOUNT_REQUEST_TO || process.env.ADMIN_EMAIL || 'admin@blackfire.local';
     const subject = `Verified Account Request from ${app.name}`;
     const text = [
@@ -218,7 +206,7 @@ router.post('/apply/verify', async (req, res) => {
       '',
       `Name: ${app.name}`,
       `Email: ${app.email}`,
-      `Username: ${app.username}`,
+      `Username: @${app.username}`,
       `Note: ${app.note || 'None'}`,
     ].join('\n');
 
@@ -228,7 +216,7 @@ router.post('/apply/verify', async (req, res) => {
         <ul style="padding-left:18px;margin:0">
           <li><strong>Name:</strong> ${app.name}</li>
           <li><strong>Email:</strong> ${app.email}</li>
-          <li><strong>Username:</strong> ${app.username}</li>
+          <li><strong>Username:</strong> @${app.username}</li>
           <li><strong>Note:</strong> ${app.note || 'None'}</li>
         </ul>
       </div>
@@ -250,78 +238,6 @@ router.get('/me', async (req, res) => {
   try {
     const user = await getSessionUser(req);
     if (!user) return res.status(401).json({ error: 'Authentication required' });
-    res.json({ user: sanitizeUser(user) });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.post('/google', async (req, res) => {
-  try {
-    await ensureBootstrapAdmin();
-    const { id_token } = req.body || {};
-    if (!id_token) {
-      return res.status(400).json({ error: 'Google token is required' });
-    }
-
-    const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(id_token)}`);
-    if (!googleRes.ok) {
-      return res.status(401).json({ error: 'Invalid Google token' });
-    }
-    const googleData = await googleRes.json();
-
-    if (googleData.error_description) {
-      return res.status(401).json({ error: googleData.error_description });
-    }
-
-    const googleClientId = process.env.GOOGLE_CLIENT_ID;
-    if (googleClientId && googleData.aud !== googleClientId) {
-      return res.status(401).json({ error: 'Invalid token audience' });
-    }
-
-    const googleId = String(googleData.sub || '');
-    const email = String(googleData.email || '').toLowerCase();
-    const name = String(googleData.name || googleData.email || '').trim();
-
-    if (!googleId || !email) {
-      return res.status(400).json({ error: 'Incomplete Google profile data' });
-    }
-
-    let user = await User.findOne({ googleId });
-    if (!user) {
-      user = await User.findOne({ email });
-      if (user) {
-        user.googleId = googleId;
-        await user.save();
-      }
-    }
-    if (!user) {
-      const baseUsername = email.split('@')[0] || `user_${googleId.slice(-6)}`;
-      let desiredUsername = baseUsername;
-      let counter = 1;
-      while (await User.findOne({ username: desiredUsername.toLowerCase() })) {
-        desiredUsername = `${baseUsername}${counter}`;
-        counter++;
-      }
-
-      user = await User.create({
-        name: name || desiredUsername,
-        email,
-        username: desiredUsername,
-        password: await hashPassword(Math.random().toString(36) + Date.now().toString(36)),
-        googleId,
-        role: 'member',
-      });
-    }
-
-    if (user.googleId !== googleId) {
-      return res.status(409).json({ error: 'This Google account is linked to another Blackfire account. Please sign in with the original method.' });
-    }
-
-    if (!user.active) {
-      return res.status(403).json({ error: 'Account is inactive' });
-    }
-
     res.json({ user: sanitizeUser(user) });
   } catch (error) {
     res.status(500).json({ error: error.message });

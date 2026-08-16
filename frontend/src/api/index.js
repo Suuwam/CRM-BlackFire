@@ -34,7 +34,6 @@ export const authApi = {
   apply: (data) => api.post('/auth/apply', data),
   verify: (data) => api.post('/auth/apply/verify', data),
   me: () => api.get('/auth/me'),
-  google: (data) => api.post('/auth/google', data),
 };
 
 export const activityApi = {

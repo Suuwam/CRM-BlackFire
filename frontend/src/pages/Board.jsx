@@ -103,6 +103,18 @@ export default function Board() {
     }
   }, [project]);
 
+  // Exit fullscreen on ESC
+  useEffect(() => {
+    if (!isFullscreen) return;
+    function handleKey(e) {
+      if (e.key === 'Escape') {
+        setIsFullscreen(false);
+      }
+    }
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [isFullscreen]);
+
   function openAdd(col) {
     const draft = loadDraft(null);
     if (draft && draft.form.title.trim()) {
@@ -353,6 +365,11 @@ export default function Board() {
         </div>
       </div>
       <div className={`page-body ${isFullscreen ? 'board-fullscreen' : ''}`}>
+        {isFullscreen && (
+          <button className="board-exit-fullscreen-btn" onClick={() => setIsFullscreen(false)} title="Exit Fullscreen (Esc)">
+            ✕
+          </button>
+        )}
         {/* Project tabs */}
         <div className="board-tabs" style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%', overflowX: 'auto', marginBottom: 12 }}>
           {allProjects.map(p => (
