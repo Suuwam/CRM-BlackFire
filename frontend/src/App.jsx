@@ -12,6 +12,10 @@ import Board from './pages/Board';
 import Auth from './pages/Auth';
 import Apply from './pages/Apply';
 import Accounts from './pages/Accounts';
+import AssignedTasks from './pages/AssignedTasks';
+import Backlog from './pages/Backlog';
+import Overdue from './pages/Overdue';
+import TopBar from './components/TopBar';
 import { ToastProvider } from './components/Toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
@@ -78,9 +82,13 @@ function AppShell() {
           onSearchOpen={() => setSearchOpen(true)}
         />
         <div className="main" style={{ position: 'relative' }}>
+          <TopBar />
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/assigned" element={<AssignedTasks />} />
+            <Route path="/backlog" element={<Backlog />} />
+            <Route path="/overdue" element={<Overdue />} />
             <Route path="/clients" element={<Clients />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/email" element={<Email />} />

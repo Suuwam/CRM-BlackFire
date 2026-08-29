@@ -7,6 +7,7 @@ const { ensureBootstrapAdmin } = require('../utils/bootstrap');
 const { sendMail } = require('../utils/mailer');
 const { rateLimit } = require('../utils/rateLimit');
 const { verifyPassword, isBcryptHash } = require('../utils/password');
+const crypto = require('crypto');
 
 const loginLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 10, prefix: 'auth-login', message: 'Too many login attempts. Please try again later.' });
 const applyLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 3, prefix: 'auth-apply', message: 'Too many account requests. Please try again later.' });
@@ -282,6 +283,85 @@ router.put('/me', requireSessionUser, profileLimiter, async (req, res) => {
 
     await user.save();
     res.json({ user: sanitizeUser(user) });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+const forgotLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 5, prefix: 'auth-forgot', message: 'Too many reset requests. Please try again later.' });
+const resetLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, prefix: 'auth-reset', message: 'Too many reset attempts. Please try again later.' });
+
+function hashResetToken(token) {
+  return crypto.createHash('sha256').update(String(token)).digest('hex');
+}
+
+function validateNewPassword(password) {
+  if (!password || password.length < 8) return 'Password must be at least 8 characters long.';
+  if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+    return 'Password must contain at least one letter and one number.';
+  }
+  return null;
+}
+
+router.post('/forgot-password', forgotLimiter, async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+
+    const user = await User.findOne({ email, active: true });
+    if (user) {
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      user.resetPasswordToken = hashResetToken(rawToken);
+      user.resetPasswordExpiry = new Date(Date.now() + 60 * 60 * 1000);
+      await user.save();
+
+      const appUrl = (process.env.APP_URL || process.env.FRONTEND_URL || 'https://crm-blackfire.vercel.app').replace(/\/$/, '');
+      const resetLink = `${appUrl}/reset-password?token=${rawToken}`;
+      const subject = 'Reset your Blackfire CRM password';
+      const text = `Reset your password using this link (expires in 1 hour):\n${resetLink}`;
+      const html = `
+        <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111;max-width:480px">
+          <h2 style="margin:0 0 12px;color:#111">Password reset</h2>
+          <p>We received a request to reset the password for your Blackfire CRM account.</p>
+          <p><a href="${resetLink}" style="display:inline-block;padding:10px 16px;background:#18181b;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">Reset password</a></p>
+          <p style="color:#555;font-size:13px">This link expires in <strong>1 hour</strong>. If you did not request this, you can ignore this email.</p>
+        </div>
+      `;
+      try {
+        await sendMail({ to: user.email, subject, text, html });
+      } catch (mailErr) {
+        console.error('Password reset mail failed:', mailErr);
+      }
+    }
+
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/reset-password', resetLimiter, async (req, res) => {
+  try {
+    const token = String(req.body?.token || '').trim();
+    const password = String(req.body?.password || '');
+    if (!token) return res.status(400).json({ error: 'Reset token is required' });
+    const passwordError = validateNewPassword(password);
+    if (passwordError) return res.status(400).json({ error: passwordError });
+
+    const user = await User.findOne({
+      resetPasswordToken: hashResetToken(token),
+      resetPasswordExpiry: { $gt: new Date() },
+      active: true,
+    });
+    if (!user) return res.status(400).json({ error: 'This reset link is invalid or has expired.' });
+
+    user.password = password;
+    user.markModified('password');
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpiry = undefined;
+    await user.save();
+
+    res.json({ ok: true });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }

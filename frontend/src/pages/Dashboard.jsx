@@ -1,20 +1,7 @@
-import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
-import { fetcher, tasksApi } from '../api';
+import { fetcher } from '../api';
 import SocialIcon from '../components/SocialIcon';
-import { AccountAvatar } from '../components/AccountPanel';
-import { useAuth } from '../context/AuthContext';
-import { useToast } from '../components/Toast';
-
-const COL_META = {
-  backlog: { label: 'Backlog', color: '#3b82f6' },
-  todo: { label: 'To Do', color: '#8b5cf6' },
-  inprogress: { label: 'In Progress', color: '#f59e0b' },
-  qa: { label: 'QA', color: '#06b6d4' },
-  done: { label: 'Done', color: '#10b981' },
-  cancelled: { label: 'Cancelled', color: '#6b7280' },
-};
 
 // Helper to calculate Donut Arc paths
 function getDonutPath(cx, cy, radius, innerRadius, startAngle, endAngle) {
@@ -383,225 +370,12 @@ function AssigneeWorkloadChart({ tasks = [], users = [] }) {
   );
 }
 
-function AssignedTaskBarChart({ tasks = [] }) {
-  const [metric, setMetric] = useState('status'); // 'status' or 'priority'
-  const [hoveredId, setHoveredId] = useState(null);
-
-  const totalAssigned = tasks.length;
-  if (totalAssigned === 0) return null;
-
-  let items = [];
-  if (metric === 'status') {
-    const statuses = [
-      { id: 'backlog', label: 'Backlog', color: '#3b82f6' },
-      { id: 'todo', label: 'To Do', color: '#8b5cf6' },
-      { id: 'inprogress', label: 'In Progress', color: '#f59e0b' },
-      { id: 'qa', label: 'QA / Review', color: '#06b6d4' },
-      { id: 'done', label: 'Done', color: '#10b981' },
-      { id: 'cancelled', label: 'Cancelled', color: '#6b7280' },
-    ];
-    items = statuses.map(s => ({
-      ...s,
-      count: tasks.filter(t => (t.column || 'backlog') === s.id).length
-    }));
-  } else {
-    const priorities = [
-      { id: 'high', label: 'High Priority', color: '#ef4444' },
-      { id: 'medium', label: 'Medium Priority', color: '#f59e0b' },
-      { id: 'low', label: 'Low Priority', color: '#10b981' },
-    ];
-    items = priorities.map(p => ({
-      ...p,
-      count: tasks.filter(t => (t.priority || 'medium') === p.id).length
-    }));
-  }
-
-  const maxVal = Math.max(...items.map(i => i.count), 1);
-
-  return (
-    <div className="assigned-chart-card" style={{ marginTop: 4, padding: '12px', background: 'var(--surface2)', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="20" x2="18" y2="10"/>
-            <line x1="12" y1="20" x2="12" y2="4"/>
-            <line x1="6" y1="20" x2="6" y2="14"/>
-          </svg>
-          Assigned Tasks Chart
-        </div>
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <button className={`btn btn-sm ${metric === 'status' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMetric('status')} style={{ fontSize: 10, padding: '2px 7px' }}>Status</button>
-          <button className={`btn btn-sm ${metric === 'priority' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMetric('priority')} style={{ fontSize: 10, padding: '2px 7px' }}>Priority</button>
-        </div>
-      </div>
-
-      <div className="assigned-scroll-segment" style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowX: 'auto', maxHeight: 180 }}>
-        {items.map(item => {
-          const barW = (item.count / maxVal) * 100;
-          const isHov = hoveredId === item.id;
-          const pct = totalAssigned > 0 ? Math.round((item.count / totalAssigned) * 100) : 0;
-
-          return (
-            <div
-              key={item.id}
-              onMouseEnter={() => setHoveredId(item.id)}
-              onMouseLeave={() => setHoveredId(null)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                fontSize: 11,
-                padding: '3px 4px',
-                borderRadius: 4,
-                background: isHov ? 'var(--surface)' : 'transparent',
-                transition: 'background 0.15s ease',
-                cursor: 'pointer',
-                width: '100%',
-                minWidth: 0,
-                boxSizing: 'border-box'
-              }}
-            >
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
-              <span className="assigned-chart-label" style={{ fontWeight: 600, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                {item.label}
-              </span>
-              <div style={{ flex: 1, height: 8, background: 'var(--border)', borderRadius: 99, overflow: 'hidden', position: 'relative', minWidth: 25 }}>
-                <div style={{
-                  height: '100%',
-                  width: `${barW}%`,
-                  background: item.color,
-                  borderRadius: 99,
-                  transition: 'width 0.35s ease'
-                }} />
-              </div>
-              <div style={{ display: 'flex', gap: 4, alignItems: 'center', minWidth: 38, justifyContent: 'flex-end', flexShrink: 0 }}>
-                <span style={{ fontWeight: 750, color: 'var(--text)' }}>{item.count}</span>
-                <span style={{ fontSize: 9.5, color: 'var(--text3)' }}>({pct}%)</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// Sprint Velocity Chart — 14-day task creation vs completion SVG area chart
-function SprintVelocityChart({ activities = [] }) {
-  const [hoverDay, setHoverDay] = useState(null);
-
-  const days = [];
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    days.push(d.toISOString().slice(0, 10));
-  }
-
-  const data = days.map(day => {
-    const created   = activities.filter(a => a.action === 'created'  && (a.createdAt || '').slice(0, 10) === day).length;
-    const completed = activities.filter(a => a.action === 'moved' && a.toColumn === 'done' && (a.createdAt || '').slice(0, 10) === day).length;
-    return { day, created, completed };
-  });
-
-  const maxVal = Math.max(...data.map(d => Math.max(d.created, d.completed)), 4);
-  const W = 460; const H = 130;
-  const PAD = { t: 14, r: 10, b: 24, l: 28 };
-  const chartW = W - PAD.l - PAD.r;
-  const chartH = H - PAD.t - PAD.b;
-
-  function xPos(i) { return PAD.l + (i / Math.max(data.length - 1, 1)) * chartW; }
-  function yPos(v) { return PAD.t + chartH - (v / maxVal) * chartH; }
-
-  function makeLine(key) {
-    return data.map((d, i) => `${xPos(i)},${yPos(d[key])}`).join(' ');
-  }
-  function makeArea(key) {
-    if (!data.length) return '';
-    const pts = data.map((d, i) => `${xPos(i)} ${yPos(d[key])}`).join(' L ');
-    const bottom = PAD.t + chartH;
-    return `M ${xPos(0)} ${bottom} L ${pts} L ${xPos(data.length - 1)} ${bottom} Z`;
-  }
-
-  return (
-    <div className="chart-card" style={{ gridColumn: '1 / -1' }}>
-      <div className="chart-header">
-        <div>
-          <div className="chart-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-            </svg>
-            Sprint Velocity — Last 14 Days
-          </div>
-          <div className="chart-sub">Daily tasks created vs completed</div>
-        </div>
-        <div style={{ display: 'flex', gap: 14, fontSize: 11, alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ width: 20, height: 3, background: '#f97316', display: 'inline-block', borderRadius: 2 }} />
-            <span style={{ fontWeight: 600, color: 'var(--text2)' }}>Created</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ width: 20, height: 3, background: '#10b981', display: 'inline-block', borderRadius: 2 }} />
-            <span style={{ fontWeight: 600, color: 'var(--text2)' }}>Completed</span>
-          </div>
-        </div>
-      </div>
-      <div className="chart-body" style={{ padding: '4px 0 0', justifyContent: 'flex-start', overflowX: 'auto', minHeight: 150, position: 'relative', width: '100%' }}>
-        <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block', minWidth: 260, overflow: 'visible' }}>
-          {[0, 0.25, 0.5, 0.75, 1].map((frac, i) => (
-            <line key={i} x1={PAD.l} y1={PAD.t + chartH * frac} x2={W - PAD.r} y2={PAD.t + chartH * frac}
-              stroke="var(--border)" strokeWidth="0.8" strokeDasharray="3 3" />
-          ))}
-          {[maxVal, Math.round(maxVal / 2), 0].map((v, i) => (
-            <text key={i} x={PAD.l - 4} y={yPos(v) + 4} fontSize="8" fill="var(--text3)" textAnchor="end" fontFamily="Inter,sans-serif">{v}</text>
-          ))}
-          <path d={makeArea('created')}   fill="rgba(249,115,22,0.09)" />
-          <path d={makeArea('completed')} fill="rgba(16,185,129,0.10)" />
-          <polyline points={makeLine('created')}   fill="none" stroke="#f97316" strokeWidth="2" strokeLinejoin="round" />
-          <polyline points={makeLine('completed')} fill="none" stroke="#10b981" strokeWidth="2" strokeLinejoin="round" />
-          {data.map((d, i) => (
-            <g key={i}>
-              <rect x={xPos(i) - 12} y={PAD.t} width={24} height={chartH} fill="transparent"
-                onMouseEnter={() => setHoverDay(i)} onMouseLeave={() => setHoverDay(null)}
-                style={{ cursor: 'crosshair' }}
-              />
-              {hoverDay === i && <line x1={xPos(i)} y1={PAD.t} x2={xPos(i)} y2={PAD.t + chartH} stroke="var(--border2)" strokeWidth="1" strokeDasharray="4 2" />}
-              <circle cx={xPos(i)} cy={yPos(d.created)}   r={hoverDay === i ? 4 : 2.5} fill="#f97316" style={{ transition: 'r 0.12s' }} />
-              <circle cx={xPos(i)} cy={yPos(d.completed)} r={hoverDay === i ? 4 : 2.5} fill="#10b981" style={{ transition: 'r 0.12s' }} />
-            </g>
-          ))}
-          {data.map((d, i) => i % 2 === 0 && (
-            <text key={i} x={xPos(i)} y={H - 4} fontSize="7.5" fill="var(--text3)" textAnchor="middle" fontFamily="Inter,sans-serif">{d.day.slice(5)}</text>
-          ))}
-        </svg>
-        {hoverDay !== null && (
-          <div style={{ position: 'absolute', top: 14, right: 14, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: 'var(--shadow-md)', pointerEvents: 'none', zIndex: 10 }}>
-            <div style={{ fontWeight: 700, marginBottom: 4, color: 'var(--text)' }}>{data[hoverDay]?.day}</div>
-            <div style={{ color: '#f97316', fontWeight: 600 }}>Created: {data[hoverDay]?.created}</div>
-            <div style={{ color: '#10b981', fontWeight: 600 }}>Completed: {data[hoverDay]?.completed}</div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default function Dashboard() {
-  const { user } = useAuth();
   const navigate = useNavigate();
-  const toast = useToast();
-  const [focusUserId, setFocusUserId] = useState('');
-  const [taskFilter, setTaskFilter] = useState('open');
-
   const { data: clients = [] } = useSWR('/clients', fetcher, { revalidateOnFocus: false });
   const { data: allEvents = [] } = useSWR('/events', fetcher, { revalidateOnFocus: false });
-  const { data: tasks = [], mutate: mutateTasks } = useSWR('/tasks', fetcher, { revalidateOnFocus: false });
+  const { data: tasks = [] } = useSWR('/tasks', fetcher, { revalidateOnFocus: false });
   const { data: users = [] } = useSWR('/users', fetcher, { revalidateOnFocus: false });
-  const { data: activities = [] } = useSWR('/activity?days=50', fetcher, { revalidateOnFocus: false });
-  const { data: sprintActivities = [] } = useSWR('/activity?days=14', fetcher, { revalidateOnFocus: false });
-
-  useEffect(() => {
-    if (!focusUserId && user?._id) setFocusUserId(String(user._id));
-  }, [focusUserId, user]);
 
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = allEvents
@@ -609,14 +383,8 @@ export default function Dashboard() {
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 6);
 
-  // Overdue: past-date events not done/cancelled
-  const overdueEvents = allEvents
-    .filter(e => e.date < today && e.status !== 'done' && e.status !== 'cancelled')
-    .sort((a, b) => a.date.localeCompare(b.date));
-  // Overdue: past-dueDate tasks not in done column
-  const overdueTasks = tasks
-    .filter(t => t.dueDate && t.dueDate < today && t.column !== 'done')
-    .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+  const overdueEvents = allEvents.filter(e => e.date < today && e.status !== 'done' && e.status !== 'cancelled');
+  const overdueTasks = tasks.filter(t => t.dueDate && t.dueDate < today && t.column !== 'done');
   const totalOverdue = overdueEvents.length + overdueTasks.length;
 
   const active   = clients.filter(c => c.status === 'Active').length;
@@ -624,35 +392,6 @@ export default function Dashboard() {
   const inProgress = tasks.filter(t => t.column === 'inprogress').length;
   const completed = tasks.filter(t => t.column === 'done').length;
   const completionRate = tasks.length > 0 ? Math.round((completed / tasks.length) * 100) : 0;
-
-  async function quickDoneTask(taskId) {
-    mutateTasks(prev => (prev || []).map(t => t._id === taskId ? { ...t, column: 'done' } : t), false);
-    toast('Task marked as done', 'success');
-    try {
-      await tasksApi.move(taskId, 'done');
-      mutateTasks();
-    } catch {
-      toast('Error updating task', 'error');
-      mutateTasks();
-    }
-  }
-  const focusUser = users.find(u => String(u._id) === String(focusUserId)) || user;
-  const assignedTasks = tasks.filter(t => {
-    const taskAssigneeId = String(t.assigneeId || '');
-    const taskAssigneeName = t.assigneeName || t.assignee || '';
-    if (focusUser?._id && taskAssigneeId && taskAssigneeId === String(focusUser._id)) return true;
-    if (focusUser?.email && t.assigneeEmail && t.assigneeEmail === focusUser.email) return true;
-    if (focusUser?.name && taskAssigneeName && taskAssigneeName === focusUser.name) return true;
-    return false;
-  });
-  const openAssigned = assignedTasks.filter(t => t.column !== 'done' && t.column !== 'cancelled');
-  const doneAssigned = assignedTasks.filter(t => t.column === 'done');
-  const visibleAssigned = taskFilter === 'open'
-    ? openAssigned
-    : taskFilter === 'done'
-      ? doneAssigned
-      : assignedTasks;
-  const activityBacklog = activities.slice(0, 12);
 
   function fmtDate(d) {
     const dt = new Date(d + 'T00:00:00');
@@ -669,231 +408,65 @@ export default function Dashboard() {
       </div>
       <div className="page-body">
         <div className="stats-grid">
-          <div className="stat-card">
+          <div className="stat-card" onClick={() => navigate('/clients')} style={{ cursor: 'pointer' }}>
             <div className="stat-label">Clients</div>
             <div className="stat-value">{clients.length}</div>
             <div className="stat-sub">{active} active · {prospect} prospects</div>
           </div>
-          <div className="stat-card">
+          <div className="stat-card" onClick={() => navigate('/calendar')} style={{ cursor: 'pointer' }}>
             <div className="stat-label">Upcoming</div>
             <div className="stat-value">{upcoming.length}</div>
             <div className="stat-sub">Next 30 days</div>
           </div>
-          <div className="stat-card">
+          <div className="stat-card" onClick={() => navigate('/assigned')} style={{ cursor: 'pointer' }}>
             <div className="stat-label">In Progress</div>
             <div className="stat-value">{inProgress}</div>
             <div className="stat-sub">Active workflow</div>
           </div>
-          <div className="stat-card">
+          <div className="stat-card" onClick={() => navigate('/board')} style={{ cursor: 'pointer' }}>
             <div className="stat-label">Completion</div>
             <div className="stat-value">{completionRate}%</div>
             <div className="stat-sub">{completed} of {tasks.length} done</div>
           </div>
-          <div className={`stat-card${totalOverdue > 0 ? ' stat-card--overdue' : ''}`}>
+          <div className={`stat-card${totalOverdue > 0 ? ' stat-card--overdue' : ''}`} onClick={() => navigate('/overdue')} style={{ cursor: 'pointer' }}>
             <div className="stat-label">Overdue</div>
             <div className="stat-value" style={{ color: totalOverdue > 0 ? '#ef4444' : undefined }}>{totalOverdue}</div>
             <div className="stat-sub">{overdueEvents.length} events · {overdueTasks.length} tasks</div>
           </div>
         </div>
 
-        <div className="dash-grid">
-          <div>
-            {/* Visual Charts Grid (Pie Chart + Bar Chart) */}
-            <div className="charts-grid">
-              <TaskPieChart tasks={tasks} clients={clients} />
-              <PriorityBarChart tasks={tasks} />
-            </div>
+        <div className="charts-grid">
+          <TaskPieChart tasks={tasks} clients={clients} />
+          <PriorityBarChart tasks={tasks} />
+        </div>
 
-            {/* Assignee Workload Chart */}
-            <div style={{ marginTop: 24 }}>
-              <AssigneeWorkloadChart tasks={tasks} users={users} />
-            </div>
+        <div style={{ marginTop: 24 }}>
+          <AssigneeWorkloadChart tasks={tasks} users={users} />
+        </div>
 
-            {/* Sprint Velocity Chart — 14-day area chart */}
-            <div className="charts-grid" style={{ marginTop: 24 }}>
-              <SprintVelocityChart activities={sprintActivities} />
-            </div>
-
-            <div style={{ marginTop: 24 }}>
-              {/* Upcoming Schedule */}
-              <div>
-                <div className="section-title">Upcoming Schedule & Social Posts</div>
-                <div className="upcoming-list">
-                  {upcoming.length === 0 && <p className="text-muted text-sm">No upcoming events scheduled.</p>}
-                  {upcoming.map(ev => (
-                    <div key={ev._id} className="upcoming-item">
-                      <div className={`up-dot`} style={{ background: ev.color === 'blue' ? '#3b82f6' : ev.color === 'green' ? '#10b981' : ev.color === 'amber' ? '#f59e0b' : ev.color === 'purple' ? '#8b5cf6' : ev.color === 'red' ? '#ef4444' : ev.color === 'pink' ? '#ec4899' : '#71717a' }} />
-                      <div className="up-info">
-                        <div className="up-title">{ev.title}</div>
-                        <div className="up-meta">
-                          {ev.clientId?.name && <span>{ev.clientId.name}</span>}
-                          {ev.time && <span>{ev.time}</span>}
-                          {(ev.platforms || []).map(pId => (
-                            <span key={pId} style={{ display:'inline-flex', alignItems:'center', marginLeft:4 }} title={pId}>
-                              <SocialIcon id={pId} size={12} />
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="up-date">{fmtDate(ev.date)}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Overdue Items */}
-              {totalOverdue > 0 && (
-                <div style={{ marginTop: 24 }}>
-                  <div className="section-title" style={{ color: '#ef4444' }}>⚠ Overdue Items</div>
-                  <div className="upcoming-list">
-                    {overdueEvents.map(ev => (
-                      <div key={ev._id} className="upcoming-item overdue-item">
-                        <div className="up-dot" style={{ background: '#ef4444' }} />
-                        <div className="up-info">
-                          <div className="up-title">{ev.title}</div>
-                          <div className="up-meta">
-                            {ev.clientId?.name && <span>{ev.clientId.name}</span>}
-                            <span className="overdue-badge">Overdue</span>
-                          </div>
-                        </div>
-                        <div className="up-date" style={{ color: '#ef4444' }}>{fmtDate(ev.date)}</div>
-                      </div>
-                    ))}
-                    {overdueTasks.map(t => (
-                      <div key={t._id} className="upcoming-item overdue-item">
-                        <div className="up-dot" style={{ background: '#ef4444' }} />
-                        <div className="up-info">
-                          <div className="up-title">{t.title}</div>
-                          <div className="up-meta">
-                            <span>Task</span>
-                            {t.assigneeName && <span>{t.assigneeName}</span>}
-                            <span className="overdue-badge">Overdue</span>
-                          </div>
-                        </div>
-                        <div className="up-date" style={{ color: '#ef4444' }}>{fmtDate(t.dueDate)}</div>
-                      </div>
+        <div style={{ marginTop: 24 }}>
+          <div className="section-title">Upcoming Schedule & Social Posts</div>
+          <div className="upcoming-list">
+            {upcoming.length === 0 && <p className="text-muted text-sm">No upcoming events scheduled.</p>}
+            {upcoming.map(ev => (
+              <div key={ev._id} className="upcoming-item">
+                <div className={`up-dot`} style={{ background: ev.color === 'blue' ? '#3b82f6' : ev.color === 'green' ? '#10b981' : ev.color === 'amber' ? '#f59e0b' : ev.color === 'purple' ? '#8b5cf6' : ev.color === 'red' ? '#ef4444' : ev.color === 'pink' ? '#ec4899' : '#71717a' }} />
+                <div className="up-info">
+                  <div className="up-title">{ev.title}</div>
+                  <div className="up-meta">
+                    {ev.clientId?.name && <span>{ev.clientId.name}</span>}
+                    {ev.time && <span>{ev.time}</span>}
+                    {(ev.platforms || []).map(pId => (
+                      <span key={pId} style={{ display:'inline-flex', alignItems:'center', marginLeft:4 }} title={pId}>
+                        <SocialIcon id={pId} size={12} />
+                      </span>
                     ))}
                   </div>
                 </div>
-              )}
-            </div>
-
-            <div className="card" style={{ marginTop: 24 }}>
-              <div className="section-title" style={{ marginBottom: 14 }}>Backlog, last 50 days</div>
-              <div className="activity-list" style={{ maxHeight: 450 }}>
-                {activityBacklog.length === 0 && <div className="empty" style={{ padding: '24px 0' }}>No recent activity.</div>}
-                {activityBacklog.map(item => {
-                  const detailedSentence = item.summary || [
-                    item.actorName || 'System',
-                    item.action,
-                    item.targetName ? `"${item.targetName}"` : '',
-                    item.fromColumn && item.toColumn ? `from ${item.fromColumn} to ${item.toColumn}` : item.toColumn ? `to ${item.toColumn}` : '',
-                    item.assigneeName ? `(assigned to ${item.assigneeName})` : ''
-                  ].filter(Boolean).join(' ');
-
-                  return (
-                    <div key={item._id} className="activity-item">
-                      <div className="activity-top">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span className={`activity-badge badge-${item.action}`}>{item.action}</span>
-                          {item.project && <span className="activity-project-tag">{item.project}</span>}
-                        </div>
-                        <span className="activity-date">{new Date(item.createdAt).toLocaleString(undefined, { month: 'numeric', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                      </div>
-                      <div className="activity-sentence" style={{ fontSize: 13.5, fontWeight: 550, color: 'var(--text)', marginTop: 8, lineHeight: 1.45 }}>
-                        {detailedSentence}
-                      </div>
-                      <div className="activity-meta" style={{ marginTop: 6, fontSize: 11, color: 'var(--text3)', display: 'flex', gap: 12 }}>
-                        <span>By: {item.actorName || 'System'}</span>
-                        {item.assigneeName && <span>Assigned to: {item.assigneeName}</span>}
-                      </div>
-                    </div>
-                  );
-                })}
+                <div className="up-date">{fmtDate(ev.date)}</div>
               </div>
-            </div>
+            ))}
           </div>
-
-          <aside className="dash-side card">
-            <div className="section-title" style={{ marginBottom: 4 }}>Assigned Tasks</div>
-            <div className="text-sm text-muted" style={{ marginBottom: 10 }}>
-              {user?.role === 'admin' ? 'Tasks for the selected account.' : 'Your assigned tasks.'}
-            </div>
-            {user?.role === 'admin' && (
-              <div className="form-group" style={{ marginBottom: 10 }}>
-                <label>Account</label>
-                <select value={focusUserId} onChange={e => setFocusUserId(e.target.value)}>
-                  {users.map(u => <option key={u._id} value={u._id}>{u.name} ({u.username})</option>)}
-                </select>
-              </div>
-            )}
-
-            <div className="assigned-person">
-              <AccountAvatar name={focusUser?.name || '?'} size={34} />
-              <div className="assigned-person-info">
-                <div className="assigned-person-name">{focusUser?.name || 'Unassigned'}</div>
-                <div className="assigned-person-meta">{focusUser?.email || 'No email on file'}</div>
-              </div>
-            </div>
-
-            <div className="assigned-filters">
-              <button type="button" className={`assigned-filter${taskFilter === 'open' ? ' active' : ''}`} onClick={() => setTaskFilter('open')}>
-                Open <span className="count">{openAssigned.length}</span>
-              </button>
-              <button type="button" className={`assigned-filter${taskFilter === 'done' ? ' active' : ''}`} onClick={() => setTaskFilter('done')}>
-                Done <span className="count">{doneAssigned.length}</span>
-              </button>
-              <button type="button" className={`assigned-filter${taskFilter === 'all' ? ' active' : ''}`} onClick={() => setTaskFilter('all')}>
-                All <span className="count">{assignedTasks.length}</span>
-              </button>
-            </div>
-
-            <div className="assigned-scroll-segment">
-              <div className="assigned-list">
-                {visibleAssigned.length === 0 && (
-                  <div className="empty" style={{ padding: '18px 0' }}>
-                    {taskFilter === 'open' ? 'No open tasks.' : taskFilter === 'done' ? 'No completed tasks.' : 'No tasks assigned.'}
-                  </div>
-                )}
-                {visibleAssigned.map(task => {
-                  const col = COL_META[task.column] || COL_META.backlog;
-                  const isDone = task.column === 'done';
-                  return (
-                    <div
-                      key={task._id}
-                      className={`assigned-item${isDone ? ' is-done' : ''}`}
-                      title="Click to view task on board"
-                    >
-                      <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => navigate(`/board?project=${task.project || 'blackfire'}`)}>
-                        <div className="assigned-title" style={{ textDecoration: isDone ? 'line-through' : 'none' }}>{task.title}</div>
-                        <div className="assigned-meta">
-                          <span className="assigned-pill">
-                            <span className="assigned-pill-dot" style={{ background: col.color }} />
-                            {col.label}
-                          </span>
-                          {task.project && <span className="assigned-pill">{task.project}</span>}
-                        </div>
-                      </div>
-                      {isDone ? (
-                        <span className="assigned-done-mark">✓</span>
-                      ) : (
-                        <button
-                          className="assigned-done-btn"
-                          aria-label="Mark as done"
-                          title="Mark as done"
-                          onClick={e => { e.stopPropagation(); quickDoneTask(task._id); }}
-                        >
-                          ✓
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <AssignedTaskBarChart tasks={assignedTasks} />
-          </aside>
         </div>
       </div>
     </>
