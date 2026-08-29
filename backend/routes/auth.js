@@ -2,7 +2,7 @@ const router = require('express').Router();
 const User = require('../models/User');
 const Activity = require('../models/Activity');
 const AccountApplication = require('../models/AccountApplication');
-const { sanitizeUser, getSessionUser } = require('../utils/session');
+const { sanitizeUser, getSessionUser, requireSessionUser } = require('../utils/session');
 const { ensureBootstrapAdmin } = require('../utils/bootstrap');
 const { sendMail } = require('../utils/mailer');
 const { rateLimit } = require('../utils/rateLimit');
@@ -241,6 +241,49 @@ router.get('/me', async (req, res) => {
     res.json({ user: sanitizeUser(user) });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+const profileLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, prefix: 'auth-me', message: 'Too many profile updates. Please slow down.' });
+
+router.put('/me', requireSessionUser, profileLimiter, async (req, res) => {
+  try {
+    const user = await User.findById(req.sessionUser._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const name = req.body.name != null ? String(req.body.name).trim() : user.name;
+    const email = req.body.email != null ? String(req.body.email).trim().toLowerCase() : user.email;
+
+    if (!name) return res.status(400).json({ error: 'Name is required' });
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) return res.status(400).json({ error: 'Please enter a valid email address.' });
+
+    if (email !== user.email) {
+      const taken = await User.findOne({ email, _id: { $ne: user._id } });
+      if (taken) return res.status(400).json({ error: 'Email is already in use' });
+    }
+
+    user.name = name;
+    user.email = email;
+
+    if (req.body.newPassword) {
+      const currentPassword = String(req.body.currentPassword || '');
+      const newPassword = String(req.body.newPassword);
+      if (!currentPassword) return res.status(400).json({ error: 'Current password is required' });
+      const match = await verifyPassword(currentPassword, user.password);
+      if (!match) return res.status(400).json({ error: 'Current password is incorrect' });
+      if (newPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters long.' });
+      if (!/[a-zA-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+        return res.status(400).json({ error: 'Password must contain at least one letter and one number.' });
+      }
+      user.password = newPassword;
+      user.markModified('password');
+    }
+
+    await user.save();
+    res.json({ user: sanitizeUser(user) });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 });
 

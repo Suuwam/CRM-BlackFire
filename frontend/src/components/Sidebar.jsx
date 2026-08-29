@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import NotificationBell from './NotificationBell';
+import AccountPanel, { AccountAvatar } from './AccountPanel';
 
 const THEMES = [
   { id: 'light', label: 'Light', bg: '#f8f8f9', dot: '#18181b' },
@@ -36,6 +37,7 @@ const adminNav = [
 ];
 
 export default function Sidebar({ user, onLogout, routeLoading, onSearchOpen }) {
+  const [accountOpen, setAccountOpen] = useState(false);
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('theme');
     return saved === 'dark' ? 'dark' : 'light';
@@ -58,8 +60,16 @@ export default function Sidebar({ user, onLogout, routeLoading, onSearchOpen }) 
         <span className="sb-badge">Engine</span>
         {user && (
           <div className="sb-user-card">
-            <div className="sb-user-name">{user.name}</div>
-            <div className="sb-user-meta">{user.username} · {user.role}</div>
+            <AccountAvatar
+              name={user.name}
+              size={32}
+              onClick={() => setAccountOpen(true)}
+              title="Account, email & password"
+            />
+            <div className="sb-user-card-info">
+              <div className="sb-user-name">{user.name}</div>
+              <div className="sb-user-meta">{user.username} · {user.role}</div>
+            </div>
           </div>
         )}
 
@@ -112,6 +122,15 @@ export default function Sidebar({ user, onLogout, routeLoading, onSearchOpen }) 
       </div>
 
       <nav className="sb-nav">
+        {user && (
+          <AccountAvatar
+            name={user.name}
+            size={28}
+            className="sb-mobile-account"
+            onClick={() => setAccountOpen(true)}
+            title="Account, email & password"
+          />
+        )}
         <div className="sb-section">Workspace</div>
         {nav.map(n => (
           <NavLink key={n.to} to={n.to}
@@ -177,6 +196,13 @@ export default function Sidebar({ user, onLogout, routeLoading, onSearchOpen }) 
       <div className="sb-footer">
         <NotificationBell />
       </div>
+
+      <AccountPanel
+        open={accountOpen}
+        onClose={() => setAccountOpen(false)}
+        account={user}
+        kind="self"
+      />
     </aside>
   );
 }

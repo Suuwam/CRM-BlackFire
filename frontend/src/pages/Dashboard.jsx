@@ -1,10 +1,20 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import useSWR, { mutate } from 'swr';
+import useSWR from 'swr';
 import { fetcher, tasksApi } from '../api';
 import SocialIcon from '../components/SocialIcon';
+import { AccountAvatar } from '../components/AccountPanel';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
+
+const COL_META = {
+  backlog: { label: 'Backlog', color: '#3b82f6' },
+  todo: { label: 'To Do', color: '#8b5cf6' },
+  inprogress: { label: 'In Progress', color: '#f59e0b' },
+  qa: { label: 'QA', color: '#06b6d4' },
+  done: { label: 'Done', color: '#10b981' },
+  cancelled: { label: 'Cancelled', color: '#6b7280' },
+};
 
 // Helper to calculate Donut Arc paths
 function getDonutPath(cx, cy, radius, innerRadius, startAngle, endAngle) {
@@ -409,8 +419,8 @@ function AssignedTaskBarChart({ tasks = [] }) {
   const maxVal = Math.max(...items.map(i => i.count), 1);
 
   return (
-    <div className="assigned-chart-card" style={{ marginTop: 12, marginBottom: 16, padding: '14px', background: 'var(--surface2)', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
+    <div className="assigned-chart-card" style={{ marginTop: 4, padding: '12px', background: 'var(--surface2)', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
             <line x1="18" y1="20" x2="18" y2="10"/>
@@ -580,6 +590,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const toast = useToast();
   const [focusUserId, setFocusUserId] = useState('');
+  const [taskFilter, setTaskFilter] = useState('open');
 
   const { data: clients = [] } = useSWR('/clients', fetcher, { revalidateOnFocus: false });
   const { data: allEvents = [] } = useSWR('/events', fetcher, { revalidateOnFocus: false });
@@ -613,8 +624,6 @@ export default function Dashboard() {
   const inProgress = tasks.filter(t => t.column === 'inprogress').length;
   const completed = tasks.filter(t => t.column === 'done').length;
   const completionRate = tasks.length > 0 ? Math.round((completed / tasks.length) * 100) : 0;
-  const totalContractValue = clients.reduce((sum, c) => sum + (Number(c.contractValue) || 0), 0);
-  const totalRevenue = clients.reduce((sum, c) => sum + (Number(c.revenue) || 0), 0);
 
   async function quickDoneTask(taskId) {
     mutateTasks(prev => (prev || []).map(t => t._id === taskId ? { ...t, column: 'done' } : t), false);
@@ -636,6 +645,13 @@ export default function Dashboard() {
     if (focusUser?.name && taskAssigneeName && taskAssigneeName === focusUser.name) return true;
     return false;
   });
+  const openAssigned = assignedTasks.filter(t => t.column !== 'done' && t.column !== 'cancelled');
+  const doneAssigned = assignedTasks.filter(t => t.column === 'done');
+  const visibleAssigned = taskFilter === 'open'
+    ? openAssigned
+    : taskFilter === 'done'
+      ? doneAssigned
+      : assignedTasks;
   const activityBacklog = activities.slice(0, 12);
 
   function fmtDate(d) {
@@ -652,48 +668,36 @@ export default function Dashboard() {
         </div>
       </div>
       <div className="page-body">
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-label">Clients</div>
+            <div className="stat-value">{clients.length}</div>
+            <div className="stat-sub">{active} active · {prospect} prospects</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Upcoming</div>
+            <div className="stat-value">{upcoming.length}</div>
+            <div className="stat-sub">Next 30 days</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">In Progress</div>
+            <div className="stat-value">{inProgress}</div>
+            <div className="stat-sub">Active workflow</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Completion</div>
+            <div className="stat-value">{completionRate}%</div>
+            <div className="stat-sub">{completed} of {tasks.length} done</div>
+          </div>
+          <div className={`stat-card${totalOverdue > 0 ? ' stat-card--overdue' : ''}`}>
+            <div className="stat-label">Overdue</div>
+            <div className="stat-value" style={{ color: totalOverdue > 0 ? '#ef4444' : undefined }}>{totalOverdue}</div>
+            <div className="stat-sub">{overdueEvents.length} events · {overdueTasks.length} tasks</div>
+          </div>
+        </div>
+
         <div className="dash-grid">
           <div>
-            {/* Metric Cards (KPIs) */}
-            <div className="stats-grid" style={{ marginBottom: 24 }}>
-              <div className="stat-card">
-                <div className="stat-label">Total Clients</div>
-                <div className="stat-value">{clients.length}</div>
-                <div className="stat-sub">{active} active · {prospect} prospects</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Upcoming Schedule & Posts</div>
-                <div className="stat-value">{upcoming.length}</div>
-                <div className="stat-sub">Next 30 days</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Product Tasks In Progress</div>
-                <div className="stat-value">{inProgress}</div>
-                <div className="stat-sub">Active workflow</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Feature Completion Rate</div>
-                <div className="stat-value">{completionRate}%</div>
-                <div className="stat-sub">{completed} of {tasks.length} features done</div>
-              </div>
-              {totalContractValue > 0 && (
-                <div className="stat-card">
-                  <div className="stat-label">Portfolio Value</div>
-                  <div className="stat-value" style={{ fontSize: totalContractValue >= 1000000 ? '1.4rem' : undefined }}>
-                    ${totalContractValue >= 1000 ? `${(totalContractValue / 1000).toFixed(1)}k` : totalContractValue.toLocaleString()}
-                  </div>
-                  <div className="stat-sub">${totalRevenue >= 1000 ? `${(totalRevenue / 1000).toFixed(1)}k` : totalRevenue.toLocaleString()} earned</div>
-                </div>
-              )}
-              {totalOverdue > 0 && (
-                <div className="stat-card stat-card--overdue">
-                  <div className="stat-label">Overdue Items</div>
-                  <div className="stat-value" style={{ color: '#ef4444' }}>{totalOverdue}</div>
-                  <div className="stat-sub">{overdueEvents.length} event{overdueEvents.length !== 1 ? 's' : ''} · {overdueTasks.length} task{overdueTasks.length !== 1 ? 's' : ''}</div>
-                </div>
-              )}
-            </div>
-
             {/* Visual Charts Grid (Pie Chart + Bar Chart) */}
             <div className="charts-grid">
               <TaskPieChart tasks={tasks} clients={clients} />
@@ -811,12 +815,12 @@ export default function Dashboard() {
           </div>
 
           <aside className="dash-side card">
-            <div className="section-title" style={{ marginBottom: 10 }}>Assigned Tasks</div>
-            <div className="text-sm text-muted" style={{ marginBottom: 12 }}>
-              {user?.role === 'admin' ? 'Inspect individual assigned tasks for any account.' : 'Your individual assigned tasks.'}
+            <div className="section-title" style={{ marginBottom: 4 }}>Assigned Tasks</div>
+            <div className="text-sm text-muted" style={{ marginBottom: 10 }}>
+              {user?.role === 'admin' ? 'Tasks for the selected account.' : 'Your assigned tasks.'}
             </div>
             {user?.role === 'admin' && (
-              <div className="form-group" style={{ marginBottom: 14 }}>
+              <div className="form-group" style={{ marginBottom: 10 }}>
                 <label>Account</label>
                 <select value={focusUserId} onChange={e => setFocusUserId(e.target.value)}>
                   {users.map(u => <option key={u._id} value={u._id}>{u.name} ({u.username})</option>)}
@@ -825,58 +829,69 @@ export default function Dashboard() {
             )}
 
             <div className="assigned-person">
-              <div className="assigned-person-name">{focusUser?.name || 'Unassigned'}</div>
-              <div className="assigned-person-meta">{focusUser?.email || 'No email on file'}</div>
-            </div>
-
-            {/* Assigned Tasks List (Now placed ABOVE the chart) */}
-            <div className="assigned-scroll-segment" style={{ marginBottom: 16 }}>
-              <div className="assigned-list">
-                {assignedTasks.length === 0 && <div className="empty" style={{ padding: '24px 0' }}>No tasks assigned.</div>}
-                {assignedTasks.map(task => (
-                  <div
-                    key={task._id}
-                    className="assigned-item"
-                    style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
-                    title="Click to view task on board"
-                  >
-                    <div style={{ flex: 1 }} onClick={() => navigate(`/board?project=${task.project || 'blackfire'}`)}>
-                      <div className="assigned-title" style={{ textDecoration: task.column === 'done' ? 'line-through' : 'none', opacity: task.column === 'done' ? 0.55 : 1 }}>{task.title}</div>
-                      <div className="assigned-meta">
-                        <span style={{ textTransform: 'capitalize' }}>{task.project}</span>
-                        <span>•</span>
-                        <span style={{ textTransform: 'capitalize' }}>{task.column}</span>
-                        <span>•</span>
-                        <span>{task.assigneeName || task.assignee || 'Unassigned'}</span>
-                      </div>
-                    </div>
-                    {task.column !== 'done' && (
-                      <button
-                        aria-label="Quick-done"
-                        title="Mark as done"
-                        onClick={e => { e.stopPropagation(); quickDoneTask(task._id); }}
-                        style={{
-                          flexShrink: 0, width: 26, height: 26, borderRadius: '50%',
-                          border: '1.5px solid #10b981', background: 'transparent',
-                          color: '#10b981', fontSize: 14, lineHeight: 1,
-                          cursor: 'pointer', display: 'flex', alignItems: 'center',
-                          justifyContent: 'center', transition: 'background 0.15s, color 0.15s'
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.background = '#10b981'; e.currentTarget.style.color = '#fff'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#10b981'; }}
-                      >
-                        ✓
-                      </button>
-                    )}
-                    {task.column === 'done' && (
-                      <span style={{ flexShrink: 0, width: 26, height: 26, borderRadius: '50%', background: '#10b981', color: '#fff', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✓</span>
-                    )}
-                  </div>
-                ))}
+              <AccountAvatar name={focusUser?.name || '?'} size={34} />
+              <div className="assigned-person-info">
+                <div className="assigned-person-name">{focusUser?.name || 'Unassigned'}</div>
+                <div className="assigned-person-meta">{focusUser?.email || 'No email on file'}</div>
               </div>
             </div>
 
-            {/* Assigned Task Bar Chart (Now placed BELOW the assigned tasks list) */}
+            <div className="assigned-filters">
+              <button type="button" className={`assigned-filter${taskFilter === 'open' ? ' active' : ''}`} onClick={() => setTaskFilter('open')}>
+                Open <span className="count">{openAssigned.length}</span>
+              </button>
+              <button type="button" className={`assigned-filter${taskFilter === 'done' ? ' active' : ''}`} onClick={() => setTaskFilter('done')}>
+                Done <span className="count">{doneAssigned.length}</span>
+              </button>
+              <button type="button" className={`assigned-filter${taskFilter === 'all' ? ' active' : ''}`} onClick={() => setTaskFilter('all')}>
+                All <span className="count">{assignedTasks.length}</span>
+              </button>
+            </div>
+
+            <div className="assigned-scroll-segment">
+              <div className="assigned-list">
+                {visibleAssigned.length === 0 && (
+                  <div className="empty" style={{ padding: '18px 0' }}>
+                    {taskFilter === 'open' ? 'No open tasks.' : taskFilter === 'done' ? 'No completed tasks.' : 'No tasks assigned.'}
+                  </div>
+                )}
+                {visibleAssigned.map(task => {
+                  const col = COL_META[task.column] || COL_META.backlog;
+                  const isDone = task.column === 'done';
+                  return (
+                    <div
+                      key={task._id}
+                      className={`assigned-item${isDone ? ' is-done' : ''}`}
+                      title="Click to view task on board"
+                    >
+                      <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => navigate(`/board?project=${task.project || 'blackfire'}`)}>
+                        <div className="assigned-title" style={{ textDecoration: isDone ? 'line-through' : 'none' }}>{task.title}</div>
+                        <div className="assigned-meta">
+                          <span className="assigned-pill">
+                            <span className="assigned-pill-dot" style={{ background: col.color }} />
+                            {col.label}
+                          </span>
+                          {task.project && <span className="assigned-pill">{task.project}</span>}
+                        </div>
+                      </div>
+                      {isDone ? (
+                        <span className="assigned-done-mark">✓</span>
+                      ) : (
+                        <button
+                          className="assigned-done-btn"
+                          aria-label="Mark as done"
+                          title="Mark as done"
+                          onClick={e => { e.stopPropagation(); quickDoneTask(task._id); }}
+                        >
+                          ✓
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             <AssignedTaskBarChart tasks={assignedTasks} />
           </aside>
         </div>

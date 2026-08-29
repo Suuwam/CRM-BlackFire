@@ -2,6 +2,7 @@ import { useState } from 'react';
 import useSWR, { mutate } from 'swr';
 import { usersApi, fetcher } from '../api';
 import Modal from '../components/Modal';
+import AccountPanel, { AccountAvatar } from '../components/AccountPanel';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 
@@ -13,6 +14,7 @@ export default function Accounts() {
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY);
+  const [panel, setPanel] = useState({ open: false, account: null, kind: 'admin' });
 
   // Fetch users and applications
   const { data: users = [] } = useSWR('/users', fetcher, { revalidateOnFocus: false });
@@ -155,10 +157,18 @@ export default function Accounts() {
                 <div className="account-card" key={app._id} style={{ borderLeft: app.status === 'rejected' ? '4px solid #ef4444' : '4px solid var(--accent)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <div>
                     <div className="account-top">
-                      <div>
-                        <div className="account-name">{app.name}</div>
-                        <div className="account-meta" style={{ fontSize: '12px', marginTop: '4px' }}>
-                          @{app.username} · {app.email}
+                      <div className="account-top-left">
+                        <AccountAvatar
+                          name={app.name}
+                          size={36}
+                          onClick={() => setPanel({ open: true, account: app, kind: 'application' })}
+                          title="Account, email & information"
+                        />
+                        <div>
+                          <div className="account-name">{app.name}</div>
+                          <div className="account-meta" style={{ fontSize: '12px', marginTop: '4px' }}>
+                            @{app.username} · {app.email}
+                          </div>
                         </div>
                       </div>
                       <span className={`tag ${app.status === 'rejected' ? 'tag-gray' : 'tag-amber'}`} style={{ textTransform: 'uppercase', fontSize: '10px' }}>
@@ -204,9 +214,21 @@ export default function Accounts() {
               {users.map(account => (
                 <div className="account-card" key={account._id}>
                   <div className="account-top">
-                    <div>
-                      <div className="account-name">{account.name}</div>
-                      <div className="account-meta">{account.username} · {account.email}</div>
+                    <div className="account-top-left">
+                      <AccountAvatar
+                        name={account.name}
+                        size={36}
+                        onClick={() => setPanel({
+                          open: true,
+                          account,
+                          kind: String(account._id) === String(user?._id) ? 'self' : 'admin',
+                        })}
+                        title="Account, email & password"
+                      />
+                      <div>
+                        <div className="account-name">{account.name}</div>
+                        <div className="account-meta">{account.username} · {account.email}</div>
+                      </div>
                     </div>
                     <span className={`tag ${account.role === 'admin' ? 'tag-amber' : 'tag-gray'}`} style={{ textTransform: 'uppercase', fontSize: '10px' }}>{account.role}</span>
                   </div>
@@ -226,6 +248,17 @@ export default function Accounts() {
           )}
         </div>
       </div>
+
+      <AccountPanel
+        open={panel.open}
+        onClose={() => setPanel({ open: false, account: null, kind: 'admin' })}
+        account={panel.account}
+        kind={panel.kind}
+        onUpdated={() => {
+          mutate('/users');
+          mutate('/users/applications');
+        }}
+      />
 
       <Modal
         open={modal}

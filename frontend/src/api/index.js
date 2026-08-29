@@ -34,6 +34,7 @@ export const authApi = {
   apply: (data) => api.post('/auth/apply', data),
   verify: (data) => api.post('/auth/apply/verify', data),
   me: () => api.get('/auth/me'),
+  updateMe: (data) => api.put('/auth/me', data),
 };
 
 export const activityApi = {
