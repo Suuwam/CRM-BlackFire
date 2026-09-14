@@ -1,6 +1,6 @@
 # Blackfire × Aawazz CRM ⚡
 
-A modern, high-performance, full-stack CRM built for **Blackfire AI** and **Aawazz**. Features a minimalist premium design system, complete client management, work scheduling calendar, variable-injected email automation, resource reference link board, and a multi-project Kanban board.
+A modern, high-performance, full-stack CRM built for **Blackfire AI** and **Aawazz**. Features a minimalist premium design system, attendance and clock-in tracking tied to CRM sign-ins, a live team presence board, work scheduling calendar, variable-injected employee email automation, resource reference link board, and a multi-project Kanban board.
 
 ![Tech Stack](https://img.shields.io/badge/Stack-React%2018%20%7C%20Node.js%20%7C%20Express%20%7C%20MongoDB-black?style=for-the-badge)
 ![UI Design](https://img.shields.io/badge/Design-Minimalist%20Premium-18181b?style=for-the-badge)
@@ -50,15 +50,18 @@ npm run dev
 - **Color-Coded Event Cards**: Work items styled dynamically by category (`Blue`, `Green`, `Amber`, `Gray`).
 - **Interactive Side Panel**: Select any day to view detailed events, scheduled client links, notes, and quick action controls (Add/Edit/Delete).
 
-### 2. 👤 Client Relationship Management
-- **Complete CRM Roster**: Filter by client status (`Active`, `Prospect`, `Inactive`) or search by name/company.
-- **Photo Upload Support**: Hover over any client avatar to upload custom profile photos via Multer API.
-- **Detailed Modal**: In-depth client detail view with email, phone, current project, and notes.
+### 2. ⏱️ Attendance & Time Tracking
+- **Clock in on sign-in**: Logging in starts the day; logging out closes it. The pill in the top bar clocks in or out manually and shows live hours.
+- **Daily Board**: Present / not present / away summaries plus a per-employee table of clock-in, clock-out, hours, overtime, status and notes, for any date.
+- **Team Presence**: Who is online right now, driven by a 60s heartbeat (offline after 3 missed beats).
+- **Work History**: Every employee sees their own 30-day history and totals in `Account → Work history`; admins see everyone's in **Admin Overview**.
+- **Backlog Trail**: Logins, logouts, exits and clock events all land in the Backlog feed.
+- Tunables: `ATTENDANCE_TZ` (backend), `VITE_SHIFT_MINUTES` and `VITE_ON_TIME_BY` (frontend).
 
-### 3. ✉️ Email Automation & Variable Substitution
+### 3. ✉️ Employee Email Automation
 - **Template Builder**: Create and edit reusable email templates.
-- **Client Variable Substitution**: Live preview substituting `{{name}}`, `{{company}}`, `{{email}}`, `{{phone}}`, and `{{project}}`.
-- **Quick Mailto Link**: One-click button to launch pre-filled client emails directly in your default mail app.
+- **Employee Directory**: Pick one or many employees as recipients — the old client roster now lives here.
+- **Variable Substitution**: Live preview substituting `{{name}}`, `{{email}}`, `{{username}}` and `{{role}}`.
 
 ### 4. 📋 Project Kanban Board
 - **Multi-Project Management**: Switch between **Blackfire AI** (Main Project) and **Aawazz** (SaaS Product).
@@ -76,7 +79,7 @@ npm run dev
 ```
 CRM-BlackFire/
 ├── backend/
-│   ├── models/        # Mongoose Data Models (Client, Event, Task, Template, Reference)
+│   ├── models/        # Mongoose Data Models (User, Attendance, Event, Task, Template, Reference)
 │   ├── routes/        # Express Route Handlers
 │   ├── uploads/       # Profile Image Storage
 │   └── server.js      # Express Server & MongoDB Connection (Serverless-ready)
@@ -84,7 +87,7 @@ CRM-BlackFire/
 │   ├── src/
 │   │   ├── api/       # Centralized Axios/Fetch API Services
 │   │   ├── components/# Reusable UI Components (Sidebar, Modal, Toast)
-│   │   ├── pages/     # Page Views (Dashboard, Calendar, Clients, Email, Board, References)
+│   │   ├── pages/     # Page Views (Dashboard, Attendance, Team, Calendar, Email, Board, References)
 │   │   └── index.css  # Premium Minimalist Design System
 │   ├── index.html
 │   └── vite.config.js

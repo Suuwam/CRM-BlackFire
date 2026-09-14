@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import AccountPanel, { AccountAvatar } from './AccountPanel';
+import ClockWidget from './ClockWidget';
 import { useAuth } from '../context/AuthContext';
 
 export default function TopBar() {
@@ -10,11 +11,13 @@ export default function TopBar() {
   return (
     <>
       <div className="app-account-wrap">
+        <ClockWidget />
         <AccountAvatar
           name={user.name}
+          photo={user.photo}
           size={36}
           onClick={() => setOpen(true)}
-          title="Account, email & password"
+          title="Account, profile & work history"
         />
       </div>
       <AccountPanel

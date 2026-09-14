@@ -41,7 +41,6 @@ export default function Overdue() {
                   <div className="up-title">{ev.title}</div>
                   <div className="up-meta">
                     <span>Event</span>
-                    {ev.clientId?.name && <span>{ev.clientId.name}</span>}
                     <span className="overdue-badge">Overdue</span>
                   </div>
                 </div>

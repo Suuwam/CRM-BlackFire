@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { mutate } from 'swr';
 import Modal from './Modal';
-import { authApi, usersApi } from '../api';
+import { attendanceApi, authApi, usersApi } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from './Toast';
+import { fmtClock, fmtDuration, workedMinutes } from '../lib/time';
 
 const PALETTE = ['#18181b', '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#059669', '#0891b2', '#4f46e5'];
 
@@ -18,14 +20,16 @@ export function initialsOf(name = '') {
   return parts.slice(0, 2).map(p => p[0]).join('').toUpperCase();
 }
 
-export function AccountAvatar({ name, size = 32, onClick, title, className = '' }) {
+export function AccountAvatar({ name, photo, size = 32, onClick, title, className = '' }) {
   const style = {
     width: size,
     height: size,
     fontSize: Math.max(10, Math.round(size * 0.36)),
-    background: avatarColor(name),
+    background: photo ? 'var(--surface2)' : avatarColor(name),
   };
-  const content = initialsOf(name);
+  const content = photo
+    ? <img src={photo} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} />
+    : initialsOf(name);
   if (onClick) {
     return (
       <button
@@ -63,6 +67,10 @@ export default function AccountPanel({ open, onClose, account, kind = 'self', on
     confirmPassword: '',
   });
 
+  const [history, setHistory] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const photoRef = useRef(null);
+
   const isApplication = kind === 'application';
   const isSelf = kind === 'self';
   const canEdit = !isApplication;
@@ -80,7 +88,17 @@ export default function AccountPanel({ open, onClose, account, kind = 'self', on
       newPassword: '',
       confirmPassword: '',
     });
+    setHistory(null);
   }, [open, account]);
+
+  useEffect(() => {
+    if (tab !== 'history' || history || !account?._id) return;
+    let alive = true;
+    attendanceApi.history({ userId: account._id, days: 30 })
+      .then(res => { if (alive) setHistory(res.data); })
+      .catch(() => { if (alive) setHistory([]); });
+    return () => { alive = false; };
+  }, [tab, history, account?._id]);
 
   if (!account) return null;
 
@@ -90,6 +108,22 @@ export default function AccountPanel({ open, onClose, account, kind = 'self', on
       setUser(nextUser);
       sessionStorage.setItem('crm_session_user', JSON.stringify(nextUser));
       localStorage.setItem('crm_session_user', JSON.stringify(nextUser));
+    }
+  }
+
+  async function uploadPhoto(file) {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const res = await authApi.uploadPhoto(file);
+      persistSession(res.data.user);
+      toast('Profile picture updated', 'success');
+      mutate('/users');
+      onUpdated?.();
+    } catch (error) {
+      toast(error?.response?.data?.error || 'Upload failed', 'error');
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -199,9 +233,15 @@ export default function AccountPanel({ open, onClose, account, kind = 'self', on
 
   const tabs = [
     { id: 'account', label: 'Account' },
+    ...(!isApplication ? [{ id: 'history', label: 'Work history' }] : []),
     { id: 'email', label: 'Email' },
     ...(!isApplication ? [{ id: 'password', label: isSelf ? 'Password' : 'Reset password' }] : []),
   ];
+
+  const totals = (history || []).reduce(
+    (acc, r) => ({ days: acc.days + (r.clockIn ? 1 : 0), minutes: acc.minutes + workedMinutes(r) }),
+    { days: 0, minutes: 0 },
+  );
 
   return (
     <Modal
@@ -230,13 +270,27 @@ export default function AccountPanel({ open, onClose, account, kind = 'self', on
       )}
     >
       <div className="account-panel-head">
-        <AccountAvatar name={account.name} size={44} />
+        <AccountAvatar name={account.name} photo={account.photo} size={48} />
         <div style={{ minWidth: 0 }}>
           <div className="account-panel-name">{account.name}</div>
           <div className="account-panel-meta">
             @{account.username}
             {account.role ? ` · ${account.role}` : account.status ? ` · ${account.status}` : ''}
           </div>
+          {isSelf && (
+            <>
+              <button className="btn btn-sm btn-secondary" style={{ marginTop: 8 }} disabled={uploading} onClick={() => photoRef.current?.click()}>
+                {uploading ? 'Uploading…' : account.photo ? 'Change picture' : 'Add picture'}
+              </button>
+              <input
+                ref={photoRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={e => { uploadPhoto(e.target.files?.[0]); e.target.value = ''; }}
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -318,6 +372,36 @@ export default function AccountPanel({ open, onClose, account, kind = 'self', on
               Created {new Date(account.createdAt).toLocaleDateString()}
             </div>
           )}
+        </div>
+      )}
+
+      {tab === 'history' && (
+        <div className="account-panel-section">
+          <div className="work-total-row">
+            <div className="work-total">
+              <span className="work-total-label">Time logged · 30 days</span>
+              <span className="work-total-value">{fmtDuration(totals.minutes)}</span>
+            </div>
+            <div className="work-total">
+              <span className="work-total-label">Days worked</span>
+              <span className="work-total-value">{totals.days}</span>
+            </div>
+            <div className="work-total">
+              <span className="work-total-label">Daily average</span>
+              <span className="work-total-value">{fmtDuration(totals.days ? totals.minutes / totals.days : 0)}</span>
+            </div>
+          </div>
+          <div className="work-history">
+            {history === null && <div className="text-sm text-muted">Loading…</div>}
+            {history?.length === 0 && <div className="text-sm text-muted">No attendance recorded yet.</div>}
+            {(history || []).map(r => (
+              <div key={r._id} className="work-history-row">
+                <span className="work-history-date">{new Date(`${r.date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                <span className="work-history-times">{fmtClock(r.clockIn) || '—'} → {fmtClock(r.clockOut) || (r.clockIn ? 'running' : '—')}</span>
+                <span className="work-history-dur">{fmtDuration(workedMinutes(r))}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

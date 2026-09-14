@@ -36,14 +36,13 @@ router.get('/', async (req, res) => {
     if (req.query.month) {
       filter.date = { $regex: `^${req.query.month}` };
     }
-    res.json(await Event.find(filter).populate('clientId','name company').sort({ date: 1, time: 1 }));
+    res.json(await Event.find(filter).sort({ date: 1, time: 1 }));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 router.post('/', writeLimiter, async (req, res) => {
   try {
     const payload = { ...req.body };
-    if (!payload.clientId) payload.clientId = null;
     res.status(201).json(await Event.create(payload));
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -51,7 +50,6 @@ router.post('/', writeLimiter, async (req, res) => {
 router.put('/:id', validateId, writeLimiter, async (req, res) => {
   try {
     const payload = { ...req.body };
-    if (!payload.clientId) payload.clientId = null;
     res.json(await Event.findByIdAndUpdate(req.params.id, payload, { new: true }));
   } catch (e) { res.status(400).json({ error: e.message }); }
 });

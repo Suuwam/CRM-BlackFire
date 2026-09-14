@@ -9,6 +9,7 @@ function sanitizeUser(user) {
     username: user.username,
     email: user.email,
     role: user.role,
+    photo: user.photo || '',
     active: user.active,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,

@@ -2,474 +2,213 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import { fetcher } from '../api';
+import { AccountAvatar } from '../components/AccountPanel';
 import SocialIcon from '../components/SocialIcon';
+import { fmtDuration, isOnline, workedMinutes } from '../lib/time';
 
-// Helper to calculate Donut Arc paths
-function getDonutPath(cx, cy, radius, innerRadius, startAngle, endAngle) {
+const STATUSES = [
+  { id: 'backlog', label: 'Backlog', color: '#3b82f6' },
+  { id: 'todo', label: 'To Do', color: '#8b5cf6' },
+  { id: 'inprogress', label: 'In Progress', color: '#f59e0b' },
+  { id: 'qa', label: 'QA / Review', color: '#06b6d4' },
+  { id: 'done', label: 'Done', color: '#10b981' },
+  { id: 'cancelled', label: 'Cancelled', color: '#6b7280' },
+];
+
+function donutPath(cx, cy, radius, innerRadius, startAngle, endAngle) {
   const angleDiff = endAngle - startAngle;
   if (angleDiff <= 0) return '';
   const effectiveEnd = angleDiff >= 359.99 ? startAngle + 359.99 : endAngle;
-  
-  const startRad = (startAngle - 90) * (Math.PI / 180);
-  const endRad = (effectiveEnd - 90) * (Math.PI / 180);
-  
-  const x1 = cx + radius * Math.cos(startRad);
-  const y1 = cy + radius * Math.sin(startRad);
-  const x2 = cx + radius * Math.cos(endRad);
-  const y2 = cy + radius * Math.sin(endRad);
-  
-  const x3 = cx + innerRadius * Math.cos(endRad);
-  const y3 = cy + innerRadius * Math.sin(endRad);
-  const x4 = cx + innerRadius * Math.cos(startRad);
-  const y4 = cy + innerRadius * Math.sin(startRad);
-  
+  const p = (angle, r) => [cx + r * Math.cos((angle - 90) * Math.PI / 180), cy + r * Math.sin((angle - 90) * Math.PI / 180)];
+  const [x1, y1] = p(startAngle, radius);
+  const [x2, y2] = p(effectiveEnd, radius);
+  const [x3, y3] = p(effectiveEnd, innerRadius);
+  const [x4, y4] = p(startAngle, innerRadius);
   const largeArc = angleDiff > 180 ? 1 : 0;
-  
   return `M ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} L ${x3} ${y3} A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${x4} ${y4} Z`;
 }
 
-function TaskPieChart({ tasks = [], clients = [] }) {
-  const [chartType, setChartType] = useState('tasks'); // 'tasks' or 'clients'
-  const [hoveredIdx, setHoveredIdx] = useState(null);
+function TaskDonut({ tasks }) {
+  const [hovered, setHovered] = useState(null);
+  const data = STATUSES.map(s => ({ ...s, value: tasks.filter(t => (t.column || 'backlog') === s.id).length })).filter(d => d.value > 0);
+  const total = data.reduce((a, d) => a + d.value, 0);
 
-  let data = [];
-  if (chartType === 'tasks') {
-    const statuses = [
-      { id: 'backlog', label: 'Backlog', color: '#3b82f6' },
-      { id: 'todo', label: 'To Do', color: '#8b5cf6' },
-      { id: 'inprogress', label: 'In Progress', color: '#f59e0b' },
-      { id: 'qa', label: 'QA / Review', color: '#06b6d4' },
-      { id: 'done', label: 'Done', color: '#10b981' },
-      { id: 'cancelled', label: 'Cancelled', color: '#6b7280' },
-    ];
-    data = statuses.map(s => ({
-      ...s,
-      value: tasks.filter(t => (t.column || 'backlog') === s.id).length
-    })).filter(d => d.value > 0);
-  } else {
-    const statuses = [
-      { id: 'Active', label: 'Active Clients', color: '#10b981' },
-      { id: 'Prospect', label: 'Prospects', color: '#3b82f6' },
-      { id: 'Inactive', label: 'Inactive', color: '#6b7280' },
-    ];
-    data = statuses.map(s => ({
-      ...s,
-      value: clients.filter(c => (c.status || 'Active') === s.id).length
-    })).filter(d => d.value > 0);
-  }
-
-  const total = data.reduce((acc, d) => acc + d.value, 0);
-
-  // Compute angles
-  let currentAngle = 0;
-  const slices = data.map((d, i) => {
-    const angle = total > 0 ? (d.value / total) * 360 : 0;
-    const startAngle = currentAngle;
-    const endAngle = currentAngle + angle;
-    currentAngle = endAngle;
-    return {
-      ...d,
-      startAngle,
-      endAngle,
-      percentage: total > 0 ? ((d.value / total) * 100).toFixed(1) : '0'
-    };
+  let angle = 0;
+  const slices = data.map(d => {
+    const start = angle;
+    angle += total ? (d.value / total) * 360 : 0;
+    return { ...d, start, end: angle, pct: total ? Math.round((d.value / total) * 100) : 0 };
   });
 
   return (
-    <div className="chart-card">
-      <div className="chart-header">
-        <div>
-          <div className="chart-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>
-              <path d="M22 12A10 10 0 0 0 12 2v10z"/>
-            </svg>
-            {chartType === 'tasks' ? 'Task Distribution' : 'Client Status Distribution'}
-          </div>
-          <div className="chart-sub">Real-time status breakdown</div>
-        </div>
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button className={`btn btn-sm ${chartType === 'tasks' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setChartType('tasks')} style={{ fontSize: 11, padding: '3px 8px' }}>Tasks</button>
-          <button className={`btn btn-sm ${chartType === 'clients' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setChartType('clients')} style={{ fontSize: 11, padding: '3px 8px' }}>Clients</button>
-        </div>
-      </div>
-
-      <div className="chart-body" style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
-        {total === 0 ? (
-          <div className="text-muted text-sm" style={{ padding: '40px 0' }}>No data available</div>
-        ) : (
+    <section className="panel">
+      <header className="panel-head">
+        <h2>Task Distribution</h2>
+        <span className="panel-sub">{total} tasks across the board</span>
+      </header>
+      <div className="panel-body donut-body">
+        {total === 0 ? <div className="empty">No tasks yet.</div> : (
           <>
-            <div style={{ position: 'relative', width: 170, height: 170, flexShrink: 0 }}>
-              <svg width="170" height="170" viewBox="0 0 200 200">
-                {slices.map((slice, i) => {
-                  const isHovered = hoveredIdx === i;
-                  const path = getDonutPath(100, 100, isHovered ? 84 : 78, 48, slice.startAngle, slice.endAngle);
-                  return (
-                    <path
-                      key={slice.id || i}
-                      d={path}
-                      fill={slice.color}
-                      opacity={hoveredIdx === null || isHovered ? 1 : 0.45}
-                      style={{ transition: 'all 0.2s ease', cursor: 'pointer' }}
-                      onMouseEnter={() => setHoveredIdx(i)}
-                      onMouseLeave={() => setHoveredIdx(null)}
-                    />
-                  );
-                })}
+            <div className="donut-wrap">
+              <svg viewBox="0 0 200 200">
+                {slices.map((s, i) => (
+                  <path
+                    key={s.id}
+                    d={donutPath(100, 100, hovered === i ? 88 : 82, 52, s.start, s.end)}
+                    fill={s.color}
+                    opacity={hovered === null || hovered === i ? 1 : 0.4}
+                    onMouseEnter={() => setHovered(i)}
+                    onMouseLeave={() => setHovered(null)}
+                  />
+                ))}
               </svg>
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', textAlign: 'center' }}>
-                <span style={{ fontSize: 24, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>
-                  {hoveredIdx !== null ? slices[hoveredIdx].value : total}
-                </span>
-                <span style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 600, marginTop: 2 }}>
-                  {hoveredIdx !== null ? slices[hoveredIdx].label : (chartType === 'tasks' ? 'Total Tasks' : 'Total Clients')}
-                </span>
+              <div className="donut-center">
+                <strong>{hovered === null ? total : slices[hovered].value}</strong>
+                <span>{hovered === null ? 'Total' : slices[hovered].label}</span>
               </div>
             </div>
-
-            <div className="pie-legend-container" style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minWidth: 130 }}>
+            <ul className="donut-legend">
               {slices.map((s, i) => (
-                <div
-                  key={s.id || i}
-                  className="pie-legend-item"
-                  onMouseEnter={() => setHoveredIdx(i)}
-                  onMouseLeave={() => setHoveredIdx(null)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    fontSize: 12,
-                    padding: '4px 8px',
-                    borderRadius: 6,
-                    background: hoveredIdx === i ? 'var(--surface2)' : 'transparent',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s',
-                    width: '100%',
-                    minWidth: 0,
-                    boxSizing: 'border-box'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
-                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-                    <span className="pie-legend-label" style={{ fontWeight: 550, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 'auto', flexShrink: 0 }}>
-                    <span style={{ fontWeight: 700, color: 'var(--text)' }}>{s.value}</span>
-                    <span style={{ fontSize: 10, color: 'var(--text3)', minWidth: 32, textAlign: 'right' }}>{s.percentage}%</span>
-                  </div>
-                </div>
+                <li key={s.id} onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)} className={hovered === i ? 'on' : ''}>
+                  <span className="dot" style={{ background: s.color }} />
+                  <span className="legend-label">{s.label}</span>
+                  <span className="legend-value">{s.value}</span>
+                  <span className="legend-pct">{s.pct}%</span>
+                </li>
               ))}
-            </div>
+            </ul>
           </>
         )}
       </div>
-    </div>
+    </section>
   );
 }
 
-function PriorityBarChart({ tasks = [] }) {
-  const [activeHover, setActiveHover] = useState(null);
-
-  const priorities = [
-    { id: 'low', label: 'Low' },
-    { id: 'medium', label: 'Medium' },
-    { id: 'high', label: 'High' },
-  ];
-
-  const data = priorities.map(p => {
-    const bf = tasks.filter(t => (t.project === 'blackfire' || !t.project) && (t.priority || 'medium') === p.id).length;
-    const aw = tasks.filter(t => t.project === 'aawazz' && (t.priority || 'medium') === p.id).length;
-    return { priority: p.label, blackfire: bf, aawazz: aw, total: bf + aw };
-  });
-
-  const maxVal = Math.max(...data.map(d => Math.max(d.blackfire, d.aawazz)), 4);
-
-  return (
-    <div className="chart-card">
-      <div className="chart-header">
-        <div>
-          <div className="chart-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="20" x2="18" y2="10"/>
-              <line x1="12" y1="20" x2="12" y2="4"/>
-              <line x1="6" y1="20" x2="6" y2="14"/>
-            </svg>
-            Tasks by Priority & Product
-          </div>
-          <div className="chart-sub">Blackfire AI vs Aawazz Product breakdown</div>
-        </div>
-        <div className="priority-chart-legend" style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 11, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 3, background: '#f97316' }} />
-            <span style={{ fontWeight: 600, color: 'var(--text2)' }}>Blackfire AI</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 3, background: '#2563eb' }} />
-            <span style={{ fontWeight: 600, color: 'var(--text2)' }}>Aawazz Product</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="chart-body" style={{ flexDirection: 'column', justifyContent: 'flex-end', padding: '10px 0 0', width: '100%', overflowX: 'hidden' }}>
-        <div style={{ width: '100%', height: 170, position: 'relative', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
-          {/* Grid background lines */}
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', pointerEvents: 'none', opacity: 0.15 }}>
-            <div style={{ borderTop: '1px dashed var(--text)', width: '100%' }} />
-            <div style={{ borderTop: '1px dashed var(--text)', width: '100%' }} />
-            <div style={{ borderTop: '1px dashed var(--text)', width: '100%' }} />
-          </div>
-
-          {data.map((d) => {
-            const bfHeight = (d.blackfire / maxVal) * 130;
-            const awHeight = (d.aawazz / maxVal) * 130;
-
-            return (
-              <div key={d.priority} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flex: 1, zIndex: 2, minWidth: 0 }}>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', height: 130 }}>
-                  {/* Blackfire bar */}
-                  <div
-                    onMouseEnter={() => setActiveHover({ group: d.priority, type: 'Blackfire', val: d.blackfire })}
-                    onMouseLeave={() => setActiveHover(null)}
-                    style={{
-                      width: 22,
-                      height: Math.max(bfHeight, 6),
-                      background: '#f97316',
-                      borderRadius: '4px 4px 0 0',
-                      transition: 'all 0.25s ease',
-                      position: 'relative',
-                      boxShadow: activeHover?.group === d.priority && activeHover?.type === 'Blackfire' ? '0 0 10px rgba(249,115,22,0.5)' : 'none',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {d.blackfire > 0 && (
-                      <span style={{ position: 'absolute', top: -18, left: '50%', transform: 'translateX(-50%)', fontSize: 10, fontWeight: 700, color: 'var(--text)' }}>
-                        {d.blackfire}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Aawazz bar */}
-                  <div
-                    onMouseEnter={() => setActiveHover({ group: d.priority, type: 'Aawazz', val: d.aawazz })}
-                    onMouseLeave={() => setActiveHover(null)}
-                    style={{
-                      width: 22,
-                      height: Math.max(awHeight, 6),
-                      background: '#3b82f6',
-                      borderRadius: '4px 4px 0 0',
-                      transition: 'all 0.25s ease',
-                      position: 'relative',
-                      boxShadow: activeHover?.group === d.priority && activeHover?.type === 'Aawazz' ? '0 0 10px rgba(37,99,235,0.5)' : 'none',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {d.aawazz > 0 && (
-                      <span style={{ position: 'absolute', top: -18, left: '50%', transform: 'translateX(-50%)', fontSize: 10, fontWeight: 700, color: 'var(--text)' }}>
-                        {d.aawazz}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <span className="priority-label" style={{ fontSize: 11, fontWeight: 650, color: 'var(--text2)', textAlign: 'center', wordBreak: 'break-word' }}>{d.priority}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AssigneeWorkloadChart({ tasks = [], users = [] }) {
-  const [hoveredIdx, setHoveredIdx] = useState(null);
-
-  // Build per-user task count from users list first, then fall back to assigneeName from tasks
-  const allNames = new Set();
-  users.forEach(u => u.name && allNames.add(u.name));
-  tasks.forEach(t => (t.assigneeName || t.assignee) && allNames.add(t.assigneeName || t.assignee));
-
-  const palette = ['#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#06b6d4', '#ec4899', '#6b7280'];
-
-  const data = Array.from(allNames)
-    .map((name, i) => ({
-      name,
-      total: tasks.filter(t => (t.assigneeName || t.assignee) === name).length,
-      inProgress: tasks.filter(t => (t.assigneeName || t.assignee) === name && t.column === 'inprogress').length,
-      done: tasks.filter(t => (t.assigneeName || t.assignee) === name && t.column === 'done').length,
-      color: palette[i % palette.length],
+function Workload({ tasks, users }) {
+  const data = users
+    .filter(u => u.active !== false)
+    .map(u => ({
+      user: u,
+      open: tasks.filter(t => (t.assigneeName || t.assignee) === u.name && t.column !== 'done' && t.column !== 'cancelled').length,
+      done: tasks.filter(t => (t.assigneeName || t.assignee) === u.name && t.column === 'done').length,
     }))
-    .filter(d => d.total > 0)
-    .sort((a, b) => b.total - a.total);
+    .filter(d => d.open + d.done > 0)
+    .sort((a, b) => b.open - a.open);
 
-  const maxVal = Math.max(...data.map(d => d.total), 1);
+  const max = Math.max(...data.map(d => d.open + d.done), 1);
 
   return (
-    <div className="chart-card">
-      <div className="chart-header">
-        <div>
-          <div className="chart-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="9" cy="7" r="4"/>
-              <path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/>
-              <path d="M16 11l2 2 4-4"/>
-            </svg>
-            Assignee Workload
+    <section className="panel">
+      <header className="panel-head">
+        <h2>Workload</h2>
+        <span className="panel-sub">Open vs done per employee</span>
+      </header>
+      <div className="panel-body scroll">
+        {data.length === 0 && <div className="empty">Nothing assigned yet.</div>}
+        {data.map(d => (
+          <div key={d.user._id} className="workload-row">
+            <AccountAvatar name={d.user.name} photo={d.user.photo} size={26} />
+            <span className="workload-name">{d.user.name}</span>
+            <div className="workload-bar">
+              <span className="seg open" style={{ width: `${(d.open / max) * 100}%` }} />
+              <span className="seg done" style={{ width: `${(d.done / max) * 100}%` }} />
+            </div>
+            <span className="workload-count">{d.open}<span className="text-muted">/{d.open + d.done}</span></span>
           </div>
-          <div className="chart-sub">Tasks assigned per team member</div>
-        </div>
+        ))}
       </div>
-
-      <div className="chart-body" style={{ flexDirection: 'column', gap: 10, padding: '10px 0', alignItems: 'stretch', width: '100%', minHeight: 'auto' }}>
-        {data.length === 0 ? (
-          <div className="text-muted text-sm" style={{ padding: '30px 0', textAlign: 'center' }}>No assignments found</div>
-        ) : (
-          data.map((d, i) => {
-            const barW = (d.total / maxVal) * 100;
-            const isHov = hoveredIdx === i;
-            return (
-              <div
-                key={d.name}
-                onMouseEnter={() => setHoveredIdx(i)}
-                onMouseLeave={() => setHoveredIdx(null)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  padding: '8px 10px',
-                  borderRadius: 8,
-                  background: isHov ? 'var(--surface2)' : 'var(--bg)',
-                  border: '1px solid var(--border)',
-                  transition: 'all 0.15s ease',
-                  width: '100%',
-                  minWidth: 0,
-                  boxSizing: 'border-box'
-                }}
-              >
-                <div style={{ width: 10, height: 10, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
-                <div className="workload-name" style={{ fontSize: 12, fontWeight: 650, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  {d.name}
-                </div>
-                <div style={{ flex: 1, height: 10, background: 'var(--border)', borderRadius: 99, overflow: 'hidden', minWidth: 30 }}>
-                  <div style={{
-                    height: '100%',
-                    width: `${barW}%`,
-                    background: d.color,
-                    borderRadius: 99,
-                    transition: 'width 0.4s ease',
-                    boxShadow: `0 0 6px ${d.color}66`
-                  }} />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 30, justifyContent: 'flex-end', flexShrink: 0 }}>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>{d.total}</span>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-    </div>
+    </section>
   );
 }
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { data: clients = [] } = useSWR('/clients', fetcher, { revalidateOnFocus: false });
   const { data: allEvents = [] } = useSWR('/events', fetcher, { revalidateOnFocus: false });
   const { data: tasks = [] } = useSWR('/tasks', fetcher, { revalidateOnFocus: false });
   const { data: users = [] } = useSWR('/users', fetcher, { revalidateOnFocus: false });
+  const { data: attendance } = useSWR('/attendance', fetcher, { refreshInterval: 60000 });
 
   const today = new Date().toISOString().slice(0, 10);
-  const upcoming = allEvents
-    .filter(e => e.date >= today)
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(0, 6);
+  const upcoming = allEvents.filter(e => e.date >= today).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 12);
+  const overdue = allEvents.filter(e => e.date < today && e.status !== 'done' && e.status !== 'cancelled').length
+    + tasks.filter(t => t.dueDate && t.dueDate < today && t.column !== 'done').length;
 
-  const overdueEvents = allEvents.filter(e => e.date < today && e.status !== 'done' && e.status !== 'cancelled');
-  const overdueTasks = tasks.filter(t => t.dueDate && t.dueDate < today && t.column !== 'done');
-  const totalOverdue = overdueEvents.length + overdueTasks.length;
+  const rows = attendance?.rows || [];
+  const online = rows.filter(isOnline).length;
+  const present = rows.filter(r => r.clockIn).length;
+  const hoursToday = rows.reduce((a, r) => a + workedMinutes(r), 0);
 
-  const active   = clients.filter(c => c.status === 'Active').length;
-  const prospect = clients.filter(c => c.status === 'Prospect').length;
   const inProgress = tasks.filter(t => t.column === 'inprogress').length;
-  const completed = tasks.filter(t => t.column === 'done').length;
-  const completionRate = tasks.length > 0 ? Math.round((completed / tasks.length) * 100) : 0;
+  const done = tasks.filter(t => t.column === 'done').length;
+  const completion = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
 
-  function fmtDate(d) {
-    const dt = new Date(d + 'T00:00:00');
-    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  }
+  const fmtDate = d => new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
   return (
-    <>
+    <div className="dash-page">
       <div className="page-head">
         <div>
           <h1>Dashboard</h1>
-          <p>Blackfire AI, Product Platform & Venture Engine Overview</p>
+          <p>Blackfire AI · product, people and delivery at a glance</p>
         </div>
       </div>
-      <div className="page-body">
-        <div className="stats-grid">
-          <div className="stat-card" onClick={() => navigate('/clients')} style={{ cursor: 'pointer' }}>
-            <div className="stat-label">Clients</div>
-            <div className="stat-value">{clients.length}</div>
-            <div className="stat-sub">{active} active · {prospect} prospects</div>
-          </div>
-          <div className="stat-card" onClick={() => navigate('/calendar')} style={{ cursor: 'pointer' }}>
-            <div className="stat-label">Upcoming</div>
-            <div className="stat-value">{upcoming.length}</div>
-            <div className="stat-sub">Next 30 days</div>
-          </div>
-          <div className="stat-card" onClick={() => navigate('/assigned')} style={{ cursor: 'pointer' }}>
-            <div className="stat-label">In Progress</div>
+
+      <div className="dash-screen">
+        <div className="stats-grid stats-grid--compact">
+          <button className="stat-card" onClick={() => navigate('/team')}>
+            <div className="stat-label">Online now</div>
+            <div className="stat-value">{online}</div>
+            <div className="stat-sub">{present} clocked in today</div>
+          </button>
+          <button className="stat-card" onClick={() => navigate('/attendance')}>
+            <div className="stat-label">Hours today</div>
+            <div className="stat-value">{fmtDuration(hoursToday)}</div>
+            <div className="stat-sub">across the team</div>
+          </button>
+          <button className="stat-card" onClick={() => navigate('/assigned')}>
+            <div className="stat-label">In progress</div>
             <div className="stat-value">{inProgress}</div>
-            <div className="stat-sub">Active workflow</div>
-          </div>
-          <div className="stat-card" onClick={() => navigate('/board')} style={{ cursor: 'pointer' }}>
+            <div className="stat-sub">active tasks</div>
+          </button>
+          <button className="stat-card" onClick={() => navigate('/board')}>
             <div className="stat-label">Completion</div>
-            <div className="stat-value">{completionRate}%</div>
-            <div className="stat-sub">{completed} of {tasks.length} done</div>
-          </div>
-          <div className={`stat-card${totalOverdue > 0 ? ' stat-card--overdue' : ''}`} onClick={() => navigate('/overdue')} style={{ cursor: 'pointer' }}>
+            <div className="stat-value">{completion}%</div>
+            <div className="stat-sub">{done} of {tasks.length} done</div>
+          </button>
+          <button className={`stat-card${overdue > 0 ? ' stat-card--overdue' : ''}`} onClick={() => navigate('/overdue')}>
             <div className="stat-label">Overdue</div>
-            <div className="stat-value" style={{ color: totalOverdue > 0 ? '#ef4444' : undefined }}>{totalOverdue}</div>
-            <div className="stat-sub">{overdueEvents.length} events · {overdueTasks.length} tasks</div>
-          </div>
+            <div className="stat-value" style={{ color: overdue > 0 ? '#ef4444' : undefined }}>{overdue}</div>
+            <div className="stat-sub">events &amp; tasks</div>
+          </button>
         </div>
 
-        <div className="charts-grid">
-          <TaskPieChart tasks={tasks} clients={clients} />
-          <PriorityBarChart tasks={tasks} />
-        </div>
-
-        <div style={{ marginTop: 24 }}>
-          <AssigneeWorkloadChart tasks={tasks} users={users} />
-        </div>
-
-        <div style={{ marginTop: 24 }}>
-          <div className="section-title">Upcoming Schedule & Social Posts</div>
-          <div className="upcoming-list">
-            {upcoming.length === 0 && <p className="text-muted text-sm">No upcoming events scheduled.</p>}
-            {upcoming.map(ev => (
-              <div key={ev._id} className="upcoming-item">
-                <div className={`up-dot`} style={{ background: ev.color === 'blue' ? '#3b82f6' : ev.color === 'green' ? '#10b981' : ev.color === 'amber' ? '#f59e0b' : ev.color === 'purple' ? '#8b5cf6' : ev.color === 'red' ? '#ef4444' : ev.color === 'pink' ? '#ec4899' : '#71717a' }} />
-                <div className="up-info">
-                  <div className="up-title">{ev.title}</div>
-                  <div className="up-meta">
-                    {ev.clientId?.name && <span>{ev.clientId.name}</span>}
-                    {ev.time && <span>{ev.time}</span>}
-                    {(ev.platforms || []).map(pId => (
-                      <span key={pId} style={{ display:'inline-flex', alignItems:'center', marginLeft:4 }} title={pId}>
-                        <SocialIcon id={pId} size={12} />
-                      </span>
-                    ))}
+        <div className="dash-panels">
+          <TaskDonut tasks={tasks} />
+          <Workload tasks={tasks} users={users} />
+          <section className="panel">
+            <header className="panel-head">
+              <h2>Upcoming</h2>
+              <span className="panel-sub">Next scheduled work</span>
+            </header>
+            <div className="panel-body scroll">
+              {upcoming.length === 0 && <div className="empty">Nothing scheduled.</div>}
+              {upcoming.map(ev => (
+                <div key={ev._id} className="upcoming-item" onClick={() => navigate('/calendar')}>
+                  <span className="up-dot" style={{ background: { blue: '#3b82f6', green: '#10b981', amber: '#f59e0b', purple: '#8b5cf6', red: '#ef4444', pink: '#ec4899' }[ev.color] || '#71717a' }} />
+                  <div className="up-info">
+                    <div className="up-title">{ev.title}</div>
+                    <div className="up-meta">
+                      {ev.time && <span>{ev.time}</span>}
+                      {(ev.platforms || []).map(p => <SocialIcon key={p} id={p} size={12} />)}
+                    </div>
                   </div>
+                  <div className="up-date">{fmtDate(ev.date)}</div>
                 </div>
-                <div className="up-date">{fmtDate(ev.date)}</div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </section>
         </div>
       </div>
-    </>
+    </div>
   );
 }

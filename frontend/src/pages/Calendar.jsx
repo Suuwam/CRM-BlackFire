@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import useSWR, { mutate } from 'swr';
-import { eventsApi, clientsApi, fetcher } from '../api';
+import { eventsApi, fetcher } from '../api';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 import SocialIcon, { PLATFORMS } from '../components/SocialIcon';

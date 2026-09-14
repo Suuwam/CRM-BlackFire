@@ -7,7 +7,25 @@ const { ensureBootstrapAdmin } = require('../utils/bootstrap');
 const { sendMail } = require('../utils/mailer');
 const { rateLimit } = require('../utils/rateLimit');
 const { verifyPassword, isBcryptHash } = require('../utils/password');
+const { recordActivity } = require('../utils/activity');
+const { clockIn, clockOut } = require('../utils/attendance');
 const crypto = require('crypto');
+const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
+const streamifier = require('streamifier');
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+const hasCloudinary = !!(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET);
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(file.mimetype.startsWith('image/') ? null : new Error('Only image files are allowed'), true),
+});
 
 const loginLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 10, prefix: 'auth-login', message: 'Too many login attempts. Please try again later.' });
 const applyLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 3, prefix: 'auth-apply', message: 'Too many account requests. Please try again later.' });
@@ -32,9 +50,90 @@ router.post('/login', loginLimiter, async (req, res) => {
       await user.save();
     }
 
+    await clockIn(user, 'login');
+    await recordActivity({
+      action: 'login',
+      targetType: 'attendance',
+      targetId: user._id,
+      targetName: user.name,
+      actorId: user._id,
+      actorName: user.name,
+      summary: `${user.name} logged in`,
+    });
+
     res.json({ user: sanitizeUser(user) });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Logout — clocks the user out and lands in the backlog
+router.post('/logout', requireSessionUser, async (req, res) => {
+  try {
+    await clockOut(req.sessionUser, 'logout');
+    await recordActivity({
+      action: 'logout',
+      targetType: 'attendance',
+      targetId: req.sessionUser._id,
+      targetName: req.sessionUser.name,
+      actorId: req.sessionUser._id,
+      actorName: req.sessionUser.name,
+      summary: `${req.sessionUser.name} logged out`,
+    });
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Exit — tab/app closed without logging out; keeps the session (and clock) running
+router.post('/exit', requireSessionUser, async (req, res) => {
+  try {
+    // A reload also fires this — collapse bursts so the backlog stays readable.
+    const recent = await Activity.findOne({
+      action: 'exit',
+      actorId: req.sessionUser._id,
+      createdAt: { $gt: new Date(Date.now() - 2 * 60 * 1000) },
+    });
+    if (recent) return res.json({ ok: true, skipped: true });
+
+    await recordActivity({
+      action: 'exit',
+      targetType: 'attendance',
+      targetId: req.sessionUser._id,
+      targetName: req.sessionUser.name,
+      actorId: req.sessionUser._id,
+      actorName: req.sessionUser.name,
+      summary: `${req.sessionUser.name} left the app`,
+    });
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Profile picture
+router.patch('/me/photo', requireSessionUser, upload.single('photo'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+    let photo;
+    if (hasCloudinary) {
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream({ folder: 'crm_avatars', width: 256, height: 256, crop: 'fill', gravity: 'face' }, (err, out) => (out ? resolve(out) : reject(err)));
+        streamifier.createReadStream(req.file.buffer).pipe(stream);
+      });
+      photo = result.secure_url;
+    } else {
+      // ponytail: no Cloudinary configured — inline small images so the feature still works
+      if (req.file.size > 400 * 1024) return res.status(400).json({ error: 'Image too large (max 400KB without Cloudinary configured)' });
+      photo = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+    }
+
+    const user = await User.findByIdAndUpdate(req.sessionUser._id, { photo }, { new: true });
+    res.json({ user: sanitizeUser(user) });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 });
 

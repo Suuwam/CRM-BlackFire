@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { authApi } from '../api';
+import { attendanceApi, authApi } from '../api';
 
 const AuthContext = createContext(null);
 
@@ -47,6 +47,25 @@ export function AuthProvider({ children }) {
     return () => { active = false; };
   }, []);
 
+  // Presence heartbeat — drives the online list and keeps the clock honest.
+  useEffect(() => {
+    if (!user?._id) return;
+    const ping = () => { attendanceApi.ping().catch(() => {}); };
+    ping();
+    const timer = setInterval(ping, 60000);
+    const onExit = () => {
+      try {
+        const raw = sessionStorage.getItem('crm_session_user') || localStorage.getItem('crm_session_user');
+        const id = raw ? JSON.parse(raw)?._id : null;
+        if (id) fetch(`${import.meta.env?.VITE_API_URL || '/api'}/auth/exit`, {
+          method: 'POST', keepalive: true, headers: { 'x-session-user': id },
+        }).catch(() => {});
+      } catch {}
+    };
+    window.addEventListener('pagehide', onExit);
+    return () => { clearInterval(timer); window.removeEventListener('pagehide', onExit); };
+  }, [user?._id]);
+
   async function login(credentials) {
     const res = await authApi.login(credentials);
     const nextUser = res.data.user;
@@ -56,7 +75,8 @@ export function AuthProvider({ children }) {
     return nextUser;
   }
 
-  function logout() {
+  async function logout() {
+    try { await authApi.logout(); } catch {}
     sessionStorage.removeItem('crm_session_user');
     localStorage.removeItem('crm_session_user');
     setUser(null);

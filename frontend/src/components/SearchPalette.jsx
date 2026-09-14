@@ -25,7 +25,7 @@ const ICONS = {
   reference: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
 };
 
-const TYPE_LABELS = { client: 'Client', task: 'Task', event: 'Event', reference: 'Reference' };
+const TYPE_LABELS = { client: 'Employee', task: 'Task', event: 'Event', reference: 'Reference' };
 const TYPE_COLORS = { client: '#10b981', task: '#f97316', event: '#3b82f6', reference: '#8b5cf6' };
 
 export default function SearchPalette({ open, onClose }) {
@@ -35,7 +35,7 @@ export default function SearchPalette({ open, onClose }) {
   const inputRef = useRef(null);
   const listRef = useRef(null);
 
-  const { data: clients = [] }    = useSWR('/clients', fetcher, { revalidateOnFocus: false });
+  const { data: employees = [] }  = useSWR('/users', fetcher, { revalidateOnFocus: false });
   const { data: tasks = [] }      = useSWR('/tasks', fetcher, { revalidateOnFocus: false });
   const { data: references = [] } = useSWR('/references', fetcher, { revalidateOnFocus: false });
 
@@ -45,9 +45,9 @@ export default function SearchPalette({ open, onClose }) {
     const q = query.toLowerCase();
     const hits = [];
 
-    clients.forEach(c => {
-      if ((c.name || '').toLowerCase().includes(q) || (c.company || '').toLowerCase().includes(q) || (c.email || '').toLowerCase().includes(q)) {
-        hits.push({ type: 'client', id: c._id, title: c.name, sub: c.company || c.email, nav: '/clients' });
+    employees.forEach(e => {
+      if ((e.name || '').toLowerCase().includes(q) || (e.username || '').toLowerCase().includes(q) || (e.email || '').toLowerCase().includes(q)) {
+        hits.push({ type: 'client', id: e._id, title: e.name, sub: e.email || `@${e.username}`, nav: '/team' });
       }
     });
 
@@ -120,7 +120,7 @@ export default function SearchPalette({ open, onClose }) {
           <input
             ref={inputRef}
             className="search-palette-input"
-            placeholder="Search clients, tasks, events, references..."
+            placeholder="Search employees, tasks, events, references..."
             value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -138,7 +138,7 @@ export default function SearchPalette({ open, onClose }) {
                 <span style={{ fontSize: 13, color: 'var(--text3)', fontWeight: 500 }}>Start typing to search across all data...</span>
               </div>
               <div style={{ display: 'flex', gap: 16, marginTop: 14, flexWrap: 'wrap' }}>
-                {[['Clients', '#10b981'], ['Tasks', '#f97316'], ['Events', '#3b82f6'], ['References', '#8b5cf6']].map(([label, color]) => (
+                {[['Employees', '#10b981'], ['Tasks', '#f97316'], ['Events', '#3b82f6'], ['References', '#8b5cf6']].map(([label, color]) => (
                   <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text3)' }}>
                     <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
                     {label}

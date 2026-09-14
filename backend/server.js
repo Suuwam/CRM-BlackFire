@@ -65,7 +65,7 @@ app.use(async (req, res, next) => {
 });
 
 // Routes
-app.use('/api/clients', require('./routes/clients'));
+app.use('/api/attendance', require('./routes/attendance'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/activity', require('./routes/activity'));

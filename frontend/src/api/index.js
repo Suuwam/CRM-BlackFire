@@ -37,6 +37,21 @@ export const authApi = {
   updateMe: (data) => api.put('/auth/me', data),
   forgotPassword: (data) => api.post('/auth/forgot-password', data),
   resetPassword: (data) => api.post('/auth/reset-password', data),
+  logout: () => api.post('/auth/logout'),
+  uploadPhoto: (file) => {
+    const fd = new FormData();
+    fd.append('photo', file);
+    return api.patch('/auth/me/photo', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+};
+
+export const attendanceApi = {
+  day: (date) => api.get('/attendance', { params: { date } }),
+  history: (params) => api.get('/attendance/history', { params }),
+  clockIn: () => api.post('/attendance/clock-in'),
+  clockOut: () => api.post('/attendance/clock-out'),
+  ping: () => api.post('/attendance/ping'),
+  note: (note) => api.post('/attendance/note', { note }),
 };
 
 export const activityApi = {
@@ -44,8 +59,7 @@ export const activityApi = {
 };
 
 export const emailApi = {
-  send: (data) => api.post('/email/send', data),
-  bulk: (data) => api.post('/email/bulk', data),
+  send: (data) => api.post('/email/bulk', data),   // one path, 1..n recipients
 };
 
 export const usersApi = {
@@ -57,19 +71,6 @@ export const usersApi = {
   approveApplication: (id) => api.post(`/users/applications/${id}/approve`),
   approveAllApplications: () => api.post('/users/applications/approve-all'),
   rejectApplication: (id) => api.post(`/users/applications/${id}/reject`),
-};
-
-export const clientsApi = {
-  list: () => api.get('/clients'),
-  get: (id) => api.get(`/clients/${id}`),
-  create: (data) => api.post('/clients', data),
-  update: (id, data) => api.put(`/clients/${id}`, data),
-  uploadPhoto: (id, file) => {
-    const fd = new FormData();
-    fd.append('photo', file);
-    return api.patch(`/clients/${id}/photo`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-  },
-  delete: (id) => api.delete(`/clients/${id}`),
 };
 
 export const eventsApi = {

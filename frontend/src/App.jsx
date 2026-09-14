@@ -4,7 +4,9 @@ import Sidebar from './components/Sidebar';
 import Toast from './components/Toast';
 import SearchPalette from './components/SearchPalette';
 import Dashboard from './pages/Dashboard';
-import Clients from './pages/Clients';
+import AdminDashboard from './pages/AdminDashboard';
+import Attendance from './pages/Attendance';
+import Team from './pages/Team';
 import Calendar from './pages/Calendar';
 import Email from './pages/Email';
 import References from './pages/References';
@@ -89,12 +91,14 @@ function AppShell() {
             <Route path="/assigned" element={<AssignedTasks />} />
             <Route path="/backlog" element={<Backlog />} />
             <Route path="/overdue" element={<Overdue />} />
-            <Route path="/clients" element={<Clients />} />
+            <Route path="/attendance" element={<Attendance />} />
+            <Route path="/team" element={<Team />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/email" element={<Email />} />
             <Route path="/references" element={<References />} />
             <Route path="/board" element={<Board />} />
-            <Route path="/accounts" element={<Accounts />} />
+            <Route path="/accounts" element={user.role === 'admin' ? <Accounts /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/admin" element={user.role === 'admin' ? <AdminDashboard /> : <Navigate to="/dashboard" replace />} />
           </Routes>
         </div>
         <Toast />

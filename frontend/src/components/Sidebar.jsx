@@ -21,10 +21,11 @@ function applyTheme(themeId) {
 
 const nav = [
   { to: '/dashboard',  label: 'Dashboard' },
+  { to: '/attendance', label: 'Attendance' },
+  { to: '/team',       label: 'Team' },
   { to: '/assigned',   label: 'Assigned Tasks' },
   { to: '/backlog',    label: 'Backlog' },
   { to: '/overdue',    label: 'Overdue' },
-  { to: '/clients',    label: 'Clients' },
   { to: '/calendar',   label: 'Calendar' },
   { to: '/email',      label: 'Email' },
   { to: '/references', label: 'Links' },
@@ -35,6 +36,7 @@ const boardNav = [
 ];
 
 const adminNav = [
+  { to: '/admin',    label: 'Admin Overview' },
   { to: '/accounts', label: 'Accounts' },
 ];
 
