@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import { fetcher } from '../api';
 import { AccountAvatar } from '../components/AccountPanel';
-import SocialIcon from '../components/SocialIcon';
-import { fmtDuration, isOnline, workedMinutes } from '../lib/time';
+import { fmtDuration, isOnline, workedMinutes, todayKey, shiftDay, SHIFT_MINUTES } from '../lib/time';
 
 const STATUSES = [
   { id: 'backlog', label: 'Backlog', color: '#3b82f6' },
@@ -14,6 +13,23 @@ const STATUSES = [
   { id: 'done', label: 'Done', color: '#10b981' },
   { id: 'cancelled', label: 'Cancelled', color: '#6b7280' },
 ];
+
+const PRIORITIES = [
+  { id: 'high', label: 'High', color: '#f97316' },
+  { id: 'medium', label: 'Medium', color: '#eab308' },
+  { id: 'low', label: 'Low', color: '#64748b' },
+];
+
+const MUTED = '#d4d4d8';
+const days = (offset, n) => Array.from({ length: n }, (_, i) => shiftDay(todayKey(), offset + i));
+const dayLabel = k => new Date(`${k}T12:00:00`).toLocaleDateString(undefined, { weekday: 'narrow' });
+const dayTitle = k => new Date(`${k}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+const isOpen = t => t.column !== 'done' && t.column !== 'cancelled';
+const nameOf = t => t.assigneeName || t.assignee;
+
+function Legend({ items }) {
+  return <ul className="chart-legend">{items.map(i => <li key={i.label}><span className="dot" style={{ background: i.color }} />{i.label}</li>)}</ul>;
+}
 
 function donutPath(cx, cy, radius, innerRadius, startAngle, endAngle) {
   const angleDiff = endAngle - startAngle;
@@ -28,7 +44,66 @@ function donutPath(cx, cy, radius, innerRadius, startAngle, endAngle) {
   return `M ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} L ${x3} ${y3} A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${x4} ${y4} Z`;
 }
 
-function TaskDonut({ tasks }) {
+function Panel({ title, sub, onClick, children, bodyClass = '' }) {
+  return (
+    <section className={`panel${onClick ? ' panel--link' : ''}`} onClick={onClick}>
+      <header className="panel-head">
+        <h2>{title}</h2>
+        <span className="panel-sub">{sub}</span>
+      </header>
+      <div className={`panel-body ${bodyClass}`}>{children}</div>
+    </section>
+  );
+}
+
+// Stacked vertical bars. rows: { key, label, title, segs: [{ v, color }] }
+function ColumnChart({ title, sub, data, legend, onClick }) {
+  const max = Math.max(...data.map(d => d.segs.reduce((a, s) => a + s.v, 0)), 1);
+  return (
+    <Panel title={title} sub={sub} onClick={onClick} bodyClass="col-body">
+      <div className="cols">
+        {data.map(d => {
+          const total = d.segs.reduce((a, s) => a + s.v, 0);
+          return (
+            <div key={d.key} className="col" title={`${d.title} · ${total}`}>
+              <span className="col-val">{total || ''}</span>
+              <span className="col-track">
+                <span className="col-stack" style={{ height: `${(total / max) * 100}%` }}>
+                  {d.segs.map((s, i) => s.v > 0 && <span key={i} style={{ flex: s.v, background: s.color }} />)}
+                </span>
+              </span>
+              <span className="col-label">{d.label}</span>
+            </div>
+          );
+        })}
+      </div>
+      {legend && <Legend items={legend} />}
+    </Panel>
+  );
+}
+
+// Stacked horizontal bars. rows: { key, label, avatar?, right, segs: [{ v, color }] }
+function BarRows({ title, sub, rows, legend, empty, onClick }) {
+  const max = Math.max(...rows.map(r => r.segs.reduce((a, s) => a + s.v, 0)), 1);
+  return (
+    <Panel title={title} sub={sub} onClick={onClick} bodyClass="scroll">
+      {rows.length === 0 && <div className="empty">{empty}</div>}
+      {rows.map(r => (
+        <div key={r.key} className="workload-row">
+          {r.avatar}
+          <span className="workload-name">{r.label}</span>
+          <div className="workload-bar">
+            {r.segs.map((s, i) => <span key={i} className="seg" style={{ width: `${(s.v / max) * 100}%`, background: s.color }} />)}
+          </div>
+          <span className="workload-count">{r.right}</span>
+        </div>
+      ))}
+      {legend && <Legend items={legend} />}
+    </Panel>
+  );
+}
+
+function TaskDonut({ tasks, onClick }) {
   const [hovered, setHovered] = useState(null);
   const data = STATUSES.map(s => ({ ...s, value: tasks.filter(t => (t.column || 'backlog') === s.id).length })).filter(d => d.value > 0);
   const total = data.reduce((a, d) => a + d.value, 0);
@@ -41,83 +116,40 @@ function TaskDonut({ tasks }) {
   });
 
   return (
-    <section className="panel">
-      <header className="panel-head">
-        <h2>Task Distribution</h2>
-        <span className="panel-sub">{total} tasks across the board</span>
-      </header>
-      <div className="panel-body donut-body">
-        {total === 0 ? <div className="empty">No tasks yet.</div> : (
-          <>
-            <div className="donut-wrap">
-              <svg viewBox="0 0 200 200">
-                {slices.map((s, i) => (
-                  <path
-                    key={s.id}
-                    d={donutPath(100, 100, hovered === i ? 88 : 82, 52, s.start, s.end)}
-                    fill={s.color}
-                    opacity={hovered === null || hovered === i ? 1 : 0.4}
-                    onMouseEnter={() => setHovered(i)}
-                    onMouseLeave={() => setHovered(null)}
-                  />
-                ))}
-              </svg>
-              <div className="donut-center">
-                <strong>{hovered === null ? total : slices[hovered].value}</strong>
-                <span>{hovered === null ? 'Total' : slices[hovered].label}</span>
-              </div>
-            </div>
-            <ul className="donut-legend">
+    <Panel title="Task Distribution" sub={`${total} tasks across the board`} onClick={onClick} bodyClass="donut-body">
+      {total === 0 ? <div className="empty">No tasks yet.</div> : (
+        <>
+          <div className="donut-wrap">
+            <svg viewBox="0 0 200 200">
               {slices.map((s, i) => (
-                <li key={s.id} onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)} className={hovered === i ? 'on' : ''}>
-                  <span className="dot" style={{ background: s.color }} />
-                  <span className="legend-label">{s.label}</span>
-                  <span className="legend-value">{s.value}</span>
-                  <span className="legend-pct">{s.pct}%</span>
-                </li>
+                <path
+                  key={s.id}
+                  d={donutPath(100, 100, hovered === i ? 88 : 82, 52, s.start, s.end)}
+                  fill={s.color}
+                  opacity={hovered === null || hovered === i ? 1 : 0.4}
+                  onMouseEnter={() => setHovered(i)}
+                  onMouseLeave={() => setHovered(null)}
+                />
               ))}
-            </ul>
-          </>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function Workload({ tasks, users }) {
-  const data = users
-    .filter(u => u.active !== false)
-    .map(u => ({
-      user: u,
-      open: tasks.filter(t => (t.assigneeName || t.assignee) === u.name && t.column !== 'done' && t.column !== 'cancelled').length,
-      done: tasks.filter(t => (t.assigneeName || t.assignee) === u.name && t.column === 'done').length,
-    }))
-    .filter(d => d.open + d.done > 0)
-    .sort((a, b) => b.open - a.open);
-
-  const max = Math.max(...data.map(d => d.open + d.done), 1);
-
-  return (
-    <section className="panel">
-      <header className="panel-head">
-        <h2>Workload</h2>
-        <span className="panel-sub">Open vs done per employee</span>
-      </header>
-      <div className="panel-body scroll">
-        {data.length === 0 && <div className="empty">Nothing assigned yet.</div>}
-        {data.map(d => (
-          <div key={d.user._id} className="workload-row">
-            <AccountAvatar name={d.user.name} photo={d.user.photo} size={26} />
-            <span className="workload-name">{d.user.name}</span>
-            <div className="workload-bar">
-              <span className="seg open" style={{ width: `${(d.open / max) * 100}%` }} />
-              <span className="seg done" style={{ width: `${(d.done / max) * 100}%` }} />
+            </svg>
+            <div className="donut-center">
+              <strong>{hovered === null ? total : slices[hovered].value}</strong>
+              <span>{hovered === null ? 'Total' : slices[hovered].label}</span>
             </div>
-            <span className="workload-count">{d.open}<span className="text-muted">/{d.open + d.done}</span></span>
           </div>
-        ))}
-      </div>
-    </section>
+          <ul className="donut-legend">
+            {slices.map((s, i) => (
+              <li key={s.id} onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)} className={hovered === i ? 'on' : ''}>
+                <span className="dot" style={{ background: s.color }} />
+                <span className="legend-label">{s.label}</span>
+                <span className="legend-value">{s.value}</span>
+                <span className="legend-pct">{s.pct}%</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </Panel>
   );
 }
 
@@ -128,8 +160,7 @@ export default function Dashboard() {
   const { data: users = [] } = useSWR('/users', fetcher, { revalidateOnFocus: false });
   const { data: attendance } = useSWR('/attendance', fetcher, { refreshInterval: 60000 });
 
-  const today = new Date().toISOString().slice(0, 10);
-  const upcoming = allEvents.filter(e => e.date >= today).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 12);
+  const today = todayKey();
   const overdue = allEvents.filter(e => e.date < today && e.status !== 'done' && e.status !== 'cancelled').length
     + tasks.filter(t => t.dueDate && t.dueDate < today && t.column !== 'done').length;
 
@@ -142,7 +173,62 @@ export default function Dashboard() {
   const done = tasks.filter(t => t.column === 'done').length;
   const completion = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
 
-  const fmtDate = d => new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  // 1 — workload per employee
+  const workload = users
+    .filter(u => u.active !== false)
+    .map(u => ({
+      user: u,
+      open: tasks.filter(t => nameOf(t) === u.name && isOpen(t)).length,
+      done: tasks.filter(t => nameOf(t) === u.name && t.column === 'done').length,
+    }))
+    .filter(d => d.open + d.done > 0)
+    .sort((a, b) => b.open - a.open)
+    .map(d => ({
+      key: d.user._id,
+      label: d.user.name,
+      avatar: <AccountAvatar name={d.user.name} photo={d.user.photo} size={26} />,
+      right: <>{d.open}<span className="text-muted">/{d.open + d.done}</span></>,
+      segs: [{ v: d.open, color: '#f97316' }, { v: d.done, color: '#86efac' }],
+    }));
+
+  // 2 — throughput, tasks finished per day
+  // ponytail: no completedAt on Task, so updatedAt stands in — a late edit to a done task shifts its bar.
+  const throughput = days(-6, 7).map(k => ({
+    key: k, label: dayLabel(k), title: dayTitle(k),
+    segs: [{ v: tasks.filter(t => t.column === 'done' && String(t.updatedAt).slice(0, 10) === k).length, color: '#10b981' }],
+  }));
+
+  // 3 — what is booked for the week ahead
+  const schedule = days(0, 7).map(k => ({
+    key: k, label: dayLabel(k), title: dayTitle(k),
+    segs: [
+      { v: allEvents.filter(e => e.date === k && e.status !== 'cancelled').length, color: '#3b82f6' },
+      { v: tasks.filter(t => t.dueDate === k && isOpen(t)).length, color: '#8b5cf6' },
+    ],
+  }));
+
+  // 4 — priority mix, overdue called out
+  const priority = PRIORITIES.map(p => {
+    const of = tasks.filter(t => (t.priority || 'medium') === p.id);
+    const late = of.filter(t => isOpen(t) && t.dueDate && t.dueDate < today).length;
+    const open = of.filter(isOpen).length - late;
+    return {
+      key: p.id, label: p.label, right: open + late,
+      segs: [{ v: late, color: '#ef4444' }, { v: open, color: p.color }, { v: of.filter(t => t.column === 'done').length, color: MUTED }],
+    };
+  });
+
+  // 5 — hours clocked today, overtime past the shift
+  const hours = rows.filter(r => r.clockIn).map(r => {
+    const worked = workedMinutes(r);
+    const u = users.find(x => String(x._id) === String(r.userId));
+    return {
+      key: r._id, label: r.userName || u?.name || 'Unknown',
+      avatar: <AccountAvatar name={r.userName || u?.name} photo={u?.photo} size={26} />,
+      right: fmtDuration(worked),
+      segs: [{ v: Math.min(worked, SHIFT_MINUTES), color: '#16a34a' }, { v: Math.max(0, worked - SHIFT_MINUTES), color: '#f59e0b' }],
+    };
+  }).sort((a, b) => b.segs[0].v + b.segs[1].v - a.segs[0].v - a.segs[1].v);
 
   return (
     <div className="dash-page">
@@ -183,30 +269,31 @@ export default function Dashboard() {
         </div>
 
         <div className="dash-panels">
-          <TaskDonut tasks={tasks} />
-          <Workload tasks={tasks} users={users} />
-          <section className="panel">
-            <header className="panel-head">
-              <h2>Upcoming</h2>
-              <span className="panel-sub">Next scheduled work</span>
-            </header>
-            <div className="panel-body scroll">
-              {upcoming.length === 0 && <div className="empty">Nothing scheduled.</div>}
-              {upcoming.map(ev => (
-                <div key={ev._id} className="upcoming-item" onClick={() => navigate('/calendar')}>
-                  <span className="up-dot" style={{ background: { blue: '#3b82f6', green: '#10b981', amber: '#f59e0b', purple: '#8b5cf6', red: '#ef4444', pink: '#ec4899' }[ev.color] || '#71717a' }} />
-                  <div className="up-info">
-                    <div className="up-title">{ev.title}</div>
-                    <div className="up-meta">
-                      {ev.time && <span>{ev.time}</span>}
-                      {(ev.platforms || []).map(p => <SocialIcon key={p} id={p} size={12} />)}
-                    </div>
-                  </div>
-                  <div className="up-date">{fmtDate(ev.date)}</div>
-                </div>
-              ))}
-            </div>
-          </section>
+          <TaskDonut tasks={tasks} onClick={() => navigate('/board')} />
+          <BarRows
+            title="Workload" sub="Open vs done per employee" rows={workload}
+            empty="Nothing assigned yet." onClick={() => navigate('/assigned')}
+            legend={[{ label: 'Open', color: '#f97316' }, { label: 'Done', color: '#86efac' }]}
+          />
+          <ColumnChart
+            title="Throughput" sub="Tasks completed, last 7 days" data={throughput}
+            onClick={() => navigate('/board')}
+          />
+          <BarRows
+            title="Priority mix" sub="Open work by priority" rows={priority}
+            empty="No tasks yet." onClick={() => navigate('/backlog')}
+            legend={[{ label: 'Overdue', color: '#ef4444' }, { label: 'Open', color: '#eab308' }, { label: 'Done', color: MUTED }]}
+          />
+          <BarRows
+            title="Hours today" sub={`Clocked time vs ${fmtDuration(SHIFT_MINUTES)} shift`} rows={hours}
+            empty="Nobody clocked in yet." onClick={() => navigate('/attendance')}
+            legend={[{ label: 'Worked', color: '#16a34a' }, { label: 'Overtime', color: '#f59e0b' }]}
+          />
+          <ColumnChart
+            title="Week ahead" sub="Scheduled events & task due dates" data={schedule}
+            onClick={() => navigate('/calendar')}
+            legend={[{ label: 'Events', color: '#3b82f6' }, { label: 'Tasks due', color: '#8b5cf6' }]}
+          />
         </div>
       </div>
     </div>

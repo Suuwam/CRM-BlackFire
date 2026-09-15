@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import AccountPanel, { AccountAvatar } from './AccountPanel';
 import ClockWidget from './ClockWidget';
+import ThemeToggle from './ThemeToggle';
 import { useAuth } from '../context/AuthContext';
 
 export default function TopBar() {
@@ -11,6 +12,7 @@ export default function TopBar() {
   return (
     <>
       <div className="app-account-wrap">
+        <ThemeToggle />
         <ClockWidget />
         <AccountAvatar
           name={user.name}

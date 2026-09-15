@@ -1,23 +1,5 @@
-import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import NotificationBell from './NotificationBell';
-
-const THEMES = [
-  { id: 'light', label: 'Light', bg: '#f8f8f9', dot: '#18181b' },
-  { id: 'dark',  label: 'Dark',  bg: '#111113', dot: '#f0f0f2' },
-];
-
-function normalizeTheme(themeId) {
-  return themeId === 'dark' ? 'dark' : 'light';
-}
-
-function applyTheme(themeId) {
-  const id = normalizeTheme(themeId);
-  const root = document.documentElement;
-  root.classList.remove('dark', 'theme-ocean', 'theme-dusk');
-  if (id === 'dark') root.classList.add('dark');
-  localStorage.setItem('theme', id);
-}
 
 const nav = [
   { to: '/dashboard',  label: 'Dashboard' },
@@ -41,20 +23,6 @@ const adminNav = [
 ];
 
 export default function Sidebar({ user, onLogout, routeLoading, onSearchOpen }) {
-  const [theme, setTheme] = useState(() => {
-    const saved = localStorage.getItem('theme');
-    return saved === 'dark' ? 'dark' : 'light';
-  });
-
-  // Apply theme on mount and on change
-  useEffect(() => {
-    applyTheme(theme);
-  }, [theme]);
-
-  function switchTheme(id) {
-    setTheme(id);
-  }
-
   return (
     <aside className="sidebar">
       <div className="sb-brand">
@@ -69,31 +37,6 @@ export default function Sidebar({ user, onLogout, routeLoading, onSearchOpen }) 
             </div>
           </div>
         )}
-
-        {/* Theme Switcher */}
-        <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--text3)', marginBottom: 6 }}>Theme</div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {THEMES.map(t => (
-              <button
-                key={t.id}
-                title={t.label}
-                onClick={() => switchTheme(t.id)}
-                style={{
-                  width: 26, height: 26, borderRadius: '50%', padding: 0, cursor: 'pointer',
-                  background: t.bg,
-                  border: theme === t.id ? '2.5px solid var(--accent)' : '2px solid var(--border)',
-                  boxShadow: theme === t.id ? '0 0 0 2px var(--border2)' : 'none',
-                  transition: 'all 0.18s ease',
-                  position: 'relative',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: t.dot }} />
-              </button>
-            ))}
-          </div>
-        </div>
 
         {/* Search Shortcut */}
         {onSearchOpen && (
