@@ -2,7 +2,7 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '../api';
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 7;
 
 export default function Backlog() {
   const { data: activities = [] } = useSWR('/activity?days=50', fetcher, { revalidateOnFocus: false });
