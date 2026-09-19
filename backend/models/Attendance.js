@@ -10,10 +10,15 @@ const attendanceSchema = new mongoose.Schema({
   clockOut: { type: Date, default: null },
   lastSeen: { type: Date, default: null },
   note:     { type: String, default: '' },
+  // Set when the sweep closed this row because the heartbeat stopped, rather than the
+  // person clicking Clock out. Only an auto-closed row may be resumed by a heartbeat.
+  autoClosed: { type: Boolean, default: false },
 }, { timestamps: true });
 
 attendanceSchema.index({ userId: 1, date: 1 }, { unique: true });
 // The team-day view and admin history both range-scan on date alone.
 attendanceSchema.index({ date: 1 });
+// The auto clock-out sweep looks for open rows that have gone quiet.
+attendanceSchema.index({ clockOut: 1, lastSeen: 1 });
 
 module.exports = mongoose.model('Attendance', attendanceSchema);
