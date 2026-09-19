@@ -337,24 +337,8 @@ button.account-avatar:hover { transform: scale(1.06); box-shadow: 0 0 0 3px rgba
 .cal-ev-action-btn--danger:hover { background: #dc2626; color: #fff; border-color: #dc2626; }
 
 /* Aawazz Section Branding & Theme */
-.aawazz-banner { background: #0f172a; border: 1px solid #334155; border-radius: var(--r); padding: 18px 24px; margin-bottom: 22px; color: #fff; display: flex; align-items: center; justify-content: space-between; gap: 20px; box-shadow: 0 4px 20px rgba(37,99,235,0.15); position: relative; overflow: hidden; }
-.aawazz-banner::after { display: none; }
-.aawazz-logo-wrap { display: flex; align-items: center; gap: 10px; }
-.aawazz-logo-text { font-size: 26px; font-weight: 800; tracking: -0.5px; color: #ffffff; display: inline-flex; align-items: center; font-family: 'Inter', sans-serif; }
-.aawazz-wave-svg { width: 34px; height: 34px; color: #2563eb; display: inline-block; vertical-align: middle; margin: 0 1px; }
-.aawazz-slogan { font-size: 15px; font-weight: 700; color: #f8fafc; margin-top: 4px; letter-spacing: -0.3px; }
-.aawazz-highlight { color: #3b82f6; font-weight: 800; }
-.aawazz-badge { background: rgba(37,99,235,0.2); border: 1px solid rgba(59,130,246,0.4); color: #60a5fa; font-size: 11.5px; font-weight: 650; padding: 4px 12px; border-radius: 20px; letter-spacing: .4px; text-transform: uppercase; }
 
 /* Blackfire AI Section Branding & Theme */
-.blackfire-banner { background: #18181b; border: 1px solid #27272a; border-radius: var(--r); padding: 18px 24px; margin-bottom: 22px; color: #fff; display: flex; align-items: center; justify-content: space-between; gap: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); position: relative; overflow: hidden; }
-.blackfire-banner::after { display: none; }
-.blackfire-logo-wrap { display: flex; align-items: center; gap: 10px; }
-.blackfire-logo-text { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; color: #ffffff; display: inline-flex; align-items: center; font-family: 'Inter', sans-serif; gap: 8px; }
-.blackfire-flame-svg { width: 28px; height: 28px; color: #f97316; display: inline-block; vertical-align: middle; }
-.blackfire-slogan { font-size: 14.5px; font-weight: 600; color: #a1a1aa; margin-top: 4px; letter-spacing: -0.2px; }
-.blackfire-highlight { color: #f97316; font-weight: 700; }
-.blackfire-badge { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #f4f4f5; font-size: 11px; font-weight: 650; padding: 4px 12px; border-radius: 20px; letter-spacing: .4px; text-transform: uppercase; }
 
 /* Kanban Card Image Thumbnail */
 .k-card-img-wrap { margin-bottom: 10px; border-radius: var(--r-sm); overflow: hidden; max-height: 150px; border: 1px solid var(--border); }
@@ -965,8 +949,6 @@ button:active, .btn:active, .sb-item:active, .client-card:active, .board-tab:act
   .board-tab { flex-shrink: 0; }
   
   /* Banners */
-  .aawazz-banner { flex-direction: column; text-align: center; padding: 16px; }
-  .aawazz-banner > div:last-child { margin-top: 12px; width: 100%; display: flex; justify-content: center; }
   
   /* References & Clients */
   .ref-grid { grid-template-columns: 1fr; gap: 14px; }
@@ -1214,3 +1196,12 @@ button.stat-card { display: block; width: 100%; cursor: pointer; }
   .clock-widget-label { display: none; }
   .app-account-wrap { padding: 10px 16px; }
 }
+
+/* Board header — one rule for every board; the accent is the board's own color. */
+.board-banner { background: #18181b; border-radius: var(--r); padding: 18px 24px; margin-bottom: 22px; color: #fff; display: flex; align-items: center; justify-content: space-between; gap: 20px; box-shadow: 0 4px 20px rgba(0,0,0,.18); }
+.board-banner-title { font-size: 24px; font-weight: 800; letter-spacing: -.5px; line-height: 1.2; }
+.board-banner-sub { font-size: 13px; font-weight: 550; opacity: .75; margin-top: 4px; }
+.board-banner-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.board-move-btn { width: 30px; height: 30px; border-radius: 8px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.25); color: #fff; font-size: 14px; cursor: pointer; transition: all var(--transition); }
+.board-move-btn:hover:not(:disabled) { background: rgba(255,255,255,.28); }
+.board-move-btn:disabled { opacity: .3; cursor: not-allowed; }

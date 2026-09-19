@@ -72,6 +72,7 @@ app.use('/api/activity', require('./routes/activity'));
 app.use('/api/events', require('./routes/events'));
 app.use('/api/templates', require('./routes/templates'));
 app.use('/api/references', require('./routes/references'));
+app.use('/api/boards', require('./routes/boards'));
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/email', require('./routes/email'));
 

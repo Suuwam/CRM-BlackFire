@@ -164,7 +164,7 @@ export default function AssignedTasks() {
             const isDone = task.column === 'done';
             return (
               <div key={task._id} className={`assigned-item${isDone ? ' is-done' : ''}`}>
-                <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => navigate(`/board?project=${task.project || 'blackfire'}`)}>
+                <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => navigate(`/board?project=${task.project}`)}>
                   <div className="assigned-title" style={{ textDecoration: isDone ? 'line-through' : 'none' }}>{task.title}</div>
                   <div className="assigned-meta">
                     <span className="assigned-pill">

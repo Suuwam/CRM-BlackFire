@@ -1,22 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import useSWR, { mutate } from 'swr';
-import { tasksApi, fetcher } from '../api';
+import { tasksApi, boardsApi, fetcher } from '../api';
+import { resolveColumnIds } from './boardColumns';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 
-const DEFAULT_PROJECTS = [
-  { id: 'blackfire', label: 'Blackfire AI', color: '#18181b', dot: '#18181b' },
-  { id: 'aawazz',   label: 'Aawazz Product', color: '#2563eb', dot: '#2563eb' },
-];
-
-const DEFAULT_COLUMNS = [
+// Starting stages for a brand new board. Every board is a row in the DB from here on —
+// there are no built-in boards and no per-board styling.
+const NEW_BOARD_COLUMNS = [
   { id: 'backlog',    label: 'Backlog' },
   { id: 'todo',       label: 'To Do' },
   { id: 'inprogress', label: 'In Progress' },
-  { id: 'qa',         label: 'QA / Review' },
   { id: 'done',       label: 'Done' },
-  { id: 'cancelled',  label: 'Cancelled' },
 ];
 
 const COLORS = [
@@ -51,7 +48,8 @@ function clearDraft(taskId) { try { sessionStorage.removeItem(getDraftKey(taskId
 
 export default function Board() {
   const { user } = useAuth();
-  const [project, setProject] = useState('aawazz');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [project, setProject] = useState(searchParams.get('project') || '');
   const [modal, setModal]     = useState(false);
   const [form, setForm]       = useState(EMPTY_TASK);
   const [editCol, setEditCol] = useState('backlog');
@@ -66,25 +64,28 @@ export default function Board() {
   const dragId = useRef(null);
   const toast = useToast();
 
-  // Custom boards state
-  const [customProjects, setCustomProjects] = useState(() => {
-    try {
-      const saved = localStorage.getItem('crm_custom_boards');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const { data: boards = [], isLoading: boardsLoading } = useSWR('/boards', fetcher, { revalidateOnFocus: false });
+  const activeProject = boards.find(p => p._id === project) || null;
+  const columns = activeProject?.columns || [];
+  const hasColumn = id => columns.some(c => c.id === id);
 
-  const allProjects = [...DEFAULT_PROJECTS, ...customProjects];
-  const activeProject = allProjects.find(p => p.id === project) || DEFAULT_PROJECTS[0];
-  const columns = activeProject.columns || DEFAULT_COLUMNS;
+  // Land on the first board, or on ?project= when another page linked here.
+  useEffect(() => {
+    if (!boards.length) return;
+    if (!boards.some(b => b._id === project)) setProject(boards[0]._id);
+  }, [boards, project]);
+
+  function selectProject(id) {
+    setProject(id);
+    setSearchParams(prev => { prev.set('project', id); return prev; }, { replace: true });
+  }
 
   // Board design settings state
   const [designModal, setDesignModal] = useState(false);
   const [designBoard, setDesignBoard] = useState({ id: '', label: '', color: 'blue', columns: [] });
+  const [boardSaving, setBoardSaving] = useState(false);
 
-  const swrKey = `/tasks?project=${project}`;
+  const swrKey = project ? `/tasks?project=${project}` : null;
   const { data: tasks = [], isLoading } = useSWR(swrKey, fetcher, {
     keepPreviousData: true,
     revalidateOnFocus: false,
@@ -231,80 +232,78 @@ export default function Board() {
     mutate(swrKey);
   }
 
-  // Board design actions
+  // Board design actions — every board is editable, including the two seeded ones.
   function openAddBoard() {
-    setDesignBoard({
-      id: '',
-      label: '',
-      color: 'blue',
-      columns: [
-        { id: 'backlog', label: 'Backlog' },
-        { id: 'todo', label: 'To Do' },
-        { id: 'inprogress', label: 'In Progress' },
-        { id: 'done', label: 'Done' }
-      ]
-    });
+    setDesignBoard({ id: '', label: '', color: 'blue', columns: NEW_BOARD_COLUMNS.map(c => ({ ...c })) });
     setDesignModal(true);
   }
 
   function openEditBoard(boardId) {
-    const b = customProjects.find(p => p.id === boardId);
+    const b = boards.find(p => p._id === boardId);
     if (!b) return;
     setDesignBoard({
-      id: b.id,
+      id: b._id,
       label: b.label,
       color: COLORS.find(c => c.hex === b.color)?.id || 'blue',
-      columns: b.columns ? [...b.columns] : [...DEFAULT_COLUMNS]
+      columns: (b.columns || []).map(c => ({ ...c })),
     });
     setDesignModal(true);
   }
 
-  function saveBoard() {
+  async function saveBoard() {
+    if (boardSaving) return;
     if (!designBoard.label.trim()) return toast('Board name required', 'error');
-    if (!designBoard.columns.length) return toast('At least one column is required', 'error');
+    if (!designBoard.columns.length) return toast('At least one stage is required', 'error');
+    if (designBoard.columns.some(c => !c.label.trim())) return toast('Every stage needs a name', 'error');
 
-    let updatedCustom;
-    const colorHex = COLORS.find(c => c.id === designBoard.color)?.hex || '#3b82f6';
-    if (designBoard.id) {
-      updatedCustom = customProjects.map(p => {
-        if (p.id === designBoard.id) {
-          return {
-            ...p,
-            label: designBoard.label.trim(),
-            color: colorHex,
-            dot: colorHex,
-            columns: designBoard.columns
-          };
-        }
-        return p;
-      });
-      toast('Board layout updated', 'success');
-    } else {
-      const newId = 'board_' + Date.now();
-      const newBoard = {
-        id: newId,
-        label: designBoard.label.trim(),
-        color: colorHex,
-        dot: colorHex,
-        columns: designBoard.columns
-      };
-      updatedCustom = [...customProjects, newBoard];
-      setProject(newId);
-      toast('Board created', 'success');
-    }
-    setCustomProjects(updatedCustom);
-    localStorage.setItem('crm_custom_boards', JSON.stringify(updatedCustom));
-    setDesignModal(false);
+    const saved = boards.find(b => b._id === designBoard.id);
+    const payload = {
+      label: designBoard.label.trim(),
+      color: COLORS.find(c => c.id === designBoard.color)?.hex || '#3b82f6',
+      columns: resolveColumnIds(designBoard.columns, saved?.columns || []),
+    };
+    setBoardSaving(true);
+    try {
+      if (designBoard.id) {
+        await boardsApi.update(designBoard.id, payload);
+        toast('Board layout updated', 'success');
+      } else {
+        const res = await boardsApi.create(payload);
+        toast('Board created', 'success');
+        selectProject(res.data._id);
+      }
+      await mutate('/boards');
+      mutate(swrKey);
+      setDesignModal(false);
+    } catch (err) {
+      toast(err?.response?.data?.error || 'Could not save board', 'error');
+    } finally { setBoardSaving(false); }
   }
 
-  function deleteBoard(boardId) {
-    if (!window.confirm('Are you sure you want to delete this board? Tasks will remain in the database but won\'t be visible here.')) return;
-    const updatedCustom = customProjects.filter(p => p.id !== boardId);
-    setCustomProjects(updatedCustom);
-    localStorage.setItem('crm_custom_boards', JSON.stringify(updatedCustom));
-    setProject('aawazz');
-    setDesignModal(false);
-    toast('Board deleted', 'success');
+  async function deleteBoard(boardId) {
+    if (!window.confirm('Delete this board? Its tasks stay in the database but will no longer be visible here.')) return;
+    try {
+      await boardsApi.delete(boardId);
+      const rest = await mutate('/boards');
+      setDesignModal(false);
+      if (rest?.length) selectProject(rest[0]._id);
+      toast('Board deleted', 'success');
+    } catch (err) {
+      toast(err?.response?.data?.error || 'Could not delete board', 'error');
+    }
+  }
+
+  // Tab order lives on the server so everyone sees the same board order.
+  async function moveBoard(boardId, direction) {
+    const ids = boards.map(b => b._id);
+    const from = ids.indexOf(boardId);
+    const to = from + direction;
+    if (from < 0 || to < 0 || to >= ids.length) return;
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    try {
+      const res = await boardsApi.reorder(ids);
+      mutate('/boards', res.data, false);
+    } catch { toast('Could not reorder boards', 'error'); }
   }
 
   function handleColumnNameChange(index, newName) {
@@ -317,10 +316,9 @@ export default function Board() {
 
   function addColumnToDesign() {
     setDesignBoard(prev => {
-      const newColId = 'col_' + Date.now() + '_' + prev.columns.length;
       return {
         ...prev,
-        columns: [...prev.columns, { id: newColId, label: 'New Stage' }]
+        columns: [...prev.columns, { id: `draft_${Date.now()}_${prev.columns.length}`, label: 'New Stage' }]
       };
     });
   }
@@ -345,7 +343,6 @@ export default function Board() {
   }
 
   function colTasks(col) { return tasks.filter(t => t.column === col); }
-  const isAawazz = project === 'aawazz';
   const getAssigneeLabel = (task) => task.assigneeName || task.assignee || 'Unassigned';
   const getAssignedByLabel = (task) => task.assignedByName || 'System';
 
@@ -354,7 +351,7 @@ export default function Board() {
       <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
         <div><h1>Project Board</h1><p>Task tracking with color coding & cover image attachments</p></div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {customProjects.some(p => p.id === project) && (
+          {activeProject && (
             <button className="btn btn-secondary btn-sm" onClick={() => openEditBoard(project)}>
               Design Layout
             </button>
@@ -372,13 +369,13 @@ export default function Board() {
         )}
         {/* Project tabs */}
         <div className="board-tabs" style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%', overflowX: 'auto', marginBottom: 12 }}>
-          {allProjects.map(p => (
-            <button key={p.id} className={`board-tab${project===p.id?' active':''}`} onClick={() => setProject(p.id)}
-              style={project===p.id ? { background: p.color || '#2563eb', borderColor: p.color || '#2563eb', color: '#fff' } : {}}>
-              {(project === p.id && isLoading) ? (
+          {boards.map(p => (
+            <button key={p._id} className={`board-tab${project===p._id?' active':''}`} onClick={() => selectProject(p._id)}
+              style={project===p._id ? { background: p.color, borderColor: p.color, color: '#fff' } : {}}>
+              {(project === p._id && isLoading) ? (
                 <div style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'authSpin 0.6s linear infinite' }} />
               ) : (
-                <span className="proj-dot" style={{ background: project===p.id ? '#fff' : (p.dot || p.color || '#2563eb') }} />
+                <span className="proj-dot" style={{ background: project===p._id ? '#fff' : p.color }} />
               )}
               {p.label}
             </button>
@@ -393,60 +390,34 @@ export default function Board() {
           </button>
         </div>
 
-        {/* Dedicated Blackfire AI Header Banner */}
-        {project === 'blackfire' && (
-          <div className="blackfire-banner">
+        {/* Board header — same markup for every board, accent comes from the board itself */}
+        {activeProject && (
+          <div className="board-banner" style={{ background: activeProject.color }}>
             <div>
-              <div className="blackfire-logo-wrap">
-                <span className="blackfire-logo-text">
-                  <svg className="blackfire-flame-svg" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 23c-4.97 0-9-3.58-9-8 0-3.08 1.87-6.26 4.36-8.8.44-.45 1.18-.13 1.15.5-.1 1.76.35 3.3 1.49 4.3 1.14 1 2.5 1.5 2.5 3 0 1.1-.9 2-2 2 .55 1.1 1.6 2 3 2s2.45-.9 3-2c-1.1 0-2-.9-2-2 0-1.5 1.36-2 2.5-3 1.14-1 1.59-2.54 1.49-4.3-.03-.63.71-.95 1.15-.5C21.13 8.74 23 11.92 23 15c0 4.42-4.03 8-9 8z"/>
-                  </svg>
-                  Blackfire AI
-                </span>
-              </div>
-              <div className="blackfire-slogan">
-                Blackfire AI, ignite intelligence, <span className="blackfire-highlight">from concept to launch</span>.
-              </div>
+              <div className="board-banner-title">{activeProject.label}</div>
+              <div className="board-banner-sub">{columns.length} stage{columns.length === 1 ? '' : 's'} · {tasks.length} task{tasks.length === 1 ? '' : 's'}</div>
             </div>
-            <div style={{ textAlign:'right', flexShrink:0 }}>
-              <span className="text-sm" style={{ opacity:.85, fontWeight:550 }}>Venture & AI Engine</span>
-            </div>
-          </div>
-        )}
-
-        {/* Dedicated Aawazz Header Banner */}
-        {isAawazz && (
-          <div className="aawazz-banner">
-            <div>
-              <div className="aawazz-logo-wrap">
-                <span className="aawazz-logo-text">
-                  aa
-                  <svg className="aawazz-wave-svg" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M 10 50 Q 30 10 50 50 T 90 50" />
-                  </svg>
-                  wazz
-                </span>
-              </div>
-              <div className="aawazz-slogan">
-                Aawazz, say it your way, <span className="aawazz-highlight">script to sound</span> made for creators.
-              </div>
-            </div>
-            <div style={{ textAlign:'right', flexShrink:0 }}>
-              <span className="text-sm" style={{ opacity:.85, fontWeight:550 }}>Audio AI Platform</span>
+            <div className="board-banner-actions">
+              <button className="board-move-btn" onClick={() => moveBoard(project, -1)} disabled={boards[0]?._id === project} title="Move board left">←</button>
+              <button className="board-move-btn" onClick={() => moveBoard(project, 1)} disabled={boards[boards.length - 1]?._id === project} title="Move board right">→</button>
             </div>
           </div>
         )}
 
         {/* Kanban board */}
         <div className="kanban-wrapper" style={{ position: 'relative', minHeight: '50vh' }}>
+          {!boardsLoading && !boards.length && (
+            <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text3)', fontSize: 13 }}>
+              No boards yet. Use <strong>+ Add Board</strong> above to create one.
+            </div>
+          )}
           <div className="kanban">
             {columns.map(col => {
               const ct = colTasks(col.id);
             return (
               <div key={col.id} className="col">
                 <div className="col-head">
-                  <span className="col-name" style={isAawazz ? { color: '#2563eb' } : {}}>{col.label}</span>
+                  <span className="col-name">{col.label}</span>
                   <span className="col-count">{ct.length}</span>
                 </div>
                 <div
@@ -473,7 +444,7 @@ export default function Board() {
                       <div className="k-card-foot" style={{ alignItems: 'flex-start' }}>
                         <div style={{ display:'flex', flexDirection:'column', gap:6, flex:1 }}>
                           <div className="k-card-tags">
-                            {(t.tags||[]).map(tg => <span key={tg} className="k-tag" style={isAawazz ? { background: '#eff6ff', color: '#1d4ed8', borderColor: '#bfdbfe' } : {}}>{tg}</span>)}
+                            {(t.tags||[]).map(tg => <span key={tg} className="k-tag">{tg}</span>)}
                           </div>
                           <div style={{ display:'flex', gap:8, fontSize:11, flexWrap: 'wrap' }}>
                             <span className="text-muted" style={{ fontWeight: 500 }}>By: {getAssignedByLabel(t)}</span>
@@ -493,14 +464,14 @@ export default function Board() {
                       </div>
 
                       <div className="k-card-actions">
-                        {t.column !== 'done' && <button className="k-card-btn k-card-btn--done" onClick={(e) => { e.stopPropagation(); markTaskDone(t._id); }}>Done</button>}
-                        {t.column !== 'cancelled' && <button className="k-card-btn k-card-btn--cancel" onClick={(e) => { e.stopPropagation(); cancelTask(t._id); }}>Cancel</button>}
+                        {hasColumn('done') && t.column !== 'done' && <button className="k-card-btn k-card-btn--done" onClick={(e) => { e.stopPropagation(); markTaskDone(t._id); }}>Done</button>}
+                        {hasColumn('cancelled') && t.column !== 'cancelled' && <button className="k-card-btn k-card-btn--cancel" onClick={(e) => { e.stopPropagation(); cancelTask(t._id); }}>Cancel</button>}
                         <button className="k-card-btn k-card-btn--edit" onClick={(e) => { e.stopPropagation(); openEdit(t); }}>Edit</button>
                         <button className="k-card-btn k-card-btn--delete" onClick={(e) => { e.stopPropagation(); del(t._id); }}>Delete</button>
                       </div>
                     </div>
                   ))}
-                  <button className="add-card-btn" onClick={() => openAdd(col.id)} style={isAawazz ? { color: '#2563eb', borderColor: '#93c5fd' } : {}}>
+                  <button className="add-card-btn" onClick={() => openAdd(col.id)}>
                     <span style={{ fontSize:14 }}>+</span> Add card
                   </button>
                 </div>
@@ -512,7 +483,7 @@ export default function Board() {
       </div>
 
       <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Task' : `Add to ${columns.find(c=>c.id===editCol)?.label || 'Stage'}`}
-        footer={<><button className="btn btn-secondary" onClick={() => setModal(false)}>Cancel</button><button className="btn btn-primary" onClick={save} disabled={saving} style={isAawazz ? { background: '#2563eb', borderColor: '#2563eb' } : {}}>{saving ? 'Saving...' : 'Save'}</button></>}>
+        footer={<><button className="btn btn-secondary" onClick={() => setModal(false)}>Cancel</button><button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button></>}>
         <div className="form-group"><label>Title *</label><input value={form.title} onChange={e => setForm(f=>({...f,title:e.target.value}))} placeholder="Task title" /></div>
         
         {/* Task Color Coding Selector */}
@@ -741,12 +712,12 @@ export default function Board() {
       <Modal open={designModal} onClose={() => setDesignModal(false)} title={designBoard.id ? 'Edit Board Layout' : 'Create New Board'}
         footer={
           <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-            {designBoard.id ? (
+            {designBoard.id && boards.length > 1 ? (
               <button className="btn btn-danger" onClick={() => deleteBoard(designBoard.id)}>Delete Board</button>
             ) : <div />}
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn btn-secondary" onClick={() => setDesignModal(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={saveBoard}>Save Board</button>
+              <button className="btn btn-primary" onClick={saveBoard} disabled={boardSaving}>{boardSaving ? 'Saving...' : 'Save Board'}</button>
             </div>
           </div>
         }

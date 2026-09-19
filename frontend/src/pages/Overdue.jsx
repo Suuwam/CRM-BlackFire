@@ -48,7 +48,7 @@ export default function Overdue() {
               </div>
             ))}
             {overdueTasks.map(t => (
-              <div key={t._id} className="upcoming-item overdue-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/board?project=${t.project || 'blackfire'}`)}>
+              <div key={t._id} className="upcoming-item overdue-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/board?project=${t.project}`)}>
                 <div className="up-dot" style={{ background: '#ef4444' }} />
                 <div className="up-info">
                   <div className="up-title">{t.title}</div>

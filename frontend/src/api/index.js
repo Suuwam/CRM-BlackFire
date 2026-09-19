@@ -100,6 +100,14 @@ export const referencesApi = {
   scrape: (url) => api.post('/references/scrape', { url }),
 };
 
+export const boardsApi = {
+  list: () => api.get('/boards'),
+  create: (data) => api.post('/boards', data),
+  update: (id, data) => api.put(`/boards/${id}`, data),
+  reorder: (ids) => api.patch('/boards/reorder', { ids }),
+  delete: (id) => api.delete(`/boards/${id}`),
+};
+
 export const tasksApi = {
   list: (project) => api.get('/tasks', { params: { project } }),
   create: (data) => api.post('/tasks', data),

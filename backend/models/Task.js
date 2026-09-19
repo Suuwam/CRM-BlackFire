@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
 
-// project: 'blackfire' | 'aawazz'
-// column:  'backlog' | 'todo' | 'inprogress' | 'qa' | 'done'
+// project: a Board._id; column: one of that board's column ids. Both are user-defined, so
+// no enum here — the Board document is the source of truth for what exists.
 const taskSchema = new mongoose.Schema({
-  project:     { type: String, enum: ['blackfire', 'aawazz'], required: true },
-  column:      { type: String, enum: ['backlog','todo','inprogress','qa','done','cancelled'], default: 'backlog' },
+  project:     { type: String, required: true },
+  column:      { type: String, default: 'backlog' },
   title:       { type: String, required: true, trim: true },
   description: { type: String, default: '' },
   priority:    { type: String, enum: ['low','medium','high'], default: 'medium' },
