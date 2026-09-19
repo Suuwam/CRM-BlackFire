@@ -63,7 +63,11 @@ async function clockOut(user, source = 'manual') {
   row.lastSeen = now;
   await row.save();
 
-  const minutes = Math.round((now - row.clockIn) / 60000);
+  // Bounded to the row's own day for the same reason the UI is: a clock-out that arrives
+  // days after the clock-in must not log a 254-hour shift.
+  const dayEnd = new Date(`${row.date}T23:59:59`);
+  const end = now > dayEnd ? dayEnd : now;
+  const minutes = Math.max(0, Math.round((end - row.clockIn) / 60000));
   await recordActivity({
     action: 'clock_out',
     targetType: 'attendance',

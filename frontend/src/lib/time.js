@@ -23,10 +23,30 @@ export function fmtDayLabel(key) {
   return new Date(`${key}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
+// When does a day's work stop counting?
+//
+//   clocked out        -> the clock-out
+//   still online now   -> now, so the live counter keeps ticking
+//   open but offline   -> lastSeen, the last heartbeat we actually observed
+//
+// and never past the end of the row's own day. Without that last bound a forgotten
+// clock-out accrued from the moment of clock-in until whenever you happened to look:
+// four shifts read as 254h, an average of 63h per day. A row covers one date, so it can
+// never legitimately exceed 24h.
 export function workedMinutes(row) {
   if (!row?.clockIn) return 0;
-  const end = row.clockOut ? new Date(row.clockOut) : new Date();
-  return Math.max(0, Math.round((end - new Date(row.clockIn)) / 60000));
+
+  const start = new Date(row.clockIn);
+  let end;
+  if (row.clockOut)      end = new Date(row.clockOut);
+  else if (isOnline(row)) end = new Date();
+  else if (row.lastSeen)  end = new Date(row.lastSeen);
+  else                    return 0;   // clocked in, never seen again: no evidence of work
+
+  const dayEnd = row.date ? new Date(`${row.date}T23:59:59`) : null;
+  if (dayEnd && !isNaN(dayEnd) && end > dayEnd) end = dayEnd;
+
+  return Math.max(0, Math.round((end - start) / 60000));
 }
 
 export function fmtDuration(minutes) {
