@@ -393,7 +393,11 @@ button.account-avatar:hover { transform: scale(1.06); box-shadow: 0 0 0 3px rgba
 
 /* Board / Kanban */
 .board-tabs  { display: flex; gap: 8px; margin-bottom: 22px; }
-.board-tab   { padding: 8px 20px; border: 1px solid var(--border); border-radius: var(--r-sm); font-size: 13px; font-weight: 550; cursor: pointer; transition: all var(--transition); background: var(--surface); color: var(--text2); display: flex; align-items: center; gap: 8px; }
+.board-tab   { padding: 8px 20px; border: 1px solid var(--border); border-radius: var(--r-sm); font-size: 13px; font-weight: 550; cursor: grab; transition: all var(--transition); background: var(--surface); color: var(--text2); display: flex; align-items: center; gap: 8px;
+               /* Claim the horizontal gesture for reordering; vertical page scroll still
+                  passes through, which matters on the phone build. */
+               touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.board-tab--dragging { cursor: grabbing; opacity: .75; transform: scale(1.04); box-shadow: 0 6px 18px rgba(0,0,0,.22); transition: none; z-index: 2; }
 .board-tab:hover { background: var(--surface2); color: var(--text); border-color: var(--border2); }
 .board-tab.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); box-shadow: 0 2px 8px rgba(0,0,0,.12); }
 .board-tab .proj-dot { width: 8px; height: 8px; border-radius: 50%; }
@@ -800,7 +804,7 @@ button.account-avatar:hover { transform: scale(1.06); box-shadow: 0 0 0 3px rgba
 }
 
 /* Reactivity & Press States */
-button:active, .btn:active, .sb-item:active, .client-card:active, .board-tab:active, .ref-card:active, .cal-ev-card:active {
+button:active, .btn:active, .sb-item:active, .client-card:active, .board-tab:active:not(.board-tab--dragging), .ref-card:active, .cal-ev-card:active {
   transform: scale(0.975) !important;
   transition: transform 0.1s ease !important;
 }
@@ -1201,10 +1205,6 @@ button.stat-card { display: block; width: 100%; cursor: pointer; }
 .board-banner { background: #18181b; border-radius: var(--r); padding: 18px 24px; margin-bottom: 22px; color: #fff; display: flex; align-items: center; justify-content: space-between; gap: 20px; box-shadow: 0 4px 20px rgba(0,0,0,.18); }
 .board-banner-title { font-size: 24px; font-weight: 800; letter-spacing: -.5px; line-height: 1.2; }
 .board-banner-sub { font-size: 13px; font-weight: 550; opacity: .75; margin-top: 4px; }
-.board-banner-actions { display: flex; gap: 6px; flex-shrink: 0; }
-.board-move-btn { width: 30px; height: 30px; border-radius: 8px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.25); color: #fff; font-size: 14px; cursor: pointer; transition: all var(--transition); }
-.board-move-btn:hover:not(:disabled) { background: rgba(255,255,255,.28); }
-.board-move-btn:disabled { opacity: .3; cursor: not-allowed; }
 
 /* ── Loading skeletons ──────────────────────────────────────────────────────
    One shimmer keyframe drives every placeholder. Reduced-motion users get the

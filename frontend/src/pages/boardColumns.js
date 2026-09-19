@@ -15,3 +15,14 @@ export function resolveColumnIds(draft, saved = []) {
     return { id, label: String(c.label).trim() };
   });
 }
+
+// Move one id to another id's slot, keeping everything else in order. Used by the board
+// tab drag; also what the stage Up/Down buttons do to a column list.
+export function moveTo(ids, fromId, toId) {
+  const from = ids.indexOf(fromId);
+  const to = ids.indexOf(toId);
+  if (from < 0 || to < 0 || from === to) return ids;
+  const next = [...ids];
+  next.splice(to, 0, next.splice(from, 1)[0]);
+  return next;
+}

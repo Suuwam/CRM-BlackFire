@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import useSWR, { mutate } from 'swr';
 import { tasksApi, boardsApi, fetcher } from '../api';
-import { resolveColumnIds } from './boardColumns';
+import { moveTo, resolveColumnIds } from './boardColumns';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
@@ -62,9 +62,18 @@ export default function Board() {
   const [commentSaving, setCommentSaving] = useState(false);
   const [detailComments, setDetailComments] = useState([]);
   const dragId = useRef(null);
+  const tabsRef = useRef(null);
+  const tabDragMoved = useRef(false);
+  const endTabDrag = useRef(null);
+  const [tabOrder, setTabOrder] = useState(null);   // ids mid-drag, null when settled
+  const [draggingBoard, setDraggingBoard] = useState(null);
   const toast = useToast();
 
   const { data: boards = [], isLoading: boardsLoading } = useSWR('/boards', fetcher, { revalidateOnFocus: false });
+  // While a tab is being dragged the strip renders the previewed order instead.
+  const orderedBoards = tabOrder
+    ? tabOrder.map(id => boards.find(b => b._id === id)).filter(Boolean)
+    : boards;
   const activeProject = boards.find(p => p._id === project) || null;
   const columns = activeProject?.columns || [];
   const hasColumn = id => columns.some(c => c.id === id);
@@ -294,17 +303,71 @@ export default function Board() {
   }
 
   // Tab order lives on the server so everyone sees the same board order.
-  async function moveBoard(boardId, direction) {
-    const ids = boards.map(b => b._id);
-    const from = ids.indexOf(boardId);
-    const to = from + direction;
-    if (from < 0 || to < 0 || to >= ids.length) return;
-    ids.splice(to, 0, ids.splice(from, 1)[0]);
-    try {
-      const res = await boardsApi.reorder(ids);
-      mutate('/boards', res.data, false);
-    } catch { toast('Could not reorder boards', 'error'); }
+  //
+  // Pointer events rather than HTML5 drag-and-drop: dragstart/drop never fire from a
+  // touch, and this has to work in the Capacitor app as well as on a desktop.
+  function startTabDrag(e, boardId) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+    const startX = e.clientX;
+    let order = boards.map(b => b._id);
+    let moved = false;
+
+    function onMove(ev) {
+      // Ignore the few pixels of travel in an ordinary click.
+      if (!moved) {
+        if (Math.abs(ev.clientX - startX) < 6) return;
+        moved = true;
+        setDraggingBoard(boardId);
+      }
+
+      const over = [...(tabsRef.current?.querySelectorAll('[data-board-id]') || [])]
+        .find(el => {
+          const r = el.getBoundingClientRect();
+          return ev.clientX >= r.left && ev.clientX <= r.right;
+        });
+      if (!over) return;
+
+      const next = moveTo(order, boardId, over.dataset.boardId);
+      if (next === order) return;
+      order = next;
+      setTabOrder(order);
+    }
+
+    async function onUp() {
+      endTabDrag.current?.();
+      endTabDrag.current = null;
+      setDraggingBoard(null);
+
+      // Never travelled far enough to be a drag — let the click select the board.
+      if (!moved) return;
+      tabDragMoved.current = true;
+      setTimeout(() => { tabDragMoved.current = false; }, 0);
+
+      const settled = order;
+      if (settled.join() === boards.map(b => b._id).join()) { setTabOrder(null); return; }
+
+      try {
+        const res = await boardsApi.reorder(settled);
+        mutate('/boards', res.data, false);
+      } catch {
+        toast('Could not reorder boards', 'error');
+      } finally {
+        setTabOrder(null);   // fall back to whatever the server says
+      }
+    }
+
+    endTabDrag.current = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
   }
+
+  useEffect(() => () => endTabDrag.current?.(), []);
 
   function handleColumnNameChange(index, newName) {
     setDesignBoard(prev => {
@@ -368,9 +431,19 @@ export default function Board() {
           </button>
         )}
         {/* Project tabs */}
-        <div className="board-tabs" style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%', overflowX: 'auto', marginBottom: 12 }}>
-          {boards.map(p => (
-            <button key={p._id} className={`board-tab${project===p._id?' active':''}`} onClick={() => selectProject(p._id)}
+        <div ref={tabsRef} className="board-tabs" style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%', overflowX: 'auto', marginBottom: 12 }}>
+          {orderedBoards.map(p => (
+            <button
+              key={p._id}
+              data-board-id={p._id}
+              className={`board-tab${project===p._id?' active':''}${draggingBoard===p._id?' board-tab--dragging':''}`}
+              title="Drag left or right to reorder"
+              onPointerDown={e => startTabDrag(e, p._id)}
+              onClick={() => {
+                // Suppress the click the browser fires at the end of a drag.
+                if (tabDragMoved.current) return;
+                selectProject(p._id);
+              }}
               style={project===p._id ? { background: p.color, borderColor: p.color, color: '#fff' } : {}}>
               {(project === p._id && isLoading) ? (
                 <div style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'authSpin 0.6s linear infinite' }} />
@@ -396,10 +469,6 @@ export default function Board() {
             <div>
               <div className="board-banner-title">{activeProject.label}</div>
               <div className="board-banner-sub">{columns.length} stage{columns.length === 1 ? '' : 's'} · {tasks.length} task{tasks.length === 1 ? '' : 's'}</div>
-            </div>
-            <div className="board-banner-actions">
-              <button className="board-move-btn" onClick={() => moveBoard(project, -1)} disabled={boards[0]?._id === project} title="Move board left">←</button>
-              <button className="board-move-btn" onClick={() => moveBoard(project, 1)} disabled={boards[boards.length - 1]?._id === project} title="Move board right">→</button>
             </div>
           </div>
         )}
