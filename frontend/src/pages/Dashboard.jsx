@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import { fetcher } from '../api';
-import { AccountAvatar } from '../components/AccountPanel';
+import { AccountAvatar } from '../components/Avatar';
+import { SkeletonPanel, SkeletonBlock } from '../components/Skeleton';
 import { fmtDuration, isOnline, workedMinutes, todayKey, shiftDay, SHIFT_MINUTES } from '../lib/time';
 
 const STATUSES = [
@@ -105,15 +106,27 @@ function BarRows({ title, sub, rows, legend, empty, onClick }) {
 
 function TaskDonut({ tasks, onClick }) {
   const [hovered, setHovered] = useState(null);
-  const data = STATUSES.map(s => ({ ...s, value: tasks.filter(t => (t.column || 'backlog') === s.id).length })).filter(d => d.value > 0);
-  const total = data.reduce((a, d) => a + d.value, 0);
 
-  let angle = 0;
-  const slices = data.map(d => {
-    const start = angle;
-    angle += total ? (d.value / total) * 360 : 0;
-    return { ...d, start, end: angle, pct: total ? Math.round((d.value / total) * 100) : 0 };
-  });
+  // Hovering a slice must not re-tally the whole board.
+  const { slices, total } = useMemo(() => {
+    const counts = new Map();
+    for (const t of tasks) {
+      const c = t.column || 'backlog';
+      counts.set(c, (counts.get(c) || 0) + 1);
+    }
+    const data = STATUSES.map(s => ({ ...s, value: counts.get(s.id) || 0 })).filter(d => d.value > 0);
+    const sum = data.reduce((a, d) => a + d.value, 0);
+
+    let angle = 0;
+    return {
+      total: sum,
+      slices: data.map(d => {
+        const start = angle;
+        angle += sum ? (d.value / sum) * 360 : 0;
+        return { ...d, start, end: angle, pct: sum ? Math.round((d.value / sum) * 100) : 0 };
+      }),
+    };
+  }, [tasks]);
 
   return (
     <Panel title="Task Distribution" sub={`${total} tasks across the board`} onClick={onClick} bodyClass="donut-body">
@@ -156,31 +169,84 @@ function TaskDonut({ tasks, onClick }) {
 export default function Dashboard() {
   const navigate = useNavigate();
   const { data: allEvents = [] } = useSWR('/events', fetcher, { revalidateOnFocus: false });
-  const { data: tasks = [] } = useSWR('/tasks', fetcher, { revalidateOnFocus: false });
-  const { data: users = [] } = useSWR('/users', fetcher, { revalidateOnFocus: false });
+  const { data: tasks = [], isLoading: tasksLoading } = useSWR('/tasks', fetcher, { revalidateOnFocus: false });
+  const { data: users = [], isLoading: usersLoading } = useSWR('/users', fetcher, { revalidateOnFocus: false });
+  const firstLoad = tasksLoading || usersLoading;
   const { data: attendance } = useSWR('/attendance', fetcher, { refreshInterval: 60000 });
 
   const today = todayKey();
-  const overdue = allEvents.filter(e => e.date < today && e.status !== 'done' && e.status !== 'cancelled').length
-    + tasks.filter(t => t.dueDate && t.dueDate < today && t.column !== 'done').length;
+
+  // Everything below used to run on every render, and the attendance poll re-renders this
+  // component once a minute. Workload alone was users x tasks; the whole block is now one
+  // pass over each collection, recomputed only when that collection actually changes.
+  const taskStats = useMemo(() => {
+    const week = days(-6, 7);
+    const ahead = days(0, 7);
+
+    const byAssignee = new Map();   // name -> { open, done }
+    const doneByDay  = new Map();   // YYYY-MM-DD -> count
+    const dueByDay   = new Map();   // YYYY-MM-DD -> open tasks due
+    const byPriority = new Map();   // priority -> { open, late, done }
+
+    let inProgress = 0, done = 0, overdueTasks = 0;
+
+    for (const t of tasks) {
+      const col = t.column || 'backlog';
+      const open = col !== 'done' && col !== 'cancelled';
+      const late = open && t.dueDate && t.dueDate < today;
+
+      if (col === 'inprogress') inProgress++;
+      if (col === 'done') done++;
+      if (t.dueDate && t.dueDate < today && col !== 'done') overdueTasks++;
+
+      const who = nameOf(t);
+      if (who) {
+        const e = byAssignee.get(who) || { open: 0, done: 0 };
+        if (open) e.open++; else if (col === 'done') e.done++;
+        byAssignee.set(who, e);
+      }
+
+      if (col === 'done' && t.updatedAt) {
+        const k = String(t.updatedAt).slice(0, 10);
+        doneByDay.set(k, (doneByDay.get(k) || 0) + 1);
+      }
+
+      if (open && t.dueDate) dueByDay.set(t.dueDate, (dueByDay.get(t.dueDate) || 0) + 1);
+
+      const pk = t.priority || 'medium';
+      const pe = byPriority.get(pk) || { open: 0, late: 0, done: 0 };
+      if (late) pe.late++; else if (open) pe.open++;
+      if (col === 'done') pe.done++;
+      byPriority.set(pk, pe);
+
+      }
+
+    return { week, ahead, byAssignee, doneByDay, dueByDay, byPriority, inProgress, done, overdueTasks };
+  }, [tasks, today]);
+
+  const eventStats = useMemo(() => {
+    const byDay = new Map();
+    let overdueEvents = 0;
+    for (const e of allEvents) {
+      if (e.date < today && e.status !== 'done' && e.status !== 'cancelled') overdueEvents++;
+      if (e.status !== 'cancelled') byDay.set(e.date, (byDay.get(e.date) || 0) + 1);
+    }
+    return { byDay, overdueEvents };
+  }, [allEvents, today]);
+
+  const overdue = eventStats.overdueEvents + taskStats.overdueTasks;
+  const { inProgress, done } = taskStats;
+  const completion = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
 
   const rows = attendance?.rows || [];
   const online = rows.filter(isOnline).length;
   const present = rows.filter(r => r.clockIn).length;
   const hoursToday = rows.reduce((a, r) => a + workedMinutes(r), 0);
 
-  const inProgress = tasks.filter(t => t.column === 'inprogress').length;
-  const done = tasks.filter(t => t.column === 'done').length;
-  const completion = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
-
   // 1 — workload per employee
-  const workload = users
+  const workload = useMemo(() => users
     .filter(u => u.active !== false)
-    .map(u => ({
-      user: u,
-      open: tasks.filter(t => nameOf(t) === u.name && isOpen(t)).length,
-      done: tasks.filter(t => nameOf(t) === u.name && t.column === 'done').length,
-    }))
+    .map(u => ({ user: u, ...(taskStats.byAssignee.get(u.name) || { open: 0, done: 0 }) }))
     .filter(d => d.open + d.done > 0)
     .sort((a, b) => b.open - a.open)
     .map(d => ({
@@ -189,46 +255,49 @@ export default function Dashboard() {
       avatar: <AccountAvatar name={d.user.name} photo={d.user.photo} size={26} />,
       right: <>{d.open}<span className="text-muted">/{d.open + d.done}</span></>,
       segs: [{ v: d.open, color: '#f97316' }, { v: d.done, color: '#86efac' }],
-    }));
+    })), [users, taskStats]);
 
   // 2 — throughput, tasks finished per day
   // ponytail: no completedAt on Task, so updatedAt stands in — a late edit to a done task shifts its bar.
-  const throughput = days(-6, 7).map(k => ({
+  const throughput = useMemo(() => taskStats.week.map(k => ({
     key: k, label: dayLabel(k), title: dayTitle(k),
-    segs: [{ v: tasks.filter(t => t.column === 'done' && String(t.updatedAt).slice(0, 10) === k).length, color: '#10b981' }],
-  }));
+    segs: [{ v: taskStats.doneByDay.get(k) || 0, color: '#10b981' }],
+  })), [taskStats]);
 
   // 3 — what is booked for the week ahead
-  const schedule = days(0, 7).map(k => ({
+  const schedule = useMemo(() => taskStats.ahead.map(k => ({
     key: k, label: dayLabel(k), title: dayTitle(k),
     segs: [
-      { v: allEvents.filter(e => e.date === k && e.status !== 'cancelled').length, color: '#3b82f6' },
-      { v: tasks.filter(t => t.dueDate === k && isOpen(t)).length, color: '#8b5cf6' },
+      { v: eventStats.byDay.get(k) || 0, color: '#3b82f6' },
+      { v: taskStats.dueByDay.get(k) || 0, color: '#8b5cf6' },
     ],
-  }));
+  })), [taskStats, eventStats]);
 
   // 4 — priority mix, overdue called out
-  const priority = PRIORITIES.map(p => {
-    const of = tasks.filter(t => (t.priority || 'medium') === p.id);
-    const late = of.filter(t => isOpen(t) && t.dueDate && t.dueDate < today).length;
-    const open = of.filter(isOpen).length - late;
+  const priority = useMemo(() => PRIORITIES.map(p => {
+    const e = taskStats.byPriority.get(p.id) || { open: 0, late: 0, done: 0 };
     return {
-      key: p.id, label: p.label, right: open + late,
-      segs: [{ v: late, color: '#ef4444' }, { v: open, color: p.color }, { v: of.filter(t => t.column === 'done').length, color: MUTED }],
+      key: p.id, label: p.label, right: e.open + e.late,
+      segs: [{ v: e.late, color: '#ef4444' }, { v: e.open, color: p.color }, { v: e.done, color: MUTED }],
     };
-  });
+  }), [taskStats]);
 
-  // 5 — hours clocked today, overtime past the shift
-  const hours = rows.filter(r => r.clockIn).map(r => {
-    const worked = workedMinutes(r);
-    const u = users.find(x => String(x._id) === String(r.userId));
-    return {
-      key: r._id, label: r.userName || u?.name || 'Unknown',
-      avatar: <AccountAvatar name={r.userName || u?.name} photo={u?.photo} size={26} />,
-      right: fmtDuration(worked),
-      segs: [{ v: Math.min(worked, SHIFT_MINUTES), color: '#16a34a' }, { v: Math.max(0, worked - SHIFT_MINUTES), color: '#f59e0b' }],
-    };
-  }).sort((a, b) => b.segs[0].v + b.segs[1].v - a.segs[0].v - a.segs[1].v);
+  // 5 — hours clocked today, overtime past the shift.
+  // Left out of the memo above on purpose: this is the one panel the 60s attendance poll
+  // genuinely changes, so it is the only one that recomputes on a poll.
+  const hours = useMemo(() => {
+    const photoOf = new Map(users.map(u => [String(u._id), u]));
+    return rows.filter(r => r.clockIn).map(r => {
+      const worked = workedMinutes(r);
+      const u = photoOf.get(String(r.userId));
+      return {
+        key: r._id, label: r.userName || u?.name || 'Unknown',
+        avatar: <AccountAvatar name={r.userName || u?.name} photo={u?.photo} size={26} />,
+        right: fmtDuration(worked),
+        segs: [{ v: Math.min(worked, SHIFT_MINUTES), color: '#16a34a' }, { v: Math.max(0, worked - SHIFT_MINUTES), color: '#f59e0b' }],
+      };
+    }).sort((a, b) => b.segs[0].v + b.segs[1].v - a.segs[0].v - a.segs[1].v);
+  }, [rows, users]);
 
   return (
     <div className="dash-page">
@@ -239,6 +308,18 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {firstLoad ? (
+        <div className="dash-screen">
+          <div className="stats-grid stats-grid--compact">
+            {Array.from({ length: 5 }, (_, i) => (
+              <div key={i} className="stat-card"><SkeletonBlock w="60%" h={10} /><SkeletonBlock w={54} h={26} style={{ marginTop: 8 }} /><SkeletonBlock w="80%" h={9} style={{ marginTop: 8 }} /></div>
+            ))}
+          </div>
+          <div className="dash-panels">
+            {Array.from({ length: 6 }, (_, i) => <SkeletonPanel key={i} />)}
+          </div>
+        </div>
+      ) : (
       <div className="dash-screen">
         <div className="stats-grid stats-grid--compact">
           <button className="stat-card" onClick={() => navigate('/team')}>
@@ -296,6 +377,7 @@ export default function Dashboard() {
           />
         </div>
       </div>
+      )}
     </div>
   );
 }

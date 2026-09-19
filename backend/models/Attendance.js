@@ -13,5 +13,7 @@ const attendanceSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 attendanceSchema.index({ userId: 1, date: 1 }, { unique: true });
+// The team-day view and admin history both range-scan on date alone.
+attendanceSchema.index({ date: 1 });
 
 module.exports = mongoose.model('Attendance', attendanceSchema);

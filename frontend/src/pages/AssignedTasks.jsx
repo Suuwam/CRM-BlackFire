@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import { fetcher, tasksApi } from '../api';
-import { AccountAvatar } from '../components/AccountPanel';
+import { AccountAvatar } from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
 

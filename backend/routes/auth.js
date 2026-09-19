@@ -2,7 +2,7 @@ const router = require('express').Router();
 const User = require('../models/User');
 const Activity = require('../models/Activity');
 const AccountApplication = require('../models/AccountApplication');
-const { sanitizeUser, getSessionUser, requireSessionUser } = require('../utils/session');
+const { sanitizeUser, getSessionUser, requireSessionUser, invalidateSessionUser } = require('../utils/session');
 const { ensureBootstrapAdmin } = require('../utils/bootstrap');
 const { sendMail } = require('../utils/mailer');
 const { rateLimit } = require('../utils/rateLimit');
@@ -11,15 +11,7 @@ const { recordActivity } = require('../utils/activity');
 const { clockIn, clockOut } = require('../utils/attendance');
 const crypto = require('crypto');
 const multer = require('multer');
-const cloudinary = require('cloudinary').v2;
-const streamifier = require('streamifier');
-
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-const hasCloudinary = !!(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET);
+const { storeImage } = require('../utils/upload');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -115,25 +107,12 @@ router.post('/exit', requireSessionUser, async (req, res) => {
 // Profile picture
 router.patch('/me/photo', requireSessionUser, upload.single('photo'), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-
-    let photo;
-    if (hasCloudinary) {
-      const result = await new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream({ folder: 'crm_avatars', width: 256, height: 256, crop: 'fill', gravity: 'face' }, (err, out) => (out ? resolve(out) : reject(err)));
-        streamifier.createReadStream(req.file.buffer).pipe(stream);
-      });
-      photo = result.secure_url;
-    } else {
-      // ponytail: no Cloudinary configured — inline small images so the feature still works
-      if (req.file.size > 400 * 1024) return res.status(400).json({ error: 'Image too large (max 400KB without Cloudinary configured)' });
-      photo = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
-    }
-
+    const photo = await storeImage(req.file, { folder: 'crm_avatars', width: 256, height: 256 });
     const user = await User.findByIdAndUpdate(req.sessionUser._id, { photo }, { new: true });
+    invalidateSessionUser(req.sessionUser._id);
     res.json({ user: sanitizeUser(user) });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(error.status || 400).json({ error: error.message });
   }
 });
 

@@ -1,6 +1,6 @@
 import useSWR from 'swr';
 import { fetcher } from '../api';
-import { AccountAvatar } from '../components/AccountPanel';
+import { AccountAvatar } from '../components/Avatar';
 import { fmtClock, fmtDuration, isOnline, workedMinutes } from '../lib/time';
 
 export default function Team() {

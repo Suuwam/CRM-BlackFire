@@ -36,5 +36,12 @@ const taskSchema = new mongoose.Schema({
   }],
 }, { timestamps: true });
 
+// Board fetch is find({ project }).sort({ column, order }) — one compound index serves both.
+taskSchema.index({ project: 1, column: 1, order: 1 });
+// Overdue / due-date views scan open tasks by date.
+taskSchema.index({ dueDate: 1 });
+// "My tasks" lookups.
+taskSchema.index({ 'assignees.userId': 1 });
+
 module.exports = mongoose.model('Task', taskSchema);
 

@@ -75,7 +75,7 @@ async function scrapeUrl(targetUrl) {
 }
 
 router.get('/', async (_, res) => {
-  try { res.json(await Reference.find().sort({ createdAt: -1 })); }
+  try { res.json(await Reference.find().sort({ createdAt: -1 }).lean()); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 

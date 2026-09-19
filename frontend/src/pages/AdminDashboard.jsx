@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '../api';
-import { AccountAvatar } from '../components/AccountPanel';
+import { AccountAvatar } from '../components/Avatar';
 import { fmtClock, fmtDuration, isLate, isOnline, workedMinutes } from '../lib/time';
 
 const RANGES = [7, 30, 90];

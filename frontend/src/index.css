@@ -1205,3 +1205,27 @@ button.stat-card { display: block; width: 100%; cursor: pointer; }
 .board-move-btn { width: 30px; height: 30px; border-radius: 8px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.25); color: #fff; font-size: 14px; cursor: pointer; transition: all var(--transition); }
 .board-move-btn:hover:not(:disabled) { background: rgba(255,255,255,.28); }
 .board-move-btn:disabled { opacity: .3; cursor: not-allowed; }
+
+/* ── Loading skeletons ──────────────────────────────────────────────────────
+   One shimmer keyframe drives every placeholder. Reduced-motion users get the
+   flat surface with no animation. */
+.sk {
+  display: block;
+  background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 37%, var(--surface2) 63%);
+  background-size: 400% 100%;
+  animation: sk-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes sk-shimmer {
+  0%   { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sk { animation: none; background: var(--surface2); }
+}
+.sk-stack { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.sk-row   { display: flex; align-items: center; gap: 10px; width: 100%; }
+.sk-grid  { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}

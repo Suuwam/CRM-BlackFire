@@ -6,6 +6,7 @@ const { requireSessionUser } = require('../utils/session');
 const { sendMail } = require('../utils/mailer');
 const { rateLimit } = require('../utils/rateLimit');
 const { recordActivity } = require('../utils/activity');
+const { storeImage } = require('../utils/upload');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -26,22 +27,30 @@ async function normalizeAssignment(data, currentUser) {
   let assigneeName  = data.assigneeName  || data.assignee || '';
   let assigneeEmail = data.assigneeEmail || '';
 
+  const incoming = Array.isArray(data.assignees) ? data.assignees : [];
+
+  // One query for every id we need, instead of one findById per assignee (N+1).
+  const needed = [assigneeId, ...incoming.filter(a => a.userId && (!a.email || !a.name)).map(a => a.userId)]
+    .filter(Boolean)
+    .map(String);
+  const byId = new Map();
+  if (needed.length) {
+    const found = await User.find({ _id: { $in: [...new Set(needed)] } }, 'name email').lean();
+    for (const u of found) byId.set(String(u._id), u);
+  }
+
   if (assigneeId) {
-    const u = await User.findById(assigneeId);
+    const u = byId.get(String(assigneeId));
     if (u) { assigneeName = u.name; assigneeEmail = u.email; }
   }
 
   // Build assignees[] from incoming array or fall back to legacy single
   let assignees = [];
-  if (Array.isArray(data.assignees) && data.assignees.length > 0) {
-    // Resolve any entries that only have userId
-    assignees = await Promise.all(data.assignees.map(async a => {
-      if (a.userId && (!a.email || !a.name)) {
-        const u = await User.findById(a.userId);
-        return { userId: a.userId, name: u?.name || a.name || '', email: u?.email || a.email || '' };
-      }
-      return { userId: a.userId || null, name: a.name || '', email: a.email || '' };
-    }));
+  if (incoming.length > 0) {
+    assignees = incoming.map(a => {
+      const u = a.userId ? byId.get(String(a.userId)) : null;
+      return { userId: a.userId || null, name: u?.name || a.name || '', email: u?.email || a.email || '' };
+    });
   } else if (assigneeName) {
     // Legacy compat — mirror single assignee into the array
     assignees = [{ userId: assigneeId || null, name: assigneeName, email: assigneeEmail }];
@@ -66,7 +75,8 @@ async function maybeNotifyAssignment(task, previousAssignees = []) {
   const newAssignees = (task.assignees || []).filter(a => a.email && !prevEmails.has(a.email));
   if (!newAssignees.length) return;
 
-  for (const assignee of newAssignees) {
+  // Parallel: N recipients used to cost N sequential SMTP round-trips on the request path.
+  await Promise.all(newAssignees.map(async assignee => {
     const subject = `New task assigned: ${task.title}`;
     const html = `
       <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111;max-width:480px">
@@ -81,7 +91,7 @@ async function maybeNotifyAssignment(task, previousAssignees = []) {
       </div>`;
     try { await sendMail({ to: assignee.email, subject, html, text: `New task assigned: ${task.title}\nAssigned by: ${task.assignedByName}` }); }
     catch (e) { console.error('Assignment notify failed:', e.message); }
-  }
+  }));
 }
 
 // Send done notification to all assignees + assigner (deduplicated)
@@ -106,7 +116,7 @@ async function notifyDone(task, movedBy) {
     task.assigneeName,
   ].filter(Boolean))].join(', ') || 'Team';
 
-  for (const [email, name] of recipients) {
+  await Promise.all([...recipients].map(async ([email, name]) => {
     const subject = `✅ Task completed: ${task.title}`;
     const html = `
       <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111;max-width:480px">
@@ -121,7 +131,7 @@ async function notifyDone(task, movedBy) {
       </div>`;
     try { await sendMail({ to: email, subject, html, text: `Task completed: ${task.title}\nMarked done by: ${movedBy?.name}` }); }
     catch (e) { console.error('Done notify failed:', e.message); }
-  }
+  }));
 }
 
 // GET by project
@@ -129,7 +139,8 @@ router.get('/', requireSessionUser, async (req, res) => {
   try {
     const filter = {};
     if (req.query.project) filter.project = req.query.project;
-    res.json(await Task.find(filter).sort({ column: 1, order: 1 }));
+    // lean(): plain objects straight to JSON, no Mongoose document wrapping per task.
+    res.json(await Task.find(filter).sort({ column: 1, order: 1 }).lean());
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -137,8 +148,7 @@ router.post('/', requireSessionUser, async (req, res) => {
   try {
     const payload = await normalizeAssignment(req.body, req.sessionUser);
     const task = await Task.create(payload);
-    await maybeNotifyAssignment(task, []);
-    await recordActivity({
+    await Promise.all([maybeNotifyAssignment(task, []), recordActivity({
       action: 'created',
       targetType: 'task',
       targetId: task._id,
@@ -151,7 +161,7 @@ router.post('/', requireSessionUser, async (req, res) => {
       assigneeEmail: task.assigneeEmail || '',
       toColumn: task.column,
       summary: `${req.sessionUser.name} created ${task.title}${task.assigneeName ? ` and assigned it to ${task.assigneeName}` : ''}`,
-    });
+    })]);
     res.status(201).json(task);
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -192,11 +202,10 @@ router.put('/:id', requireSessionUser, writeLimiter, async (req, res) => {
 // Upload image for task/card
 router.patch('/:id/image', requireSessionUser, writeLimiter, upload.single('image'), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
-    const b64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
-    const task = await Task.findByIdAndUpdate(req.params.id, { image: b64 }, { new: true });
+    const image = await storeImage(req.file, { folder: 'crm_tasks' });
+    const task = await Task.findByIdAndUpdate(req.params.id, { image }, { new: true });
     res.json(task);
-  } catch (e) { res.status(400).json({ error: e.message }); }
+  } catch (e) { res.status(e.status || 400).json({ error: e.message }); }
 });
 
 // PATCH move column

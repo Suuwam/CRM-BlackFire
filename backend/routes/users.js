@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const User = require('../models/User');
 const AccountApplication = require('../models/AccountApplication');
-const { sanitizeUser, requireSessionUser, requireAdmin } = require('../utils/session');
+const { sanitizeUser, requireSessionUser, requireAdmin, invalidateSessionUser } = require('../utils/session');
 const { rateLimit } = require('../utils/rateLimit');
 const { recordActivity } = require('../utils/activity');
 
@@ -10,7 +10,7 @@ const writeLimiter = rateLimit({ windowMs: 60 * 1000, max: 15, prefix: 'users-wr
 
 router.get('/', async (_, res) => {
   try {
-    const users = await User.find().sort({ name: 1 });
+    const users = await User.find().sort({ name: 1 }).lean();
     res.json(users.map(sanitizeUser));
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -57,6 +57,7 @@ router.put('/:id', requireAdmin, writeLimiter, async (req, res) => {
     if (req.body.password) payload.password = req.body.password;
 
     const user = await User.findByIdAndUpdate(req.params.id, payload, { new: true, runValidators: true });
+    invalidateSessionUser(req.params.id);
     if (user) {
       await recordActivity({
         action: 'updated',
@@ -80,6 +81,7 @@ router.delete('/:id', requireAdmin, writeLimiter, async (req, res) => {
       return res.status(400).json({ error: 'You cannot delete your own account' });
     }
     const user = await User.findByIdAndDelete(req.params.id);
+    invalidateSessionUser(req.params.id);
     if (user) {
       await recordActivity({
         action: 'deleted',
@@ -99,7 +101,7 @@ router.delete('/:id', requireAdmin, writeLimiter, async (req, res) => {
 
 router.get('/applications', requireAdmin, async (req, res) => {
   try {
-    const apps = await AccountApplication.find({ isEmailVerified: true }).sort({ createdAt: -1 });
+    const apps = await AccountApplication.find({ isEmailVerified: true }).sort({ createdAt: -1 }).select('-password').lean();
     res.json(apps);
   } catch (error) {
     res.status(500).json({ error: error.message });

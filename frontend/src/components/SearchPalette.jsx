@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import { fetcher } from '../api';
+import { useDebounced } from '../lib/useDebounced';
 
 function highlightMatch(text, query) {
   if (!query || !text) return text || '';
@@ -39,10 +40,13 @@ export default function SearchPalette({ open, onClose }) {
   const { data: tasks = [] }      = useSWR('/tasks', fetcher, { revalidateOnFocus: false });
   const { data: references = [] } = useSWR('/references', fetcher, { revalidateOnFocus: false });
 
-  // Build unified result set
-  const results = (() => {
-    if (!query.trim()) return [];
-    const q = query.toLowerCase();
+  // Typing "invoice" scanned every employee, task and reference seven times. Wait for the
+  // keystrokes to settle, then scan once — and only redo it when an input actually changed.
+  const debouncedQuery = useDebounced(query, 180);
+
+  const results = useMemo(() => {
+    if (!debouncedQuery.trim()) return [];
+    const q = debouncedQuery.toLowerCase();
     const hits = [];
 
     employees.forEach(e => {
@@ -64,7 +68,7 @@ export default function SearchPalette({ open, onClose }) {
     });
 
     return hits.slice(0, 12);
-  })();
+  }, [debouncedQuery, employees, tasks, references]);
 
   useEffect(() => {
     setActiveIdx(0);
@@ -175,11 +179,11 @@ export default function SearchPalette({ open, onClose }) {
                     {TYPE_LABELS[item.type]}
                   </span>
                   <span className="search-palette-item-title">
-                    {highlightMatch(item.title, query)}
+                    {highlightMatch(item.title, debouncedQuery)}
                   </span>
                   {item.sub && (
                     <span className="search-palette-item-sub">
-                      {highlightMatch(item.sub, query)}
+                      {highlightMatch(item.sub, debouncedQuery)}
                     </span>
                   )}
                   <span className="search-palette-item-arrow">

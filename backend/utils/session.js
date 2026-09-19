@@ -16,11 +16,38 @@ function sanitizeUser(user) {
   };
 }
 
+// Every authenticated request resolves the caller, and the 60s presence heartbeat means
+// each open tab alone is one findById per minute. Cache the lookup for a few seconds so a
+// burst of requests costs one round-trip instead of one each.
+//
+// The TTL is deliberately short and every route that changes or removes a user calls
+// invalidateSessionUser, so deactivating an account still takes effect immediately.
+const SESSION_TTL_MS = Number(process.env.SESSION_CACHE_MS || 10_000);
+const sessionCache = new Map(); // id -> { user, expires }
+
+function invalidateSessionUser(id) {
+  if (id) sessionCache.delete(String(id));
+}
+
 async function getSessionUser(req) {
   const sessionUserId = req.get('x-session-user');
   if (!sessionUserId || !mongoose.isValidObjectId(sessionUserId)) return null;
+
+  const key = String(sessionUserId);
+  const hit = sessionCache.get(key);
+  if (hit && hit.expires > Date.now()) return hit.user;
+
   const user = await User.findById(sessionUserId);
-  return user && user.active ? user : null;
+  const resolved = user && user.active ? user : null;
+  sessionCache.set(key, { user: resolved, expires: Date.now() + SESSION_TTL_MS });
+
+  // ponytail: bounded by eviction on read, not a background sweep. One team's worth of
+  // users never grows this past a few dozen entries; swap in an LRU if that stops holding.
+  if (sessionCache.size > 500) {
+    const now = Date.now();
+    for (const [k, v] of sessionCache) if (v.expires <= now) sessionCache.delete(k);
+  }
+  return resolved;
 }
 
 async function requireSessionUser(req, res, next) {
@@ -41,4 +68,4 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-module.exports = { sanitizeUser, getSessionUser, requireSessionUser, requireAdmin };
+module.exports = { sanitizeUser, getSessionUser, requireSessionUser, requireAdmin, invalidateSessionUser };

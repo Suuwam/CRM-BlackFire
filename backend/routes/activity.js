@@ -28,8 +28,23 @@ router.get('/', requireSessionUser, async (req, res) => {
       filter.$or = [{ actorId: uid }, { assigneeId: uid }];
     }
 
+    // Paginated mode, opted into with ?page=. Without it the response stays a plain array
+    // so the notification bell and the other existing callers are untouched.
+    if (req.query.page !== undefined) {
+      const perPage = Math.max(1, Math.min(100, Number(req.query.limit || 20)));
+      const page = Math.max(0, Number(req.query.page) || 0);
+
+      // countDocuments and the page fetch are independent — run them together.
+      const [total, items] = await Promise.all([
+        Activity.countDocuments(filter),
+        Activity.find(filter).sort({ createdAt: -1 }).skip(page * perPage).limit(perPage).lean(),
+      ]);
+
+      return res.json({ items, total, page, pages: Math.max(1, Math.ceil(total / perPage)) });
+    }
+
     const limit = req.query.since ? 100 : 250;
-    const activities = await Activity.find(filter).sort({ createdAt: -1 }).limit(limit);
+    const activities = await Activity.find(filter).sort({ createdAt: -1 }).limit(limit).lean();
     res.json(activities);
   } catch (error) {
     res.status(500).json({ error: error.message });

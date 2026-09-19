@@ -2,7 +2,8 @@ import { useState } from 'react';
 import useSWR, { mutate } from 'swr';
 import { usersApi, fetcher } from '../api';
 import Modal from '../components/Modal';
-import AccountPanel, { AccountAvatar } from '../components/AccountPanel';
+import AccountPanel from '../components/AccountPanel';
+import { AccountAvatar } from '../components/Avatar';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 

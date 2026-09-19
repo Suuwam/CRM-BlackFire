@@ -11,14 +11,26 @@
     <link rel="manifest" href="/manifest.json" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@300;400;500;600;700;800&family=Jost:wght@300;400;500&display=swap" rel="stylesheet" />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@300;400;500;600;700;800&family=Jost:wght@300;400;500&display=swap"
+      media="print"
+      onload="this.media='all'; this.onload=null;"
+    />
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@300;400;500;600;700;800&family=Jost:wght@300;400;500&display=swap" />
+    </noscript>
     <script>
       if (localStorage.getItem('theme') === 'dark') {
         document.documentElement.classList.add('dark');
       }
+      // Deferred past first paint: registration competes with the app bundle for bandwidth
+      // and the main thread, and nothing on the first visit depends on it.
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW reg error:', err));
+          setTimeout(() => {
+            navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW reg error:', err));
+          }, 1500);
         });
       }
     </script>
