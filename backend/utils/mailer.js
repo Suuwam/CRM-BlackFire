@@ -18,8 +18,7 @@ function getTransport() {
 async function sendMail({ to, subject, text, html }) {
   const transport = getTransport();
   if (!transport) {
-    console.info(`[mail skipped] to=${to} subject=${subject}`);
-    return { skipped: true };
+    throw new Error('Mail is not configured (SMTP_HOST, SMTP_USER, SMTP_PASS)');
   }
 
   const from = process.env.MAIL_FROM || process.env.SMTP_USER;
