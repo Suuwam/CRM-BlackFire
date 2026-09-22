@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AccountAvatar } from './Avatar';
+import AccountPanel from './AccountPanel';
 import ClockWidget from './ClockWidget';
 import ThemeToggle from './ThemeToggle';
 import { useAuth } from '../context/AuthContext';
