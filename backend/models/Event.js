@@ -17,4 +17,7 @@ const eventSchema = new mongoose.Schema({
   image:     { type: String, default: '' },
 }, { timestamps: true });
 
+// Calendar queries filter by exact date or a ^YYYY-MM prefix and sort by date+time.
+eventSchema.index({ date: 1, time: 1 });
+
 module.exports = mongoose.model('Event', eventSchema);

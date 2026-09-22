@@ -141,6 +141,16 @@ export default function Calendar() {
 
   const [saving, setSaving] = useState(false);
 
+  // Screenshot pasted into the notes becomes the event picture — it uploads with the save,
+  // same path as picking the file by hand.
+  function pasteImage(e) {
+    const file = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith('image/'));
+    if (!file) return;
+    e.preventDefault();
+    setImageFile(file);
+    toast('Image attached to this event', 'info');
+  }
+
   async function save() {
     if (saving) return;
     if (!form.title.trim() || !form.date) return toast('Title and date required', 'error');
@@ -543,9 +553,10 @@ export default function Calendar() {
 
         <div className="form-group"><label>Event Picture</label>
           <input ref={fileInputRef} type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0] || null)} />
+          {imageFile && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>{imageFile.name || 'Pasted image'} — uploads on save <button className="btn btn-secondary btn-sm" style={{ padding: '2px 6px', fontSize: 10, marginLeft: 6 }} onClick={() => setImageFile(null)}>Clear</button></div>}
         </div>
 
-        <div className="form-group"><label>Notes</label><textarea value={form.notes} onChange={e => setForm(f=>({...f,notes:e.target.value}))} placeholder="Post caption or notes..." /></div>
+        <div className="form-group"><label>Notes</label><textarea value={form.notes} onChange={e => setForm(f=>({...f,notes:e.target.value}))} onPaste={pasteImage} placeholder="Post caption or notes... (paste an image to attach it)" /></div>
       </Modal>
     </>
   );

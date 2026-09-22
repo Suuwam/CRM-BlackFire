@@ -16,4 +16,13 @@ const activitySchema = new mongoose.Schema({
   summary: { type: String, default: '' },
 }, { timestamps: true });
 
+// Every read filters and sorts on createdAt; without this it is a collscan + in-memory sort.
+activitySchema.index({ createdAt: -1 });
+activitySchema.index({ actorId: 1, createdAt: -1 });
+
+// ponytail: the log is append-only and only ever read 180 days back, so let Mongo expire it.
+// Raise ACTIVITY_TTL_DAYS (or drop the index) if this ever has to be an audit trail.
+const TTL_DAYS = Number(process.env.ACTIVITY_TTL_DAYS || 365);
+activitySchema.index({ createdAt: 1 }, { expireAfterSeconds: TTL_DAYS * 86400 });
+
 module.exports = mongoose.model('Activity', activitySchema);

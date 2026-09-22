@@ -10,4 +10,6 @@ const referenceSchema = new mongoose.Schema({
   notes:       { type: String, default: '' },
 }, { timestamps: true });
 
+referenceSchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model('Reference', referenceSchema);

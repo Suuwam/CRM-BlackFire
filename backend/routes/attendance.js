@@ -2,9 +2,16 @@ const router = require('express').Router();
 const mongoose = require('mongoose');
 const Attendance = require('../models/Attendance');
 const { requireSessionUser } = require('../utils/session');
-const { dayKey, isOnline, clockIn, clockOut, heartbeat } = require('../utils/attendance');
+const { dayKey, isOnline, clockIn, clockOut, heartbeat, closeStaleAttendance } = require('../utils/attendance');
 
 router.use(requireSessionUser);
+
+// Throttled internally, so the 60s poll from every open tab costs one sweep per 30s, not
+// one per request. Awaited so a reader sees the swept state rather than stale open rows.
+router.use(async (req, res, next) => {
+  try { await closeStaleAttendance(); } catch (e) { console.error('Attendance sweep failed:', e.message); }
+  next();
+});
 
 function shape(row) {
   return { ...row.toObject(), online: isOnline(row) };

@@ -1,21 +1,34 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '../api';
+import { SkeletonRows } from '../components/Skeleton';
+import { useDebounced } from '../lib/useDebounced';
 
 const PAGE_SIZE = 7;
 
 export default function Backlog() {
-  const { data: activities = [] } = useSWR('/activity?days=50', fetcher, { revalidateOnFocus: false });
   const [page, setPage] = useState(0);
   const [filter, setFilter] = useState('');
 
-  const visible = filter
-    ? activities.filter(a => `${a.summary} ${a.actorName} ${a.action} ${a.targetName}`.toLowerCase().includes(filter.toLowerCase()))
-    : activities;
+  // Was: download 250 rows, render 7. Now the server sends exactly the page being shown.
+  // keepPreviousData holds the current page on screen while the next one loads, so paging
+  // does not blank the list.
+  const { data, isLoading } = useSWR(
+    `/activity?days=50&page=${page}&limit=${PAGE_SIZE}`,
+    fetcher,
+    { revalidateOnFocus: false, keepPreviousData: true },
+  );
 
-  const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  const serverItems = data?.items || [];
+  const pages = data?.pages || 1;
   const current = Math.min(page, pages - 1);
-  const slice = visible.slice(current * PAGE_SIZE, current * PAGE_SIZE + PAGE_SIZE);
+
+  // ponytail: the text filter still narrows the page you are on, not the whole log. Push it
+  // into the Mongo query (a $text index or a regex on summary) when someone needs that.
+  const q = useDebounced(filter, 200).toLowerCase();
+  const slice = q
+    ? serverItems.filter(a => `${a.summary} ${a.actorName} ${a.action} ${a.targetName}`.toLowerCase().includes(q))
+    : serverItems;
 
   return (
     <>
@@ -33,13 +46,14 @@ export default function Backlog() {
                 <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
             </span>
-            <input placeholder="Filter activity..." value={filter} onChange={e => { setFilter(e.target.value); setPage(0); }} />
+            <input placeholder="Filter this page..." value={filter} onChange={e => setFilter(e.target.value)} />
           </div>
-          <span className="text-sm text-muted">{visible.length} entries</span>
+          <span className="text-sm text-muted">{data?.total ?? 0} entries</span>
         </div>
 
         <div className="activity-list" style={{ maxHeight: 'none' }}>
-          {slice.length === 0 && <div className="empty" style={{ padding: '24px 0' }}>No activity found.</div>}
+          {isLoading && !data && <SkeletonRows rows={PAGE_SIZE} />}
+          {!isLoading && slice.length === 0 && <div className="empty" style={{ padding: '24px 0' }}>No activity found.</div>}
           {slice.map(item => {
             const sentence = item.summary || [
               item.actorName || 'System',

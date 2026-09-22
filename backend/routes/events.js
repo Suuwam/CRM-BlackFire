@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const Event = require('../models/Event');
 const { requireSessionUser } = require('../utils/session');
 const { rateLimit } = require('../utils/rateLimit');
+const { storeImage } = require('../utils/upload');
 
 // All event routes require a logged-in session
 router.use(requireSessionUser);
@@ -36,7 +37,7 @@ router.get('/', async (req, res) => {
     if (req.query.month) {
       filter.date = { $regex: `^${req.query.month}` };
     }
-    res.json(await Event.find(filter).sort({ date: 1, time: 1 }));
+    res.json(await Event.find(filter).sort({ date: 1, time: 1 }).lean());
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -57,15 +58,10 @@ router.put('/:id', validateId, writeLimiter, async (req, res) => {
 // Upload image for event (memory storage -> base64 data URI)
 router.patch('/:id/image', validateId, upload.single('image'), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
-    const b64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
-    const event = await Event.findByIdAndUpdate(
-      req.params.id,
-      { image: b64 },
-      { new: true }
-    );
+    const image = await storeImage(req.file, { folder: 'crm_events' });
+    const event = await Event.findByIdAndUpdate(req.params.id, { image }, { new: true });
     res.json(event);
-  } catch (e) { res.status(400).json({ error: e.message }); }
+  } catch (e) { res.status(e.status || 400).json({ error: e.message }); }
 });
 
 router.delete('/:id', validateId, writeLimiter, async (req, res) => {

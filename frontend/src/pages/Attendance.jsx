@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import useSWR, { mutate } from 'swr';
 import { attendanceApi, fetcher } from '../api';
-import { AccountAvatar } from '../components/AccountPanel';
+import { AccountAvatar } from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
 import {

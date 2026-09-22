@@ -40,7 +40,7 @@ function cleanColumns(input) {
 router.get('/', async (_, res) => {
   try {
     if (await Board.countDocuments() === 0) await Board.insertMany(SEED);
-    res.json(await Board.find().sort({ order: 1, createdAt: 1 }));
+    res.json(await Board.find().sort({ order: 1, createdAt: 1 }).lean());
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

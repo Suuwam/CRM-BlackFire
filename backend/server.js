@@ -36,7 +36,11 @@ app.options('*', cors(corsOptions));
 // ─── Body Parsing (with size cap to prevent DoS) ──────────────────────────────
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  maxAge: '30d',       // upload filenames are stable once written
+  immutable: true,
+  etag: true,
+}));
 
 // Mongo DB connection handling for serverless & local
 let cachedConnection = null;
@@ -49,6 +53,14 @@ async function connectDB() {
   if (!cachedConnection) {
     cachedConnection = await mongoose.connect(process.env.MONGO_URI, {
       serverSelectionTimeoutMS: 4000,
+      // Every warm serverless instance keeps its own pool, so the driver default of 100
+      // multiplies by instance count and burns through the Atlas connection limit. A single
+      // instance only ever handles a handful of concurrent requests.
+      maxPoolSize: Number(process.env.MONGO_POOL_SIZE || 10),
+      minPoolSize: 0,
+      maxIdleTimeMS: 30_000,
+      // Fail fast instead of silently queueing operations while the socket is down.
+      bufferCommands: false,
     });
   }
   return cachedConnection;

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import useSWR, { mutate } from 'swr';
 import { templatesApi, emailApi, fetcher } from '../api';
 import Modal from '../components/Modal';
-import { AccountAvatar } from '../components/AccountPanel';
+import { AccountAvatar } from '../components/Avatar';
 import { useToast } from '../components/Toast';
 
 const TOKENS = ['{{name}}', '{{email}}', '{{username}}', '{{role}}'];
