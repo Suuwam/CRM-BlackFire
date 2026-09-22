@@ -63,10 +63,11 @@ export default function Board() {
   const [detailComments, setDetailComments] = useState([]);
   const dragId = useRef(null);
   const tabsRef = useRef(null);
-  const tabDragMoved = useRef(false);
-  const endTabDrag = useRef(null);
+  const stagesRef = useRef(null);
+  const dragMoved = useRef(false);
+  const endDrag = useRef(null);
   const [tabOrder, setTabOrder] = useState(null);   // ids mid-drag, null when settled
-  const [draggingBoard, setDraggingBoard] = useState(null);
+  const [draggingId, setDraggingId] = useState(null);
   const toast = useToast();
 
   const { data: boards = [], isLoading: boardsLoading } = useSWR('/boards', fetcher, { revalidateOnFocus: false });
@@ -302,62 +303,55 @@ export default function Board() {
     }
   }
 
-  // Tab order lives on the server so everyone sees the same board order.
+  // Drag to reorder: board tabs (left/right, order saved on the server so everyone sees the
+  // same one) and the stages in Design Layout (up/down, local to the draft).
   //
   // Pointer events rather than HTML5 drag-and-drop: dragstart/drop never fire from a
   // touch, and this has to work in the Capacitor app as well as on a desktop.
-  function startTabDrag(e, boardId) {
+  function startReorder(e, id, { axis, container, ids, onPreview, onSettle }) {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
 
-    const startX = e.clientX;
-    let order = boards.map(b => b._id);
+    const at = ev => (axis === 'x' ? ev.clientX : ev.clientY);
+    const start = at(e);
+    let order = ids;
     let moved = false;
 
     function onMove(ev) {
       // Ignore the few pixels of travel in an ordinary click.
       if (!moved) {
-        if (Math.abs(ev.clientX - startX) < 6) return;
+        if (Math.abs(at(ev) - start) < 6) return;
         moved = true;
-        setDraggingBoard(boardId);
+        setDraggingId(id);
       }
 
-      const over = [...(tabsRef.current?.querySelectorAll('[data-board-id]') || [])]
+      const over = [...(container()?.querySelectorAll('[data-drag-id]') || [])]
         .find(el => {
           const r = el.getBoundingClientRect();
-          return ev.clientX >= r.left && ev.clientX <= r.right;
+          return axis === 'x'
+            ? at(ev) >= r.left && at(ev) <= r.right
+            : at(ev) >= r.top  && at(ev) <= r.bottom;
         });
       if (!over) return;
 
-      const next = moveTo(order, boardId, over.dataset.boardId);
+      const next = moveTo(order, id, over.dataset.dragId);
       if (next === order) return;
       order = next;
-      setTabOrder(order);
+      onPreview(order);
     }
 
-    async function onUp() {
-      endTabDrag.current?.();
-      endTabDrag.current = null;
-      setDraggingBoard(null);
+    function onUp() {
+      endDrag.current?.();
+      endDrag.current = null;
+      setDraggingId(null);
 
       // Never travelled far enough to be a drag — let the click select the board.
       if (!moved) return;
-      tabDragMoved.current = true;
-      setTimeout(() => { tabDragMoved.current = false; }, 0);
-
-      const settled = order;
-      if (settled.join() === boards.map(b => b._id).join()) { setTabOrder(null); return; }
-
-      try {
-        const res = await boardsApi.reorder(settled);
-        mutate('/boards', res.data, false);
-      } catch {
-        toast('Could not reorder boards', 'error');
-      } finally {
-        setTabOrder(null);   // fall back to whatever the server says
-      }
+      dragMoved.current = true;
+      setTimeout(() => { dragMoved.current = false; }, 0);
+      onSettle(order);
     }
 
-    endTabDrag.current = () => {
+    endDrag.current = () => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
@@ -367,7 +361,19 @@ export default function Board() {
     window.addEventListener('pointercancel', onUp);
   }
 
-  useEffect(() => () => endTabDrag.current?.(), []);
+  async function saveBoardOrder(ids) {
+    if (ids.join() === boards.map(b => b._id).join()) { setTabOrder(null); return; }
+    try {
+      const res = await boardsApi.reorder(ids);
+      mutate('/boards', res.data, false);
+    } catch {
+      toast('Could not reorder boards', 'error');
+    } finally {
+      setTabOrder(null);   // fall back to whatever the server says
+    }
+  }
+
+  useEffect(() => () => endDrag.current?.(), []);
 
   function handleColumnNameChange(index, newName) {
     setDesignBoard(prev => {
@@ -393,16 +399,14 @@ export default function Board() {
     });
   }
 
-  function moveColumn(index, direction) {
-    setDesignBoard(prev => {
-      const cols = [...prev.columns];
-      const targetIndex = index + direction;
-      if (targetIndex < 0 || targetIndex >= cols.length) return prev;
-      const temp = cols[index];
-      cols[index] = cols[targetIndex];
-      cols[targetIndex] = temp;
-      return { ...prev, columns: cols };
-    });
+  // Screenshot pasted into the description becomes the card cover — it uploads with the save,
+  // same path as picking the file by hand.
+  function pasteImage(e) {
+    const file = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith('image/'));
+    if (!file) return;
+    e.preventDefault();
+    setImageFile(file);
+    toast('Image attached as card cover', 'info');
   }
 
   function colTasks(col) { return tasks.filter(t => t.column === col); }
@@ -435,13 +439,19 @@ export default function Board() {
           {orderedBoards.map(p => (
             <button
               key={p._id}
-              data-board-id={p._id}
-              className={`board-tab${project===p._id?' active':''}${draggingBoard===p._id?' board-tab--dragging':''}`}
+              data-drag-id={p._id}
+              className={`board-tab${project===p._id?' active':''}${draggingId===p._id?' board-tab--dragging':''}`}
               title="Drag left or right to reorder"
-              onPointerDown={e => startTabDrag(e, p._id)}
+              onPointerDown={e => startReorder(e, p._id, {
+                axis: 'x',
+                container: () => tabsRef.current,
+                ids: boards.map(b => b._id),
+                onPreview: setTabOrder,
+                onSettle: saveBoardOrder,
+              })}
               onClick={() => {
                 // Suppress the click the browser fires at the end of a drag.
-                if (tabDragMoved.current) return;
+                if (dragMoved.current) return;
                 selectProject(p._id);
               }}
               style={project===p._id ? { background: p.color, borderColor: p.color, color: '#fff' } : {}}>
@@ -569,7 +579,7 @@ export default function Board() {
           </div>
         </div>
 
-        <div className="form-group"><label>Description</label><textarea value={form.description} onChange={e => setForm(f=>({...f,description:e.target.value}))} placeholder="Optional details..." /></div>
+        <div className="form-group"><label>Description</label><textarea value={form.description} onChange={e => setForm(f=>({...f,description:e.target.value}))} onPaste={pasteImage} placeholder="Optional details... (paste an image to attach it as the cover)" /></div>
         <div className="form-row">
           <div className="form-group"><label>Priority</label>
             <select value={form.priority} onChange={e => setForm(f=>({...f,priority:e.target.value}))}>
@@ -637,7 +647,8 @@ export default function Board() {
           <div className="form-group"><label>Tags (comma separated)</label><input value={form.tags} onChange={e => setForm(f=>({...f,tags:e.target.value}))} placeholder="bug, feature, audio" /></div>
           <div className="form-group"><label>Due Date</label><input type="date" value={form.dueDate} onChange={e => setForm(f=>({...f,dueDate:e.target.value}))} /></div>
         </div>
-        <div className="form-group"><label>Card Cover Picture</label><input type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0] || null)} /></div>
+        <div className="form-group"><label>Card Cover Picture</label><input type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0] || null)} />
+          {imageFile && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>{imageFile.name || 'Pasted image'} — uploads on save <button className="btn btn-secondary btn-sm" style={{ padding: '2px 6px', fontSize: 10, marginLeft: 6 }} onClick={() => setImageFile(null)}>Clear</button></div>}</div>
       </Modal>
 
       <Modal open={!!viewingTask} onClose={() => { setViewingTask(null); setDetailComments([]); setCommentText(''); }} title="Task Details" footer={<button className="btn btn-secondary" onClick={() => { setViewingTask(null); setDetailComments([]); setCommentText(''); }}>Close</button>}>
@@ -814,14 +825,20 @@ export default function Board() {
             <label style={{ margin: 0 }}>Columns / Stages</label>
             <button className="btn btn-secondary btn-sm" onClick={addColumnToDesign} style={{ padding: '4px 10px', fontSize: 11.5 }}>+ Add Stage</button>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 240, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: '10px' }}>
+          <div ref={stagesRef} style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 240, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: '10px' }}>
             {designBoard.columns.map((col, idx) => (
-              <div key={col.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div key={col.id} data-drag-id={col.id}
+                style={{ display: 'flex', gap: 8, alignItems: 'center', opacity: draggingId === col.id ? 0.6 : 1 }}>
+                <span title="Drag to reorder"
+                  style={{ cursor: 'grab', touchAction: 'none', userSelect: 'none', color: 'var(--text3)', fontSize: 14, padding: '0 2px' }}
+                  onPointerDown={e => startReorder(e, col.id, {
+                    axis: 'y',
+                    container: () => stagesRef.current,
+                    ids: designBoard.columns.map(c => c.id),
+                    onPreview: ids => setDesignBoard(b => ({ ...b, columns: ids.map(i => b.columns.find(c => c.id === i)) })),
+                    onSettle: () => {},   // saved with the rest of the board
+                  })}>⋮⋮</span>
                 <input value={col.label} onChange={e => handleColumnNameChange(idx, e.target.value)} placeholder="Stage Name" style={{ flex: 1, padding: '6px 10px', fontSize: 13 }} />
-                
-                <button className="btn btn-secondary btn-sm" onClick={() => moveColumn(idx, -1)} disabled={idx === 0} style={{ padding: '4px 8px', fontSize: 11 }}>Up</button>
-                <button className="btn btn-secondary btn-sm" onClick={() => moveColumn(idx, 1)} disabled={idx === designBoard.columns.length - 1} style={{ padding: '4px 8px', fontSize: 11 }}>Down</button>
-                
                 <button className="btn btn-danger btn-sm" onClick={() => removeColumnFromDesign(idx)} disabled={designBoard.columns.length <= 1} style={{ padding: '4px 8px', fontSize: 11 }}>Remove</button>
               </div>
             ))}
