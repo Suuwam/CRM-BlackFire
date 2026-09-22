@@ -2,6 +2,7 @@ const router = require('express').Router();
 const multer = require('multer');
 const Task = require('../models/Task');
 const User = require('../models/User');
+const Board = require('../models/Board');
 const { requireSessionUser } = require('../utils/session');
 const { sendMail } = require('../utils/mailer');
 const { rateLimit } = require('../utils/rateLimit');
@@ -69,11 +70,19 @@ async function normalizeAssignment(data, currentUser) {
   };
 }
 
+// task.project is a Board._id — 'board_1758…' for anything created in the app — so mail has
+// to resolve the board's label or it shows that raw id.
+async function projectLabel(id) {
+  return (await Board.findById(id).lean())?.label || id;
+}
+
 // Send assignment notification to newly assigned people
 async function maybeNotifyAssignment(task, previousAssignees = []) {
   const prevEmails = new Set(previousAssignees.map(a => a.email).filter(Boolean));
   const newAssignees = (task.assignees || []).filter(a => a.email && !prevEmails.has(a.email));
   if (!newAssignees.length) return;
+
+  const project = await projectLabel(task.project);
 
   // Parallel: N recipients used to cost N sequential SMTP round-trips on the request path.
   await Promise.all(newAssignees.map(async assignee => {
@@ -83,13 +92,21 @@ async function maybeNotifyAssignment(task, previousAssignees = []) {
         <h2 style="margin:0 0 12px">New task assigned to you</h2>
         <table style="width:100%;border-collapse:collapse;font-size:14px">
           <tr><td style="padding:5px 0;color:#555;width:100px">Task</td><td style="font-weight:600">${task.title}</td></tr>
-          <tr><td style="padding:5px 0;color:#555">Project</td><td style="text-transform:capitalize">${task.project}</td></tr>
+          <tr><td style="padding:5px 0;color:#555">Project</td><td>${project}</td></tr>
           <tr><td style="padding:5px 0;color:#555">Assigned by</td><td>${task.assignedByName || 'System'}</td></tr>
           <tr><td style="padding:5px 0;color:#555">Priority</td><td style="text-transform:capitalize">${task.priority}</td></tr>
           <tr><td style="padding:5px 0;color:#555">Due date</td><td>${task.dueDate || 'Not set'}</td></tr>
         </table>
+        <p style="margin:16px 0 0;font-size:12px;color:#777">Replying to this mail is encouraged.</p>
       </div>`;
-    try { await sendMail({ to: assignee.email, subject, html, text: `New task assigned: ${task.title}\nAssigned by: ${task.assignedByName}` }); }
+    try {
+      await sendMail({
+        to: assignee.email,
+        subject,
+        html,
+        text: `New task assigned: ${task.title}\nAssigned by: ${task.assignedByName}\n\nReplying to this mail is encouraged.`,
+      });
+    }
     catch (e) { console.error('Assignment notify failed:', e.message); }
   }));
 }
@@ -116,6 +133,8 @@ async function notifyDone(task, movedBy) {
     task.assigneeName,
   ].filter(Boolean))].join(', ') || 'Team';
 
+  const project = await projectLabel(task.project);
+
   await Promise.all([...recipients].map(async ([email, name]) => {
     const subject = `✅ Task completed: ${task.title}`;
     const html = `
@@ -124,7 +143,7 @@ async function notifyDone(task, movedBy) {
         <p style="margin:0 0 16px;color:#555;font-size:13px">Marked done by ${movedBy?.name || 'a team member'}.</p>
         <table style="width:100%;border-collapse:collapse;font-size:14px">
           <tr><td style="padding:5px 0;color:#555;width:100px">Task</td><td style="font-weight:600">${task.title}</td></tr>
-          <tr><td style="padding:5px 0;color:#555">Project</td><td style="text-transform:capitalize">${task.project}</td></tr>
+          <tr><td style="padding:5px 0;color:#555">Project</td><td>${project}</td></tr>
           <tr><td style="padding:5px 0;color:#555">Assigned to</td><td>${allAssigneeNames}</td></tr>
           ${task.dueDate ? `<tr><td style="padding:5px 0;color:#555">Due date</td><td>${task.dueDate}</td></tr>` : ''}
         </table>
