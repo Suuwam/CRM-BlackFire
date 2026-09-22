@@ -28,6 +28,7 @@ const COLORS = [
 ];
 
 const EMPTY_TASK = { title:'', description:'', priority:'medium', color:'blue', tags:'', dueDate:'', assignees:[] };
+const APP_TITLE = 'CRM — Blackfire & Aawazz';
 
 // --- Draft cache helpers for Board tasks ---
 const DRAFT_KEY_PREFIX = 'crm_board_draft_';
@@ -57,6 +58,10 @@ export default function Board() {
   const [viewingTask, setViewingTask] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [imageFile, setImageFile] = useState(null);
+  const [imagePasted, setImagePasted] = useState(false);
+  const [imageLimit, setImageLimit] = useState(false);
+  const [imagePreview, setImagePreview] = useState('');
+  const coverInputRef = useRef(null);
   const [assigneeSearch, setAssigneeSearch] = useState('');
   const [commentText, setCommentText] = useState('');
   const [commentSaving, setCommentSaving] = useState(false);
@@ -77,6 +82,11 @@ export default function Board() {
     : boards;
   const activeProject = boards.find(p => p._id === project) || null;
   const columns = activeProject?.columns || [];
+
+  useEffect(() => {
+    document.title = activeProject?.label ? `${activeProject.label} — CRM` : APP_TITLE;
+    return () => { document.title = APP_TITLE; };
+  }, [activeProject?.label]);
   const hasColumn = id => columns.some(c => c.id === id);
 
   // Land on the first board, or on ?project= when another page linked here.
@@ -114,6 +124,16 @@ export default function Board() {
     }
   }, [project]);
 
+  useEffect(() => {
+    if (!imageFile) {
+      setImagePreview('');
+      return;
+    }
+    const url = URL.createObjectURL(imageFile);
+    setImagePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [imageFile]);
+
   // Exit fullscreen on ESC
   useEffect(() => {
     if (!isFullscreen) return;
@@ -126,13 +146,21 @@ export default function Board() {
     return () => document.removeEventListener('keydown', handleKey);
   }, [isFullscreen]);
 
+  function resetCover() {
+    setImageFile(null);
+    setImagePasted(false);
+    setImageLimit(false);
+    if (coverInputRef.current) coverInputRef.current.value = '';
+  }
+
   function openAdd(col) {
     const draft = loadDraft(null);
+    resetCover();
     if (draft && draft.form.title.trim()) {
-      setForm(draft.form); setEditCol(draft.col || col); setEditing(null); setImageFile(null); setModal(true);
+      setForm(draft.form); setEditCol(draft.col || col); setEditing(null); setModal(true);
       toast('Restored unsaved draft', 'info');
     } else {
-      setForm({ ...EMPTY_TASK }); setEditCol(col); setEditing(null); setImageFile(null); setModal(true);
+      setForm({ ...EMPTY_TASK }); setEditCol(col); setEditing(null); setModal(true);
     }
   }
 
@@ -140,8 +168,9 @@ export default function Board() {
     const draft = loadDraft(t._id);
     const hasCol = columns.some(c => c.id === t.column);
     const targetCol = hasCol ? t.column : (columns[0]?.id || 'backlog');
+    resetCover();
     if (draft?.form?.title?.trim()) {
-      setForm(draft.form); setEditCol(draft.col || targetCol); setEditing(t._id); setImageFile(null); setModal(true);
+      setForm(draft.form); setEditCol(draft.col || targetCol); setEditing(t._id); setModal(true);
       toast('Restored unsaved edits', 'info');
     } else {
       let assignees = t.assignees?.length ? t.assignees : [];
@@ -156,7 +185,7 @@ export default function Board() {
         tags: (t.tags || []).join(', '),
         dueDate: t.dueDate || '',
         assignees,
-      }); setEditCol(targetCol); setEditing(t._id); setImageFile(null); setModal(true);
+      }); setEditCol(targetCol); setEditing(t._id); setModal(true);
     }
   }
 
@@ -196,7 +225,7 @@ export default function Board() {
         mutate(swrKey, [...tasks, savedTask], false);
       }
       if (imageFile && savedTask?._id) await tasksApi.uploadImage(savedTask._id, imageFile);
-      clearDraft(editing); toast('Task saved', 'success'); setModal(false); setImageFile(null);
+      clearDraft(editing); toast('Task saved', 'success'); setModal(false); resetCover();
       mutate(swrKey);
     } catch (err) {
       const errMsg = err?.response?.data?.error;
@@ -399,24 +428,58 @@ export default function Board() {
     });
   }
 
+  // A card keeps one cover. The first paste or file becomes it; another attempt is refused.
+  function coverAlreadySet() {
+    if (imageFile) return true;
+    if (!editing) return false;
+    return Boolean(tasks.find(t => t._id === editing)?.image);
+  }
+
+  function takeCover(file, fromPaste) {
+    if (!file) return;
+    if (coverAlreadySet()) {
+      setImageLimit(true);
+      if (coverInputRef.current) coverInputRef.current.value = '';
+      return;
+    }
+    setImageLimit(false);
+    setImagePasted(fromPaste);
+    setImageFile(file);
+  }
+
   // Screenshot pasted into the description becomes the card cover — it uploads with the save,
   // same path as picking the file by hand.
   function pasteImage(e) {
-    const file = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith('image/'));
-    if (!file) return;
+    const images = [...(e.clipboardData?.files || [])].filter(f => f.type.startsWith('image/'));
+    if (!images.length) return;
     e.preventDefault();
-    setImageFile(file);
-    toast('Image attached as card cover', 'info');
+    if (!coverAlreadySet() && images.length > 1) {
+      setImageFile(images[0]);
+      setImagePasted(true);
+      setImageLimit(true);
+      return;
+    }
+    takeCover(images[0], true);
+  }
+
+  function pickCover(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    takeCover(file, false);
   }
 
   function colTasks(col) { return tasks.filter(t => t.column === col); }
   const getAssigneeLabel = (task) => task.assigneeName || task.assignee || 'Unassigned';
   const getAssignedByLabel = (task) => task.assignedByName || 'System';
+  const savedCover = !imagePreview && editing ? (tasks.find(t => t._id === editing)?.image || '') : '';
+  const coverSrc = imagePreview || (savedCover
+    ? (savedCover.startsWith('data:') || savedCover.startsWith('http') ? savedCover : `/uploads/${savedCover}`)
+    : '');
 
   return (
     <>
       <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-        <div><h1>Project Board</h1><p>Task tracking with color coding & cover image attachments</p></div>
+        <div><h1>{activeProject?.label || 'Project Board'}</h1><p>Task tracking with color coding & cover image attachments</p></div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {activeProject && (
             <button className="btn btn-secondary btn-sm" onClick={() => openEditBoard(project)}>
@@ -647,8 +710,16 @@ export default function Board() {
           <div className="form-group"><label>Tags (comma separated)</label><input value={form.tags} onChange={e => setForm(f=>({...f,tags:e.target.value}))} placeholder="bug, feature, audio" /></div>
           <div className="form-group"><label>Due Date</label><input type="date" value={form.dueDate} onChange={e => setForm(f=>({...f,dueDate:e.target.value}))} /></div>
         </div>
-        <div className="form-group"><label>Card Cover Picture</label><input type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0] || null)} />
-          {imageFile && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>{imageFile.name || 'Pasted image'} — uploads on save <button className="btn btn-secondary btn-sm" style={{ padding: '2px 6px', fontSize: 10, marginLeft: 6 }} onClick={() => setImageFile(null)}>Clear</button></div>}</div>
+        <div className="form-group"><label>Card Cover Picture</label><input ref={coverInputRef} type="file" accept="image/*" onChange={pickCover} />
+          {coverSrc && (
+            <div className="cover-paste-card">
+              <img src={coverSrc} alt="" />
+              {imagePasted && <div className="cover-paste-badge">[image pasted]</div>}
+            </div>
+          )}
+          {imageLimit && <div className="cover-paste-limit">Only one image can be added</div>}
+          {imageFile && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>{imageFile.name || 'Pasted image'} — uploads on save <button className="btn btn-secondary btn-sm" style={{ padding: '2px 6px', fontSize: 10, marginLeft: 6 }} onClick={resetCover}>Clear</button></div>}
+        </div>
       </Modal>
 
       <Modal open={!!viewingTask} onClose={() => { setViewingTask(null); setDetailComments([]); setCommentText(''); }} title="Task Details" footer={<button className="btn btn-secondary" onClick={() => { setViewingTask(null); setDetailComments([]); setCommentText(''); }}>Close</button>}>
