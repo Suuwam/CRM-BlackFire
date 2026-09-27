@@ -79,7 +79,7 @@ export default function Milestones() {
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <button className={`btn btn-sm ${m.done ? 'btn-secondary' : 'btn-primary'}`}
+                <button className={`btn btn-sm ${m.done ? 'btn-secondary' : 'milestone-done'}`}
                   onClick={() => run(() => milestonesApi.setDone(m._id, !m.done), m.done ? 'Milestone reopened' : 'Milestone done')}>
                   {m.done ? 'Reopen' : 'Mark done'}
                 </button>
