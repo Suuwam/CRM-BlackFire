@@ -53,7 +53,7 @@ export default function Milestones() {
           <h1 style={{ ...dramatic, fontSize: 30 }}>Milestones</h1>
           <p>{total} milestone{total === 1 ? '' : 's'} · everyone is notified of changes</p>
         </div>
-        {canWrite && <button className="btn btn-primary" onClick={openAdd}>+ New Milestone</button>}
+        {canWrite && <button className="milestone-new" onClick={openAdd}><span>+</span> New Milestone</button>}
       </div>
 
       <div className="page-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
