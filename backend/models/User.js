@@ -9,6 +9,8 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ['admin', 'member'], default: 'member' },
   photo: { type: String, default: '' },
   active: { type: Boolean, default: true },
+  // Lets a member write and delete milestones; admins can regardless.
+  milestoneAccess: { type: Boolean, default: false },
   resetPasswordToken: { type: String, default: undefined },
   resetPasswordExpiry: { type: Date, default: undefined },
 }, { timestamps: true });

@@ -3,6 +3,7 @@ import NotificationBell from './NotificationBell';
 
 const nav = [
   { to: '/dashboard',  label: 'Dashboard' },
+  { to: '/milestones', label: 'Milestones' },
   { to: '/attendance', label: 'Attendance' },
   { to: '/team',       label: 'Team' },
   { to: '/assigned',   label: 'Assigned Tasks' },

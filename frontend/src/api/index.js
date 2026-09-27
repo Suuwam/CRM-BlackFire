@@ -100,6 +100,13 @@ export const referencesApi = {
   scrape: (url) => api.post('/references/scrape', { url }),
 };
 
+export const milestonesApi = {
+  create: (data) => api.post('/milestones', data),
+  update: (id, data) => api.put(`/milestones/${id}`, data),
+  setDone: (id, done) => api.patch(`/milestones/${id}/done`, { done }),
+  delete: (id) => api.delete(`/milestones/${id}`),
+};
+
 export const boardsApi = {
   list: () => api.get('/boards'),
   create: (data) => api.post('/boards', data),

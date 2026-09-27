@@ -15,6 +15,7 @@ const Attendance    = lazy(() => import('./pages/Attendance'));
 const Team          = lazy(() => import('./pages/Team'));
 const Calendar      = lazy(() => import('./pages/Calendar'));
 const Email         = lazy(() => import('./pages/Email'));
+const Milestones    = lazy(() => import('./pages/Milestones'));
 const References    = lazy(() => import('./pages/References'));
 const Board         = lazy(() => import('./pages/Board'));
 const Auth          = lazy(() => import('./pages/Auth'));
@@ -99,6 +100,7 @@ function AppShell() {
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/milestones" element={<Milestones />} />
             <Route path="/assigned" element={<AssignedTasks />} />
             <Route path="/backlog" element={<Backlog />} />
             <Route path="/overdue" element={<Overdue />} />

@@ -11,6 +11,7 @@ function sanitizeUser(user) {
     role: user.role,
     photo: user.photo || '',
     active: user.active,
+    milestoneAccess: !!user.milestoneAccess,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };

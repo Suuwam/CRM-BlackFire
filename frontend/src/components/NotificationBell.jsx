@@ -2,6 +2,10 @@ import { useState, useRef, useEffect } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '../api';
 
+function isNotifiable(a) {
+  return a.targetType === 'milestone' || isEmailActivity(a);
+}
+
 function isEmailActivity(a) {
   const s = (a.summary || '').toLowerCase();
   const ac = (a.action || '').toLowerCase();
@@ -21,7 +25,7 @@ export default function NotificationBell() {
     revalidateOnFocus: false,
   });
 
-  const emailItems = activities.filter(isEmailActivity);
+  const emailItems = activities.filter(isNotifiable);
   const unread = emailItems.filter(a => new Date(a.createdAt).getTime() > lastSeen).length;
 
   function toggle() {
@@ -45,7 +49,7 @@ export default function NotificationBell() {
     <div ref={panelRef} style={{ position: 'relative' }}>
       <button
         onClick={toggle}
-        title="Email Notifications"
+        title="Notifications"
         style={{
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '9px 12px', borderRadius: 8,
@@ -73,7 +77,7 @@ export default function NotificationBell() {
             </span>
           )}
         </span>
-        <span>Email Alerts</span>
+        <span>Alerts</span>
         {unread > 0 && (
           <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, background: '#ef444422', color: '#ef4444', borderRadius: 20, padding: '1px 7px' }}>
             {unread} new
@@ -90,12 +94,12 @@ export default function NotificationBell() {
           maxHeight: 360, display: 'flex', flexDirection: 'column',
         }}>
           <div style={{ padding: '12px 16px 8px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>Email Activity</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>Emails &amp; Milestones</span>
             <span style={{ fontSize: 10, color: 'var(--text3)' }}>Last 14 days</span>
           </div>
           <div style={{ overflowY: 'auto', flex: 1 }}>
             {emailItems.length === 0 && (
-              <div style={{ padding: '24px 16px', fontSize: 12, color: 'var(--text3)', textAlign: 'center' }}>No email activity found</div>
+              <div style={{ padding: '24px 16px', fontSize: 12, color: 'var(--text3)', textAlign: 'center' }}>Nothing new</div>
             )}
             {emailItems.slice(0, 20).map((a, i) => {
               const isNew = new Date(a.createdAt).getTime() > lastSeen;

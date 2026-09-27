@@ -7,7 +7,7 @@ import { AccountAvatar } from '../components/Avatar';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 
-const EMPTY = { name: '', username: '', email: '', password: '', role: 'member', active: true };
+const EMPTY = { name: '', username: '', email: '', password: '', role: 'member', active: true, milestoneAccess: false };
 
 export default function Accounts() {
   const { user } = useAuth();
@@ -44,6 +44,7 @@ export default function Accounts() {
       password: '',
       role: account.role,
       active: account.active,
+      milestoneAccess: !!account.milestoneAccess,
     });
     setModal(true);
   }
@@ -284,6 +285,9 @@ export default function Accounts() {
         <div className="form-row">
           <div className="form-group"><label>Role</label><select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}><option value="member">Member</option><option value="admin">Admin</option></select></div>
           <div className="form-group"><label>Status</label><select value={form.active ? 'active' : 'disabled'} onChange={e => setForm(f => ({ ...f, active: e.target.value === 'active' }))}><option value="active">Active</option><option value="disabled">Disabled</option></select></div>
+        </div>
+        <div className="form-row">
+          <div className="form-group"><label>Milestones</label><select value={form.milestoneAccess ? 'yes' : 'no'} onChange={e => setForm(f => ({ ...f, milestoneAccess: e.target.value === 'yes' }))}><option value="no">Can only mark done</option><option value="yes">Can write &amp; delete</option></select></div>
         </div>
       </Modal>
     </>

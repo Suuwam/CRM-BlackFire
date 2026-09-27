@@ -26,6 +26,7 @@ router.post('/', requireAdmin, writeLimiter, async (req, res) => {
       password: req.body.password,
       role: req.body.role === 'admin' ? 'admin' : 'member',
       active: req.body.active !== false,
+      milestoneAccess: req.body.milestoneAccess === true,
     };
 
     const user = await User.create(payload);
@@ -52,6 +53,7 @@ router.put('/:id', requireAdmin, writeLimiter, async (req, res) => {
       email: String(req.body.email || '').trim().toLowerCase(),
       role: req.body.role === 'admin' ? 'admin' : 'member',
       active: req.body.active !== false,
+      milestoneAccess: req.body.milestoneAccess === true,
     };
 
     if (req.body.password) payload.password = req.body.password;
