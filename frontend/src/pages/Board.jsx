@@ -28,7 +28,7 @@ const COLORS = [
 ];
 
 const EMPTY_TASK = { title:'', description:'', priority:'medium', color:'blue', tags:'', dueDate:'', assignees:[] };
-const APP_TITLE = 'CRM — Blackfire & Aawazz';
+const APP_TITLE = 'CRM | Blackfire & Aawazz';
 
 // --- Draft cache helpers for Board tasks ---
 const DRAFT_KEY_PREFIX = 'crm_board_draft_';
@@ -84,7 +84,7 @@ export default function Board() {
   const columns = activeProject?.columns || [];
 
   useEffect(() => {
-    document.title = activeProject?.label ? `${activeProject.label} — CRM` : APP_TITLE;
+    document.title = activeProject?.label ? `${activeProject.label} | CRM` : APP_TITLE;
     return () => { document.title = APP_TITLE; };
   }, [activeProject?.label]);
   const hasColumn = id => columns.some(c => c.id === id);
