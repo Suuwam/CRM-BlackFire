@@ -1,162 +1,173 @@
 # Blackfire × Aawazz CRM ⚡
 
-A modern, high-performance, full-stack CRM built for **Blackfire AI** and **Aawazz**. Features a minimalist premium design system, attendance and clock-in tracking tied to CRM sign-ins, a live team presence board, work scheduling calendar, variable-injected employee email automation, resource reference link board, and a multi-project Kanban board.
+The internal CRM for **Blackfire AI** and **Aawazz**: attendance and live team presence, milestones, a multi-project Kanban board, calendar, employee email automation, a links board, and feedback dashboards for every website we run. It's available on the web, on Android, and on iPhone.
 
-![Tech Stack](https://img.shields.io/badge/Stack-React%2018%20%7C%20Node.js%20%7C%20Express%20%7C%20MongoDB-black?style=for-the-badge)
-![UI Design](https://img.shields.io/badge/Design-Minimalist%20Premium-18181b?style=for-the-badge)
+**Open it:** **[crm-blackfire.vercel.app](https://crm-blackfire.vercel.app)**
 
----
-
-## 💻 How to Access & Run Locally
-
-### Direct Access (Currently Running)
-If the local server is running on your machine:
-- **Frontend App**: [http://localhost:5173](http://localhost:5173)
-- **Backend API**: [http://localhost:5000/api/health](http://localhost:5000/api/health)
+![Stack](https://img.shields.io/badge/Stack-React%2018%20%7C%20Node.js%20%7C%20Express%20%7C%20MongoDB-black?style=for-the-badge)
+![Platforms](https://img.shields.io/badge/Platforms-Web%20%7C%20Android%20%7C%20iPhone-18181b?style=for-the-badge)
 
 ---
 
-### Step-by-Step Local Setup
+## 📲 Get the app
 
-#### 1. Clone the Repository
-```bash
-git clone https://github.com/Suuwam/CRM-BlackFire.git
-cd CRM-BlackFire
-```
+### Android
 
-#### 2. Start the Backend Server
-```bash
-cd backend
-npm install
-npm run dev
-```
-> The backend runs at `http://localhost:5000` connected to MongoDB Atlas.
+<a href="https://crm-blackfire.vercel.app/crm-blackfire.apk">
+  <img src="https://img.shields.io/badge/Download-Android%20APK-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Download for Android" height="48">
+</a>
 
-#### 3. Start the Frontend Application
-Open a new terminal window:
-```bash
-cd frontend
-npm install
-npm run dev
-```
-> The frontend runs at `http://localhost:5173`.
+1. Tap the button above on your phone. It downloads `crm-blackfire.apk`.
+2. Open the file. If Android asks, allow **Install unknown apps** for your browser or Files app.
+3. Open **Blackfire CRM**, sign in, and tap **Allow** when it asks to send notifications.
+
+### iPhone / iPad
+
+You don't need the App Store. You install it from Safari in about 30 seconds (requires iOS 16.4 or later):
+
+1. Open **[crm-blackfire.vercel.app](https://crm-blackfire.vercel.app)** in **Safari**. It has to be Safari, not Chrome.
+2. Tap the **Share** button (the square with an arrow ↑ at the bottom of the screen).
+3. Scroll down and tap **Add to Home Screen**, then tap **Add**.
+4. Open **Blackfire** from your home screen and sign in.
+5. To get notifications, tap **Alerts** at the bottom of the menu, then **Enable notifications**, then **Allow**.
+
+> The **Enable notifications** button only appears in the home-screen app. iPhones don't allow notifications from a regular Safari tab.
+
+### What you get notified about
+New website feedback, milestone changes, and emails, on both Android and iPhone. Tapping a notification opens the matching page. You won't be notified about changes you made yourself.
 
 ---
 
-## 🎨 Key Features & Modules
+## 🎨 Features
 
-### 1. 📅 Work Scheduling Calendar
-- **Bigger Grid & Exact Day Alignment**: Visual month grid with auto-filled date alignment and day numbers.
-- **Color-Coded Event Cards**: Work items styled dynamically by category (`Blue`, `Green`, `Amber`, `Gray`).
-- **Interactive Side Panel**: Select any day to view detailed events, scheduled client links, notes, and quick action controls (Add/Edit/Delete).
+| Area | What it does |
+|---|---|
+| **Dashboard** | Workload, throughput, priority mix, hours today and the week ahead. |
+| **Milestones** | Numbered company milestones. Everyone can mark them done, and every change notifies the team. |
+| **Attendance** | Signing in clocks you in and signing out clocks you out (or use the top-bar pill). Daily board with hours, overtime and notes. |
+| **Team** | Who's online right now, based on a 60 s heartbeat. Offline after 3 missed beats. |
+| **Assigned · Backlog · Overdue** | Your tasks, the full activity trail, and anything past due. |
+| **Calendar** | Month grid with color-coded work items and a side panel to add, edit or delete them. |
+| **Email** | Reusable templates sent to one or many employees, with `{{name}}`, `{{email}}`, `{{username}}` and `{{role}}` filled in. |
+| **Links** | A bookmark board for design assets, docs and tools, with tags and search. |
+| **Board** | Kanban per project (Blackfire AI, Aawazz…): Backlog → To Do → In Progress → QA → Done, with drag and drop. |
+| **Feedback** | Reviews from our websites, with a dashboard for each site. See below. |
+| **Admin** | Admin Overview (everyone's work history) and Accounts (approve sign-up requests; set role, active and milestone access). |
 
-### 2. ⏱️ Attendance & Time Tracking
-- **Clock in on sign-in**: Logging in starts the day; logging out closes it. The pill in the top bar clocks in or out manually and shows live hours.
-- **Daily Board**: Present / not present / away summaries plus a per-employee table of clock-in, clock-out, hours, overtime, status and notes, for any date.
-- **Team Presence**: Who is online right now, driven by a 60s heartbeat (offline after 3 missed beats).
-- **Work History**: Every employee sees their own 30-day history and totals in `Account → Work history`; admins see everyone's in **Admin Overview**.
-- **Backlog Trail**: Logins, logouts, exits and clock events all land in the Backlog feed.
-- Tunables: `ATTENDANCE_TZ` (backend), `VITE_SHIFT_MINUTES` and `VITE_ON_TIME_BY` (frontend).
+### 💬 Website Feedback
 
-### 3. ✉️ Employee Email Automation
-- **Template Builder**: Create and edit reusable email templates.
-- **Employee Directory**: Pick one or many employees as recipients — the old client roster now lives here.
-- **Variable Substitution**: Live preview substituting `{{name}}`, `{{email}}`, `{{username}}` and `{{role}}`.
+Every review left on one of our websites (LipiSub first) arrives in the CRM within seconds.
 
-### 4. 📋 Project Kanban Board
-- **Multi-Project Management**: Switch between **Blackfire AI** (Main Project) and **Aawazz** (SaaS Product).
-- **5-Stage Pipeline**: Backlog → To Do → In Progress → QA / Review → Done.
-- **Interactive Drag & Drop**: Drag task cards seamlessly across columns with real-time API sync.
+- **Sidebar → Feedback** shows *All websites*, plus one entry for each connected site.
+- **Each site's dashboard** shows:
+  - the average rating
+  - **positive (4–5★), neutral (3★) and negative (1–2★)** counts and their split
+  - a chart of the last 30 days
+  - the breakdown by star rating and by category
+  - **similar feedback**: reviews that say the same thing, grouped together (e.g. *"10× export froze"*)
+  - a filterable list of every review
+- Everyone signed in can view feedback. Only admins can add or remove websites.
 
-### 5. 🔗 Reference Link Board
-- **Resource Bookmark Manager**: Track design assets, documentation, and external tools.
-- **Tag Filtering & Search**: Categorize links with tags and copy URLs in one click.
-
-### 6. 💬 Website Feedback
-Reviews left on our websites (LipiSub first) land in the CRM, one dashboard per website.
-
-- **Sidebar → Feedback**: *All websites* plus one entry per connected site.
-- **Per-site dashboard**: average rating; **positive (4–5★) / neutral (3★) / negative (1–2★)** counts and split; last-30-days chart; star and category breakdown; **similar feedback** (reviews that say the same thing, grouped by shared words, e.g. "10× export froze"); a filterable list of every review.
-- **Alerts**: every new review shows in the Alerts bell, and as a phone notification (Android app, and iPhone home-screen app).
-- Everyone signed in can view it; only admins add or remove websites.
-
-**Connecting a website (no code in the CRM):**
-1. CRM → **Feedback → All websites** → type the site's name → **Add website**.
-2. Click **Setup** and copy the two values into that site's server env:
+#### Connecting a website (no code changes in the CRM)
+1. Go to **Feedback → All websites**, type the site's name, and click **Add website**.
+2. Click **Setup** and copy the two values into that site's server environment:
    ```
    CRM_WEBHOOK_URL=https://crm-blackfire.vercel.app/api/feedback/hook/<site>
    CRM_WEBHOOK_SECRET=<the secret shown>
    ```
-3. Restart the site. New reviews arrive within seconds; old ones can be resent from the site's admin (LipiSub: *Admin → Feedback → Send to CRM*).
+3. Restart the site. To bring in reviews from before the link was set up, resend them from the site's admin (LipiSub: *Admin → Feedback → Send to CRM*).
 
-*New secret* replaces a leaked secret (the site stops sending until its env is updated). *Remove* deletes the site and its reviews.
+**New secret** replaces a leaked secret. The site stops sending until you update its env. **Remove** deletes the site and all its reviews.
 
-**Adding a site other than LipiSub:** it must send LipiSub's format. Copy `lipsub-backend/src/services/crmWebhook.js` (about 60 lines, no dependencies), call `postWebhook(feedbackPayload(row), { url, secret })` when a review is saved, then connect it as above. The contract is in `lipsub-backend/DEPLOY.md` → *Feedback → CRM*:
-- `POST` JSON `{ event, id, createdAt, feedback: { rating 1–5, category bug|idea|praise|other, message, page }, user: { id, email, name, plan } }`
-- Headers: `X-LipiSub-Timestamp` (unix seconds) and `X-LipiSub-Signature: sha256=HMAC-SHA256(secret, "<timestamp>.<raw body>")`. `X-Webhook-Timestamp` / `X-Webhook-Signature` work too.
-- The CRM rejects a bad signature (401) or a timestamp more than 5 minutes off, and skips an `id` it already has, so resends are safe.
+#### Adding a site other than LipiSub
+The site has to send LipiSub's format. The easiest way is to copy `lipsub-backend/src/services/crmWebhook.js` (about 60 lines, no dependencies). Call `postWebhook(feedbackPayload(row), { url, secret })` whenever a review is saved, then connect the site as described above. The full contract is in `lipsub-backend/DEPLOY.md` under *Feedback → CRM*:
 
-Check: `cd backend && node test-feedback.js`.
-
-### 7. 🍎 iPhone (Home Screen app)
-No App Store needed. On the iPhone (iOS 16.4+):
-1. Open **https://crm-blackfire.vercel.app** in **Safari** → **Share** → **Add to Home Screen**.
-2. Open **Blackfire** from the home screen and sign in.
-3. **Alerts** (bottom of the sidebar) → **Enable notifications** → **Allow**.
-
-New feedback, milestone changes and emails then arrive as notifications even with the app closed (Web Push). Tapping one opens the matching page. The button only appears in the home-screen app; Safari tabs can't receive push on iPhone. Desktop Chrome/Edge/Firefox get the same button.
-
-- You don't get notified of your own changes.
-- No setup: the push keys (VAPID) are generated on first use and stored in Mongo (`settings` collection). To pin your own instead, set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (from `npx web-push generate-vapid-keys`) and optionally `VAPID_SUBJECT=mailto:you@…`. Changing the keys means everyone taps **Enable notifications** again.
-
-### 8. 📱 Mobile App (Android)
-- Download `crm-blackfire.apk` (repo root, or `/crm-blackfire.apk` on the deployed site) and install it.
-- **Notifications**: new feedback, milestone changes and emails pop up as phone notifications. Allow notifications when asked on first launch. The app checks every minute while it is open or recently in the background. A fully closed app catches up when reopened (no Firebase push yet).
-- Rebuild after frontend changes:
-  ```bash
-  cd frontend && npm run build && npx cap sync android
-  cd android && JAVA_HOME=../../jdk21 ./gradlew assembleDebug
-  cp app/build/outputs/apk/debug/app-debug.apk ../../crm-blackfire.apk
-  cp app/build/outputs/apk/debug/app-debug.apk ../public/crm-blackfire.apk
-  ```
+- **Body:** `POST` JSON `{ event, id, createdAt, feedback: { rating 1–5, category bug|idea|praise|other, message, page }, user: { id, email, name, plan } }`
+- **Headers:** `X-LipiSub-Timestamp` (unix seconds) and `X-LipiSub-Signature: sha256=HMAC-SHA256(secret, "<timestamp>.<raw body>")`. `X-Webhook-Timestamp` / `X-Webhook-Signature` also work.
+- **What the CRM rejects:** a bad signature (401) or a timestamp more than 5 minutes off. If it already has a review's `id`, it skips it, so resending is safe.
 
 ---
 
-## 🛠️ Architecture & Tech Stack
+## 💻 Run locally
+
+```bash
+git clone https://github.com/Suuwam/CRM-BlackFire.git
+cd CRM-BlackFire
+
+# Backend → http://localhost:5000
+cd backend && cp .env.example .env   # set MONGO_URI
+npm install && npm run dev
+
+# Frontend → http://localhost:5173 (new terminal; proxies /api to :5000)
+cd frontend && npm install && npm run dev
+```
+
+Checks:
+```bash
+node backend/test-feedback.js   # webhook signatures + similar-feedback grouping
+node frontend/sw.test.mjs       # service worker never serves a stale app shell
+```
+
+### Environment variables (backend / Vercel)
+
+| Variable | Needed | What for |
+|---|---|---|
+| `MONGO_URI` | **yes** | MongoDB Atlas connection string |
+| `ALLOWED_ORIGINS` | prod | Comma-separated CORS allow-list |
+| `ATTENDANCE_TZ` | | Day boundary for attendance (default `Asia/Kathmandu`) |
+| `SMTP_HOST` `SMTP_PORT` `SMTP_SECURE` `SMTP_USER` `SMTP_PASS` `MAIL_FROM` | for email | Outgoing mail |
+| `CLOUDINARY_CLOUD_NAME` `CLOUDINARY_API_KEY` `CLOUDINARY_API_SECRET` | for uploads | Profile photos and card images |
+| `VAPID_PUBLIC_KEY` `VAPID_PRIVATE_KEY` `VAPID_SUBJECT` | no | Push keys. If unset, they're generated on first use and stored in Mongo (`settings`). If you change them, everyone has to tap *Enable notifications* again. |
+
+Frontend: `VITE_API_URL` (default `/api`), `VITE_SHIFT_MINUTES`, `VITE_ON_TIME_BY`.
+
+---
+
+## 📱 Building the mobile apps
+
+**Android** (Capacitor). Run this after any frontend change, then commit both APKs:
+```bash
+cd frontend && npm run build && npx cap sync android
+cd android && JAVA_HOME=../../jdk21 ./gradlew assembleDebug
+cp app/build/outputs/apk/debug/app-debug.apk ../../crm-blackfire.apk
+cp app/build/outputs/apk/debug/app-debug.apk ../public/crm-blackfire.apk   # what the download button serves
+```
+The app turns new alerts into phone notifications using `@capacitor/local-notifications`. It checks every minute while it's open or was used recently.
+
+**iPhone** doesn't need a build. It's the website installed to the home screen (`frontend/public/manifest.json` + `sw.js`), and notifications come through Web Push (`backend/utils/push.js`). Every deploy updates it automatically. A native Xcode project (`frontend/ios`) also exists, but building it requires a Mac.
+
+---
+
+## 🛠️ Architecture
 
 ```
 CRM-BlackFire/
+├── api/index.js         # Vercel serverless entry → backend/server.js
 ├── backend/
-│   ├── models/        # Mongoose Data Models (User, Attendance, Event, Task, Template, Reference, Feedback, FeedbackSource)
-│   ├── routes/        # Express Route Handlers
-│   ├── uploads/       # Profile Image Storage
-│   └── server.js      # Express Server & MongoDB Connection (Serverless-ready)
+│   ├── models/          # User, Attendance, Event, Task, Board, Milestone, Template, Reference,
+│   │                    # Activity, AccountApplication, Feedback, FeedbackSource
+│   ├── routes/          # Express routes (/api/*), incl. feedback.js (webhook + dashboards), push.js
+│   ├── utils/           # session, rate limit, mailer, activity log, feedback, push
+│   └── server.js
 ├── frontend/
-│   ├── src/
-│   │   ├── api/       # Centralized Axios/Fetch API Services
-│   │   ├── components/# Reusable UI Components (Sidebar, Modal, Toast)
-│   │   ├── pages/     # Page Views (Dashboard, Attendance, Team, Calendar, Email, Board, References, Feedback)
-│   │   └── index.css  # Premium Minimalist Design System
-│   ├── index.html
-│   └── vite.config.js
-└── vercel.json        # Unified Vercel Monorepo Deployment Config
+│   ├── src/             # React 18 + Vite: pages/, components/, api/, index.css
+│   ├── public/          # manifest.json, sw.js (offline shell + push), crm-blackfire.apk
+│   ├── android/         # Capacitor Android project
+│   └── ios/             # Capacitor iOS project
+├── crm-blackfire.apk    # latest Android build
+└── vercel.json          # one Vercel project: SPA + /api
 ```
 
-- **Frontend**: React 18, Vite, React Router DOM, Custom CSS System (Inter 800 variable font, dark zinc accents)
-- **Backend**: Node.js, Express, Mongoose 8, Multer, CORS
-- **Database**: MongoDB Atlas (`crmcluster`)
+- **Frontend:** React 18, Vite, React Router, SWR, custom CSS design system, Capacitor 8
+- **Backend:** Node.js, Express, Mongoose 8, web-push, Nodemailer, Cloudinary
+- **Database:** MongoDB Atlas
 
----
+## 🌐 Deploying
 
-## 🌐 Deploying to Vercel
+Pushing to `main` deploys to Vercel. To set it up from scratch: import the repo at [vercel.com/new](https://vercel.com/new), add `MONGO_URI` (plus any of the optional variables above), and deploy. `vercel.json` handles the build and routing.
 
-The project includes a serverless-ready `vercel.json` configuration for unified full-stack Vercel deployment.
-
-1. Push code to your GitHub repo: `https://github.com/Suuwam/CRM-BlackFire`
-2. Go to **[Vercel Dashboard](https://vercel.com/new)** → Import `CRM-BlackFire`.
-3. Add Environment Variable:
-   - `MONGO_URI`: `mongodb+srv://crmadmin:<password>@crmcluster.0yyfhqw.mongodb.net/crm-blackfire?retryWrites=true&w=majority`
-4. Click **Deploy**.
+The code lives in two repositories that are kept identical:
+[Suuwam/CRM-BlackFire](https://github.com/Suuwam/CRM-BlackFire) and [BlackfireAI/real-crm-blackfire](https://github.com/BlackfireAI/real-crm-blackfire).
 
 ---
 
