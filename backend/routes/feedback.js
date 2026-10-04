@@ -76,7 +76,12 @@ function slugify(name) {
   return String(name).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
 }
 
+// "all" is the combined dashboard: every website's reviews together.
+const ALL = { name: 'All websites', slug: 'all', color: '#6366f1' };
+const scope = (source) => (source._id ? { source: source._id } : {});
+
 async function findSource(req, res) {
+  if (String(req.params.slug).toLowerCase() === 'all') return ALL;
   const source = await FeedbackSource.findOne({ slug: String(req.params.slug).toLowerCase() }).lean();
   if (!source) res.status(404).json({ error: 'Feedback source not found' });
   return source;
@@ -105,6 +110,7 @@ router.post('/sources', requireAdmin, async (req, res) => {
     const name = String(req.body.name || '').trim();
     const slug = slugify(req.body.slug || name);
     if (!name || !slug) return res.status(400).json({ error: 'Name is required' });
+    if (slug === 'all') return res.status(400).json({ error: '"all" is reserved for the combined dashboard' });
     if (await FeedbackSource.exists({ slug })) return res.status(400).json({ error: `A source called "${slug}" already exists` });
     const color = HEX.test(req.body.color || '') ? req.body.color : undefined;
     const s = await FeedbackSource.create({ name, slug, color, secret: crypto.randomBytes(32).toString('hex') });
@@ -153,14 +159,14 @@ router.get('/sources/:slug/stats', async (req, res) => {
     if (!source) return;
     const since = new Date(Date.now() - 30 * 864e5);
     const [bySentiment, byRating, byCategory, byDay, recent] = await Promise.all([
-      Feedback.aggregate([{ $match: { source: source._id } }, { $group: { _id: '$sentiment', n: { $sum: 1 } } }]),
-      Feedback.aggregate([{ $match: { source: source._id } }, { $group: { _id: '$rating', n: { $sum: 1 } } }]),
-      Feedback.aggregate([{ $match: { source: source._id } }, { $group: { _id: '$category', n: { $sum: 1 } } }]),
+      Feedback.aggregate([{ $match: scope(source) }, { $group: { _id: '$sentiment', n: { $sum: 1 } } }]),
+      Feedback.aggregate([{ $match: scope(source) }, { $group: { _id: '$rating', n: { $sum: 1 } } }]),
+      Feedback.aggregate([{ $match: scope(source) }, { $group: { _id: '$category', n: { $sum: 1 } } }]),
       Feedback.aggregate([
-        { $match: { source: source._id, sentAt: { $gte: since } } },
+        { $match: { ...scope(source), sentAt: { $gte: since } } },
         { $group: { _id: { d: { $dateToString: { format: '%Y-%m-%d', date: '$sentAt' } }, m: '$sentiment' }, n: { $sum: 1 } } },
       ]),
-      Feedback.find({ source: source._id, message: { $ne: '' } }).sort({ sentAt: -1 }).limit(500)
+      Feedback.find({ ...scope(source), message: { $ne: '' } }).sort({ sentAt: -1 }).limit(500)
         .select('message rating sentiment').lean(),
     ]);
     const toObj = (rows) => Object.fromEntries(rows.map(r => [r._id, r.n]));
@@ -185,14 +191,14 @@ router.get('/sources/:slug/items', async (req, res) => {
   try {
     const source = await findSource(req, res);
     if (!source) return;
-    const q = { source: source._id };
+    const q = scope(source);
     if (['positive', 'neutral', 'negative'].includes(req.query.sentiment)) q.sentiment = req.query.sentiment;
     if (CATEGORIES.includes(req.query.category)) q.category = req.query.category;
     const page = Math.max(0, Number(req.query.page) || 0);
     const limit = Math.min(50, Math.max(1, Number(req.query.limit) || PER_PAGE)); // as many as fit on screen
     const [total, items] = await Promise.all([
       Feedback.countDocuments(q),
-      Feedback.find(q).sort({ sentAt: -1 }).skip(page * limit).limit(limit).lean(),
+      Feedback.find(q).sort({ sentAt: -1 }).skip(page * limit).limit(limit).populate('source', 'name color').lean(),
     ]);
     res.json({ items, total, page, pages: Math.max(1, Math.ceil(total / limit)) });
   } catch (e) { res.status(500).json({ error: e.message }); }

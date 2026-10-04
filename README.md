@@ -58,7 +58,7 @@ New website feedback, milestone changes, and emails, on both Android and iPhone.
 
 Every review left on one of our websites (LipiSub first) arrives in the CRM within seconds.
 
-- **Sidebar → Feedback** (at the bottom) lists every website. Admins add new ones there.
+- **Sidebar → Feedback** (at the bottom) lists every website. Admins add new ones there. **All websites dashboard** combines every site's reviews in one dashboard, with a per-website breakdown.
 - **Each site's dashboard** shows:
   - the average rating
   - **positive (4–5★), neutral (3★) and negative (1–2★)** counts and their split

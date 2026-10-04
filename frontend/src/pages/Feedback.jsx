@@ -58,7 +58,10 @@ function Sources() {
           <h1>Feedback</h1>
           <p>Reviews from every website, each with its own dashboard</p>
         </div>
-        {isAdmin && <button className="btn btn-primary" onClick={() => setAdding({ name: '', color: '#3b82f6' })}>+ Add website</button>}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {reviews > 0 && <Link className="btn btn-secondary" to="/feedback/all">All websites dashboard</Link>}
+          {isAdmin && <button className="btn btn-primary" onClick={() => setAdding({ name: '', color: '#3b82f6' })}>+ Add website</button>}
+        </div>
       </div>
 
       <div className="page-body page-fit" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -218,6 +221,7 @@ function SourceDashboard({ slug }) {
   const [page, setPage] = useState(0);
   const [reviewRef, perPage] = useFitCount(20, `${sentiment}|${category}|${page}`);
   const { data: st, error } = useSWR(`/feedback/sources/${slug}/stats`, fetcher);
+  const { data: sites } = useSWR(slug === 'all' ? '/feedback/sources' : null, fetcher);
   const { data: list } = useSWR(
     `/feedback/sources/${slug}/items?page=${page}&limit=${perPage}&sentiment=${sentiment}&category=${category}`, fetcher, { keepPreviousData: true });
 
@@ -271,6 +275,20 @@ function SourceDashboard({ slug }) {
           <div className="card">
             <div className="section-title" style={{ marginBottom: 10 }}>Sentiment split</div>
             <SentimentBar counts={st.sentiment} total={st.total} labels />
+          </div>
+        )}
+
+        {sites?.length > 0 && (
+          <div className="card">
+            <div className="section-title" style={{ marginBottom: 10 }}>By website</div>
+            {sites.map(s => (
+              <Link key={s._id} to={`/feedback/${s.slug}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', fontSize: 13, color: 'inherit', textDecoration: 'none' }}>
+                <span style={{ width: 8, height: 8, borderRadius: 2, background: s.color || '#3b82f6', flexShrink: 0 }} />
+                <span style={{ width: 130, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+                <span style={{ width: 90, color: 'var(--text2)' }}>{s.total} · {s.total ? `${s.avgRating}★` : '–'}</span>
+                <div style={{ flex: 1 }}>{s.total > 0 ? <SentimentBar counts={s.counts} total={s.total} /> : <span style={{ color: 'var(--text3)' }}>no reviews yet</span>}</div>
+              </Link>
+            ))}
           </div>
         )}
 
@@ -342,6 +360,7 @@ function SourceDashboard({ slug }) {
             <div key={f._id} style={{ padding: '10px 0', borderTop: '1px solid var(--border)', fontSize: 13 }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span style={{ color: SENTIMENTS.find(s => s.key === f.sentiment).color, letterSpacing: 1 }}>{stars(f.rating)}</span>
+                {slug === 'all' && f.source && <span className="tag" style={{ background: f.source.color || '#3b82f6', color: '#fff' }}>{f.source.name}</span>}
                 <span className="tag tag-gray">{f.category}</span>
                 {f.urgent && <span className="tag tag-red">urgent</span>}
                 <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--text3)' }}>

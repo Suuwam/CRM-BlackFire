@@ -1582,7 +1582,6 @@ html.dark .cal-page-body:not([style]) { --cal-accent: #e4e4e7; --cal-ink: #111; 
 .tone-red { --tone: #dc2626; --tone-bg: rgba(220,38,38,.1); }
 .sum-grid { gap: 16px; }
 .sum-card { border-radius: 14px; padding: 18px 20px; position: relative; overflow: hidden; box-shadow: var(--shadow); }
-.sum-card::after { content: ''; position: absolute; right: -40px; top: -40px; width: 120px; height: 120px; border-radius: 50%; background: var(--sum-tone); opacity: .07; pointer-events: none; }
 .sum-card--green { --sum-tone: #16a34a; } .sum-card--blue { --sum-tone: #2563eb; } .sum-card--amber { --sum-tone: #f59e0b; }
 .sum-card-title { font-size: 13px; margin-bottom: 16px; }
 .sum-card-ico { width: 28px; height: 28px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; color: #fff; background: var(--sum-tone) !important; box-shadow: 0 3px 10px -3px var(--sum-tone); }
@@ -1618,7 +1617,6 @@ html.dark .cal-page-body:not([style]) { --cal-accent: #e4e4e7; --cal-ink: #111; 
 /* ── Dashboard polish: tinted stat tiles, softer panels ── */
 .stats-grid--compact .stat-card { position: relative; overflow: hidden; border-radius: 14px; box-shadow: var(--shadow); }
 .stats-grid--compact .stat-card::before { content: ''; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px; border-radius: 0 3px 3px 0; background: var(--tile, var(--text3)); }
-.stats-grid--compact .stat-card::after { content: ''; position: absolute; right: -28px; top: -28px; width: 90px; height: 90px; border-radius: 50%; background: var(--tile, var(--text3)); opacity: .07; }
 .stats-grid--compact .stat-card:nth-child(1) { --tile: #16a34a; }
 .stats-grid--compact .stat-card:nth-child(2) { --tile: #2563eb; }
 .stats-grid--compact .stat-card:nth-child(3) { --tile: #f59e0b; }
