@@ -59,7 +59,7 @@ function Sources() {
           <p>Reviews from every website, each with its own dashboard</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          {reviews > 0 && <Link className="btn btn-secondary" to="/feedback/all">All websites dashboard</Link>}
+          {all.length > 0 && <Link className="btn btn-secondary" to="/feedback/all">All websites dashboard</Link>}
           {isAdmin && <button className="btn btn-primary" onClick={() => setAdding({ name: '', color: '#3b82f6' })}>+ Add website</button>}
         </div>
       </div>
@@ -242,7 +242,7 @@ function SourceDashboard({ slug }) {
         <div className="page-body">
           <div className="card fb-hero" style={{ '--site': st.source.color }}>
             <span className="fb-hero-badge">{st.source.name.slice(0, 1).toUpperCase()}</span>
-            <div className="fb-hero-title">Waiting for {st.source.name}'s first review</div>
+            <div className="fb-hero-title">Waiting for {slug === 'all' ? 'the' : `${st.source.name}'s`} first review</div>
             <p>As soon as someone leaves feedback on {st.source.name}, it shows up here with ratings, trends and similar-review groups.
               If nothing arrives, check that the website is connected.</p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>

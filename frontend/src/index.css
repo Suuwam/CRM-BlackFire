@@ -1442,7 +1442,6 @@ button.color-dot-opt { padding: 0; }
 .fb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
 .fb-site { --site: #3b82f6; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 14px; padding: 18px 18px 16px; border-top: 4px solid var(--site); transition: box-shadow var(--transition), transform var(--transition); }
 .fb-site:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
-.fb-site::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 72px; background: linear-gradient(var(--site), transparent); opacity: .07; pointer-events: none; }
 .fb-site-head { display: flex; align-items: center; gap: 12px; position: relative; }
 .fb-site-badge { width: 40px; height: 40px; border-radius: 12px; background: var(--site); color: #fff; font-weight: 800; font-size: 17px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
 .fb-site-name { display: block; font-size: 16px; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1544,7 +1543,7 @@ button.color-dot-opt { padding: 0; }
 .cal-cell-num--today { background: var(--cal-accent); color: var(--cal-ink); }
 .cal-ev-count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; background: var(--cal-accent); color: var(--cal-ink); font-size: 10.5px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
 .cal-side-panel { border-radius: 16px; box-shadow: var(--shadow); }
-.cal-sp-header { border-bottom: 1px solid var(--border); background: linear-gradient(var(--cal-tint), transparent); }
+.cal-sp-header { border-bottom: 1px solid var(--border); }
 .cal-sp-day-num { color: var(--cal-accent); }
 .cal-sp-add-btn, .cal-sp-add-btn:hover { background: var(--cal-accent); color: var(--cal-ink); }
 .cal-sp-add-first:hover { background: var(--cal-accent); color: var(--cal-ink); border-color: var(--cal-accent); }
@@ -1584,7 +1583,7 @@ html.dark .cal-page-body:not([style]) { --cal-accent: #e4e4e7; --cal-ink: #111; 
 .sum-card { border-radius: 14px; padding: 18px 20px; position: relative; overflow: hidden; box-shadow: var(--shadow); }
 .sum-card--green { --sum-tone: #16a34a; } .sum-card--blue { --sum-tone: #2563eb; } .sum-card--amber { --sum-tone: #f59e0b; }
 .sum-card-title { font-size: 13px; margin-bottom: 16px; }
-.sum-card-ico { width: 28px; height: 28px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; color: #fff; background: var(--sum-tone) !important; box-shadow: 0 3px 10px -3px var(--sum-tone); }
+.sum-card-ico { width: 28px; height: 28px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; color: #fff; background: var(--sum-tone) !important; }
 .sum-item { padding-left: 10px; border-left: 2px solid var(--border); }
 .sum-item-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px; }
 .sum-item-value { font-size: 24px; }
@@ -1634,7 +1633,7 @@ html.dark .cal-page-body:not([style]) { --cal-accent: #e4e4e7; --cal-ink: #111; 
 .fb-dash .fb-insights > .stats-grid .stat-card:first-child { border-top: 3px solid var(--site); }
 .fb-none { margin: 24px 0; text-align: center; color: var(--text3); font-size: 13px; padding: 28px 12px; border: 1px dashed var(--border2); border-radius: 12px; }
 .fb-hero { --site: #3b82f6; max-width: 640px; margin: 40px auto; text-align: center; padding: 44px 32px; border-radius: 18px; border-top: 4px solid var(--site); box-shadow: var(--shadow-md); display: flex; flex-direction: column; align-items: center; gap: 12px; }
-.fb-hero-badge { width: 64px; height: 64px; border-radius: 18px; background: var(--site); color: #fff; font-size: 28px; font-weight: 800; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 30px -10px var(--site); }
+.fb-hero-badge { width: 64px; height: 64px; border-radius: 18px; background: var(--site); color: #fff; font-size: 28px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
 .fb-hero-title { font-size: 20px; font-weight: 800; letter-spacing: -.4px; }
 .fb-hero p { color: var(--text2); font-size: 13.5px; line-height: 1.6; max-width: 460px; }
 @media (min-width: 769px) { .main:has(.email-page) .email-layout { grid-template-columns: 330px minmax(0, 1fr); } }
