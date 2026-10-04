@@ -53,7 +53,7 @@ html.dark {
   overflow: visible;
   pointer-events: none;
 }
-.app-account-wrap > * { margin-top: 12px; pointer-events: auto; }
+.app-account-wrap > * { margin-top: 14px; pointer-events: auto; flex-shrink: 0; }
 .app-account-wrap > :last-child { margin-right: 24px; }
 .app-account-wrap > * { pointer-events: auto; }
 
@@ -81,7 +81,7 @@ html.dark {
 .sb-footer button:hover { background: var(--surface2); color: var(--text); }
 
 /* Page */
-.page-head { padding: 28px 210px 22px 32px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.page-head { padding: 28px 290px 22px 32px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
 .page-head h1 { font-size: 21px; font-weight: 700; letter-spacing: -.4px; color: var(--text); }
 .page-head p  { font-size: 12.5px; color: var(--text3); margin-top: 3px; }
 /* Header stays pinned while the page scrolls, under the sticky account controls (z 90). Desktop only: the stacked phone header would eat the screen. */
@@ -989,7 +989,8 @@ button:active, .btn:active, .sb-item:active, .client-card:active, .board-tab:act
 /* Clock in/out pill in the top bar */
 .clock-widget {
   display: flex; align-items: center; gap: 9px;
-  padding: 6px 14px 6px 11px;
+  height: 36px; box-sizing: border-box;
+  padding: 0 14px 0 11px;
   background: var(--surface); border: 1px solid var(--border2);
   border-radius: 99px; box-shadow: var(--shadow);
   transition: all var(--transition);
@@ -1004,11 +1005,25 @@ button:active, .btn:active, .sb-item:active, .client-card:active, .board-tab:act
   width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
   border: 1px solid var(--border); border-radius: 50%; background: var(--surface);
   color: var(--text2); box-shadow: var(--shadow); transition: all var(--transition);
+  position: relative; overflow: hidden;
 }
+/* Sun in light mode, moon in dark; they swap with a turn. */
+.theme-icon { position: absolute; transition: transform .5s cubic-bezier(.4,0,.2,1), opacity .3s ease; }
+.theme-icon--moon { opacity: 0; transform: rotate(-90deg) scale(.4); }
+html.dark .theme-icon--sun { opacity: 0; transform: rotate(90deg) scale(.4); }
+html.dark .theme-icon--moon { opacity: 1; transform: none; }
+.theme-toggle:active .theme-icon { transition-duration: .2s; }
+
+/* Theme switch: the new theme is revealed as a growing circle (ThemeToggle.jsx). */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+/* Fallback where View Transitions are missing: a short colour cross-fade. */
+html.theme-fade, html.theme-fade *, html.theme-fade *::before, html.theme-fade *::after {
+  transition: background-color .4s ease, color .4s ease, border-color .4s ease, fill .4s ease, stroke .4s ease !important;
+}
+@media (prefers-reduced-motion: reduce) { .theme-icon { transition: none; } }
 .theme-toggle:hover { color: var(--text); border-color: var(--text3); box-shadow: var(--shadow-md); }
 .clock-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text3); flex-shrink: 0; }
-.clock-dot.live { background: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,.18); animation: pulseDot 2s ease-in-out infinite; }
-@keyframes pulseDot { 0%,100% { box-shadow: 0 0 0 3px rgba(22,163,74,.18); } 50% { box-shadow: 0 0 0 6px rgba(22,163,74,.05); } }
+.clock-dot.live { background: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,.18); }
 
 /* Dashboard — exactly one screen, panels scroll internally */
 .dash-page { display: flex; flex-direction: column; height: 100%; max-height: 100%; overflow: hidden; }
