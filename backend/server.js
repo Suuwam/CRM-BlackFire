@@ -93,6 +93,7 @@ app.use('/api/boards', require('./routes/boards'));
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/email', require('./routes/email'));
 app.use('/api/feedback', require('./routes/feedback'));
+app.use('/api/push', require('./routes/push'));
 
 // Health check
 app.get('/api/health', (_, res) => res.json({ status: 'ok' }));

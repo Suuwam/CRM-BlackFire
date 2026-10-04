@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import useSWR from 'swr';
-import { fetcher } from '../api';
+import api, { fetcher } from '../api';
 
 function isNotifiable(a) {
   return a.targetType === 'milestone' || a.targetType === 'feedback' || isEmailActivity(a);
@@ -35,6 +35,48 @@ function isEmailActivity(a) {
   const ac = (a.action || '').toLowerCase();
   const t = (a.type || '').toLowerCase();
   return t === 'email' || ac.includes('email') || s.includes('email') || s.includes('sent mail') || s.includes('bulk mail');
+}
+
+// Web Push for the browser / iPhone home-screen app (the Android app uses notifyPhone above).
+// iOS only offers PushManager once the CRM is added to the home screen.
+const webPushSupported = () => !window.Capacitor?.isNativePlatform?.()
+  && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+
+function b64ToBytes(b64) {
+  const raw = atob((b64 + '='.repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(raw, c => c.charCodeAt(0));
+}
+
+async function enableWebPush() {
+  if ((await Notification.requestPermission()) !== 'granted') throw new Error('Notifications were not allowed');
+  const reg = await navigator.serviceWorker.ready;
+  const { data } = await api.get('/push/key');
+  const sub = await reg.pushManager.getSubscription()
+    || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(data.publicKey) });
+  await api.post('/push/subscribe', sub.toJSON());
+}
+
+function PushToggle() {
+  const [state, setState] = useState('checking'); // checking | off | on | busy | blocked
+  useEffect(() => {
+    if (!webPushSupported()) return setState('unsupported');
+    if (Notification.permission === 'denied') return setState('blocked');
+    navigator.serviceWorker.ready.then(r => r.pushManager.getSubscription())
+      .then(sub => {
+        setState(sub && Notification.permission === 'granted' ? 'on' : 'off');
+        if (sub) api.post('/push/subscribe', sub.toJSON()).catch(() => {}); // re-link after a login switch
+      })
+      .catch(() => setState('off'));
+  }, []);
+  if (state === 'unsupported' || state === 'checking') return <span style={{ fontSize: 10, color: 'var(--text3)' }}>Last 14 days</span>;
+  if (state === 'on') return <span style={{ fontSize: 10, color: 'var(--text3)' }}>Phone alerts on</span>;
+  if (state === 'blocked') return <span style={{ fontSize: 10, color: 'var(--text3)' }}>Alerts blocked in settings</span>;
+  return (
+    <button disabled={state === 'busy'} onClick={() => { setState('busy'); enableWebPush().then(() => setState('on'), () => setState(Notification.permission === 'denied' ? 'blocked' : 'off')); }}
+      style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', cursor: 'pointer' }}>
+      {state === 'busy' ? 'Enabling…' : 'Enable notifications'}
+    </button>
+  );
 }
 
 export default function NotificationBell() {
@@ -121,7 +163,7 @@ export default function NotificationBell() {
         }}>
           <div style={{ padding: '12px 16px 8px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>Emails, Milestones &amp; Feedback</span>
-            <span style={{ fontSize: 10, color: 'var(--text3)' }}>Last 14 days</span>
+            <PushToggle />
           </div>
           <div style={{ overflowY: 'auto', flex: 1 }}>
             {emailItems.length === 0 && (

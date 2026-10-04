@@ -77,7 +77,7 @@ Reviews left on our websites (LipiSub first) land in the CRM, one dashboard per 
 
 - **Sidebar → Feedback**: *All websites* plus one entry per connected site.
 - **Per-site dashboard**: average rating; **positive (4–5★) / neutral (3★) / negative (1–2★)** counts and split; last-30-days chart; star and category breakdown; **similar feedback** (reviews that say the same thing, grouped by shared words, e.g. "10× export froze"); a filterable list of every review.
-- **Alerts**: every new review shows in the Alerts bell, and as a phone notification in the mobile app.
+- **Alerts**: every new review shows in the Alerts bell, and as a phone notification (Android app, and iPhone home-screen app).
 - Everyone signed in can view it; only admins add or remove websites.
 
 **Connecting a website (no code in the CRM):**
@@ -98,7 +98,18 @@ Reviews left on our websites (LipiSub first) land in the CRM, one dashboard per 
 
 Check: `cd backend && node test-feedback.js`.
 
-### 7. 📱 Mobile App (Android)
+### 7. 🍎 iPhone (Home Screen app)
+No App Store needed. On the iPhone (iOS 16.4+):
+1. Open **https://crm-blackfire.vercel.app** in **Safari** → **Share** → **Add to Home Screen**.
+2. Open **Blackfire** from the home screen and sign in.
+3. **Alerts** (bottom of the sidebar) → **Enable notifications** → **Allow**.
+
+New feedback, milestone changes and emails then arrive as notifications even with the app closed (Web Push). Tapping one opens the matching page. The button only appears in the home-screen app; Safari tabs can't receive push on iPhone. Desktop Chrome/Edge/Firefox get the same button.
+
+- You don't get notified of your own changes.
+- No setup: the push keys (VAPID) are generated on first use and stored in Mongo (`settings` collection). To pin your own instead, set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (from `npx web-push generate-vapid-keys`) and optionally `VAPID_SUBJECT=mailto:you@…`. Changing the keys means everyone taps **Enable notifications** again.
+
+### 8. 📱 Mobile App (Android)
 - Download `crm-blackfire.apk` (repo root, or `/crm-blackfire.apk` on the deployed site) and install it.
 - **Notifications**: new feedback, milestone changes and emails pop up as phone notifications. Allow notifications when asked on first launch. The app checks every minute while it is open or recently in the background. A fully closed app catches up when reopened (no Firebase push yet).
 - Rebuild after frontend changes:

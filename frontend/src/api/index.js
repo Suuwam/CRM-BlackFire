@@ -141,3 +141,5 @@ export const apiRoot = () => {
   const base = api.defaults.baseURL;
   return base.startsWith('http') ? base : `${window.location.origin}${base}`;
 };
+
+export default api;

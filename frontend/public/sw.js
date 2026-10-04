@@ -48,3 +48,24 @@ self.addEventListener('fetch', (event) => {
     }))
   );
 });
+
+// Web Push (home-screen app on iPhone, or any browser that allowed notifications).
+self.addEventListener('push', (event) => {
+  const data = event.data ? event.data.json() : {};
+  event.waitUntil(self.registration.showNotification(data.title || 'Blackfire CRM', {
+    body: data.body || '',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    data: { url: data.url || '/' },
+  }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || '/';
+  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+    const win = wins.find((w) => new URL(w.url).origin === self.location.origin);
+    if (win) return win.focus().then(() => win.navigate(url));
+    return self.clients.openWindow(url);
+  }));
+});
