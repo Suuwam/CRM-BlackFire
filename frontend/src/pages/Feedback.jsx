@@ -243,9 +243,10 @@ function SourceDashboard({ slug }) {
           <div className="card fb-hero" style={{ '--site': st.source.color }}>
             <span className="fb-hero-badge">{st.source.name.slice(0, 1).toUpperCase()}</span>
             <div className="fb-hero-title">Waiting for {slug === 'all' ? 'the' : `${st.source.name}'s`} first review</div>
-            <p>As soon as someone leaves feedback on {st.source.name}, it shows up here with ratings, trends and similar-review groups.
-              If nothing arrives, check that the website is connected.</p>
+            <p>As soon as someone leaves feedback on {slug === 'all' ? 'any of your websites' : st.source.name}, it will appear here with ratings, trends and groups of similar reviews.
+              Nothing showing up? Make sure the website is connected.</p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <Link className="btn btn-secondary" to="/feedback">← Back</Link>
               <Link className="btn btn-primary" to="/feedback">How to connect</Link>
             </div>
           </div>
