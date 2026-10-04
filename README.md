@@ -126,10 +126,10 @@ Frontend: `VITE_API_URL` (default `/api`), `VITE_SHIFT_MINUTES`, `VITE_ON_TIME_B
 
 ## 📱 Building the mobile apps
 
-**Android** (Capacitor). Run this after any frontend change, then commit both APKs:
+**Android** (Capacitor). Run this after any frontend change, then commit both APKs. Use `build:android`, not plain `build`: the download copy in `public/` would otherwise be packed inside the new APK, which then grows every rebuild.
 ```bash
-cd frontend && npm run build && npx cap sync android
-cd android && JAVA_HOME=../../jdk21 ./gradlew assembleDebug
+cd frontend && npm run build:android   # web build without the APK itself, then cap sync
+cd android && JAVA_HOME=../../jdk21 ./gradlew clean assembleDebug
 cp app/build/outputs/apk/debug/app-debug.apk ../../crm-blackfire.apk
 cp app/build/outputs/apk/debug/app-debug.apk ../public/crm-blackfire.apk   # what the download button serves
 ```
