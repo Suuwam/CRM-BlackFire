@@ -1394,3 +1394,8 @@ button.stat-card { display: block; width: 100%; cursor: pointer; }
 .modal-cols .modal-col > .form-group, .modal-cols .modal-col > .form-row { margin-bottom: 12px; }
 .modal-cols .modal-col > .form-row .form-group { margin-bottom: 0; }
 .modal-cols .modal-col > :last-child { margin-bottom: 0; }
+/* Backlog & Overdue: search on top and pager at the bottom stay put; only the list scrolls */
+@media (min-width: 769px) {
+  .page-fit .scroll-area { flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 6px; }
+  .page-fit .scroll-area .upcoming-item:hover { transform: none; }
+}

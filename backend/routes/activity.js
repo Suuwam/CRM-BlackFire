@@ -7,6 +7,7 @@ const { requireSessionUser } = require('../utils/session');
 //   days    - how many days back (default 50, max 180)
 //   since   - ISO timestamp: return only activities created after this time (overrides days)
 //   userId  - filter to activities where actorId OR assigneeId matches (optional)
+//   q       - text search across summary, actor, action, target and project (optional)
 router.get('/', requireSessionUser, async (req, res) => {
   try {
     const filter = {};
@@ -26,6 +27,13 @@ router.get('/', requireSessionUser, async (req, res) => {
     if (req.query.userId) {
       const uid = req.query.userId;
       filter.$or = [{ actorId: uid }, { assigneeId: uid }];
+    }
+
+    // Search the whole log, not just one page. The text is escaped, so it is matched literally.
+    const q = String(req.query.q || '').trim().slice(0, 100);
+    if (q) {
+      const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      filter.$and = [{ $or: ['summary', 'actorName', 'action', 'targetName', 'project', 'assigneeName'].map(f => ({ [f]: rx })) }];
     }
 
     // Paginated mode, opted into with ?page=. Without it the response stays a plain array
