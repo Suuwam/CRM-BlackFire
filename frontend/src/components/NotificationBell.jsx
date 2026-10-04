@@ -3,7 +3,31 @@ import useSWR from 'swr';
 import { fetcher } from '../api';
 
 function isNotifiable(a) {
-  return a.targetType === 'milestone' || isEmailActivity(a);
+  return a.targetType === 'milestone' || a.targetType === 'feedback' || isEmailActivity(a);
+}
+
+const NATIVE_SEEN = 'crm_native_notif_seen';
+
+// In the mobile app, turn each new alert into a phone notification. Uses the same
+// 60s activity poll as the bell, so it fires while the app is open or recently backgrounded.
+// ponytail: no FCM push — a fully closed app shows nothing until reopened. Add Firebase
+// push if alerts must arrive with the app killed.
+async function notifyPhone(items) {
+  if (!window.Capacitor?.isNativePlatform?.()) return;
+  let seen = Number(localStorage.getItem(NATIVE_SEEN) || 0);
+  if (!seen) { localStorage.setItem(NATIVE_SEEN, String(Date.now())); return; } // first run: no backlog flood
+  const fresh = items.filter(a => new Date(a.createdAt).getTime() > seen);
+  if (!fresh.length) return;
+  localStorage.setItem(NATIVE_SEEN, String(Math.max(...fresh.map(a => new Date(a.createdAt).getTime()))));
+  const { LocalNotifications } = await import('@capacitor/local-notifications');
+  if ((await LocalNotifications.requestPermissions()).display !== 'granted') return;
+  await LocalNotifications.schedule({
+    notifications: fresh.slice(0, 5).map((a, i) => ({
+      id: (Date.now() % 1e9) + i,
+      title: a.targetType === 'feedback' ? `New feedback · ${a.actorName}` : a.targetType === 'milestone' ? 'Milestone update' : 'Blackfire CRM',
+      body: a.summary || `${a.actorName} ${a.action}`,
+    })),
+  });
 }
 
 function isEmailActivity(a) {
@@ -27,6 +51,8 @@ export default function NotificationBell() {
 
   const emailItems = activities.filter(isNotifiable);
   const unread = emailItems.filter(a => new Date(a.createdAt).getTime() > lastSeen).length;
+
+  useEffect(() => { notifyPhone(emailItems).catch(() => {}); }, [activities]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function toggle() {
     if (!open) {
@@ -94,7 +120,7 @@ export default function NotificationBell() {
           maxHeight: 360, display: 'flex', flexDirection: 'column',
         }}>
           <div style={{ padding: '12px 16px 8px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>Emails &amp; Milestones</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>Emails, Milestones &amp; Feedback</span>
             <span style={{ fontSize: 10, color: 'var(--text3)' }}>Last 14 days</span>
           </div>
           <div style={{ overflowY: 'auto', flex: 1 }}>

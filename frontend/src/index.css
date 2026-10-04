@@ -22,6 +22,7 @@ input, textarea, select { font: inherit; }
   --shadow-md: 0 4px 20px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.06);
   --shadow-lg: 0 10px 40px rgba(0,0,0,.1), 0 2px 6px rgba(0,0,0,.05);
   --sidebar: 240px;
+  --fb-pos: #2a78d6; --fb-neu: #a1a1aa; --fb-neg: #d03b3b;
   --transition: .18s cubic-bezier(.4,0,.2,1);
 }
 
@@ -33,6 +34,7 @@ html.dark {
   --sidebar-bg: #18181b;
   --cal-grid-bg: #27272a; --cal-cell-bg: #1c1c1f; --cal-cell-border: #3a3a3f;
   --cal-main-bg: #1c1c1f;
+  --fb-pos: #4b93e8; --fb-neu: #a8a8ae; --fb-neg: #e5605b;
 }
 
 /* Layout */

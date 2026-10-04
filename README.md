@@ -72,6 +72,43 @@ npm run dev
 - **Resource Bookmark Manager**: Track design assets, documentation, and external tools.
 - **Tag Filtering & Search**: Categorize links with tags and copy URLs in one click.
 
+### 6. 💬 Website Feedback
+Reviews left on our websites (LipiSub first) land in the CRM, one dashboard per website.
+
+- **Sidebar → Feedback**: *All websites* plus one entry per connected site.
+- **Per-site dashboard**: average rating; **positive (4–5★) / neutral (3★) / negative (1–2★)** counts and split; last-30-days chart; star and category breakdown; **similar feedback** (reviews that say the same thing, grouped by shared words, e.g. "10× export froze"); a filterable list of every review.
+- **Alerts**: every new review shows in the Alerts bell, and as a phone notification in the mobile app.
+- Everyone signed in can view it; only admins add or remove websites.
+
+**Connecting a website (no code in the CRM):**
+1. CRM → **Feedback → All websites** → type the site's name → **Add website**.
+2. Click **Setup** and copy the two values into that site's server env:
+   ```
+   CRM_WEBHOOK_URL=https://crm-blackfire.vercel.app/api/feedback/hook/<site>
+   CRM_WEBHOOK_SECRET=<the secret shown>
+   ```
+3. Restart the site. New reviews arrive within seconds; old ones can be resent from the site's admin (LipiSub: *Admin → Feedback → Send to CRM*).
+
+*New secret* replaces a leaked secret (the site stops sending until its env is updated). *Remove* deletes the site and its reviews.
+
+**Adding a site other than LipiSub:** it must send LipiSub's format. Copy `lipsub-backend/src/services/crmWebhook.js` (about 60 lines, no dependencies), call `postWebhook(feedbackPayload(row), { url, secret })` when a review is saved, then connect it as above. The contract is in `lipsub-backend/DEPLOY.md` → *Feedback → CRM*:
+- `POST` JSON `{ event, id, createdAt, feedback: { rating 1–5, category bug|idea|praise|other, message, page }, user: { id, email, name, plan } }`
+- Headers: `X-LipiSub-Timestamp` (unix seconds) and `X-LipiSub-Signature: sha256=HMAC-SHA256(secret, "<timestamp>.<raw body>")`. `X-Webhook-Timestamp` / `X-Webhook-Signature` work too.
+- The CRM rejects a bad signature (401) or a timestamp more than 5 minutes off, and skips an `id` it already has, so resends are safe.
+
+Check: `cd backend && node test-feedback.js`.
+
+### 7. 📱 Mobile App (Android)
+- Download `crm-blackfire.apk` (repo root, or `/crm-blackfire.apk` on the deployed site) and install it.
+- **Notifications**: new feedback, milestone changes and emails pop up as phone notifications. Allow notifications when asked on first launch. The app checks every minute while it is open or recently in the background. A fully closed app catches up when reopened (no Firebase push yet).
+- Rebuild after frontend changes:
+  ```bash
+  cd frontend && npm run build && npx cap sync android
+  cd android && JAVA_HOME=../../jdk21 ./gradlew assembleDebug
+  cp app/build/outputs/apk/debug/app-debug.apk ../../crm-blackfire.apk
+  cp app/build/outputs/apk/debug/app-debug.apk ../public/crm-blackfire.apk
+  ```
+
 ---
 
 ## 🛠️ Architecture & Tech Stack
@@ -79,7 +116,7 @@ npm run dev
 ```
 CRM-BlackFire/
 ├── backend/
-│   ├── models/        # Mongoose Data Models (User, Attendance, Event, Task, Template, Reference)
+│   ├── models/        # Mongoose Data Models (User, Attendance, Event, Task, Template, Reference, Feedback, FeedbackSource)
 │   ├── routes/        # Express Route Handlers
 │   ├── uploads/       # Profile Image Storage
 │   └── server.js      # Express Server & MongoDB Connection (Serverless-ready)
@@ -87,7 +124,7 @@ CRM-BlackFire/
 │   ├── src/
 │   │   ├── api/       # Centralized Axios/Fetch API Services
 │   │   ├── components/# Reusable UI Components (Sidebar, Modal, Toast)
-│   │   ├── pages/     # Page Views (Dashboard, Attendance, Team, Calendar, Email, Board, References)
+│   │   ├── pages/     # Page Views (Dashboard, Attendance, Team, Calendar, Email, Board, References, Feedback)
 │   │   └── index.css  # Premium Minimalist Design System
 │   ├── index.html
 │   └── vite.config.js

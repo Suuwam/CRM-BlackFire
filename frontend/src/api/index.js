@@ -129,3 +129,15 @@ export const tasksApi = {
   addComment: (id, text) => api.post(`/tasks/${id}/comments`, { text }),
   deleteComment: (id, commentId) => api.delete(`/tasks/${id}/comments/${commentId}`),
 };
+
+export const feedbackApi = {
+  createSource: (data) => api.post('/feedback/sources', data),
+  rotateSecret: (id) => api.post(`/feedback/sources/${id}/rotate`),
+  deleteSource: (id) => api.delete(`/feedback/sources/${id}`),
+};
+
+// Absolute API root, for showing a website the webhook URL to paste into its env.
+export const apiRoot = () => {
+  const base = api.defaults.baseURL;
+  return base.startsWith('http') ? base : `${window.location.origin}${base}`;
+};
