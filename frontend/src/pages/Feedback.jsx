@@ -4,6 +4,7 @@ import useSWR from 'swr';
 import { feedbackApi, fetcher, apiRoot } from '../api';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
+import Pager, { usePage } from '../components/Pager';
 
 const SENTIMENTS = [
   { key: 'positive', label: 'Positive', sub: '4–5★', color: 'var(--fb-pos)' },
@@ -27,6 +28,7 @@ function Sources() {
   const { data: sources, mutate } = useSWR('/feedback/sources', fetcher);
   const [name, setName] = useState('');
   const [open, setOpen] = useState(null); // source _id whose connection details are shown
+  const srcPg = usePage(sources || [], 10);
 
   async function run(fn, ok) {
     try { const r = await fn(); toast(ok, 'success'); mutate(); return r; }
@@ -66,7 +68,7 @@ function Sources() {
           </div>
         )}
 
-        {sources?.map(s => (
+        {srcPg.items.map(s => (
           <div key={s._id} className="card">
             <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 180 }}>
@@ -99,6 +101,7 @@ function Sources() {
             )}
           </div>
         ))}
+        <Pager {...srcPg} />
       </div>
     </>
   );

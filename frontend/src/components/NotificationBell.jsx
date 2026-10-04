@@ -6,22 +6,46 @@ function isNotifiable(a) {
   return a.targetType === 'milestone' || a.targetType === 'feedback' || isEmailActivity(a);
 }
 
+function isEmailActivity(a) {
+  const s = (a.summary || '').toLowerCase();
+  const ac = (a.action || '').toLowerCase();
+  const t = (a.type || '').toLowerCase();
+  return t === 'email' || ac.includes('email') || s.includes('email') || s.includes('sent mail') || s.includes('bulk mail');
+}
+
+const isNative = () => !!window.Capacitor?.isNativePlatform?.();
 const NATIVE_SEEN = 'crm_native_notif_seen';
+const NATIVE_ON = 'crm_native_notif_on';   // the Alerts switch in the app ('off' = muted)
+const NATIVE_ASKED = 'crm_native_notif_asked';
+const getLocal = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+const setLocal = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+const localNotifications = () => import('@capacitor/local-notifications').then(m => m.LocalNotifications);
+
+// Android app: show the system "Allow notifications?" prompt once, on the first launch.
+// Android keeps the answer, and we never prompt again on our own; the Alerts switch can.
+export async function askPhonePermissionOnce() {
+  if (!isNative() || getLocal(NATIVE_ASKED)) return;
+  setLocal(NATIVE_ASKED, '1');
+  const LN = await localNotifications();
+  const { display } = await LN.checkPermissions();
+  if (display !== 'granted' && display !== 'denied') await LN.requestPermissions();
+}
 
 // In the mobile app, turn each new alert into a phone notification. Uses the same
 // 60s activity poll as the bell, so it fires while the app is open or recently backgrounded.
 // ponytail: no FCM push — a fully closed app shows nothing until reopened. Add Firebase
 // push if alerts must arrive with the app killed.
 async function notifyPhone(items) {
-  if (!window.Capacitor?.isNativePlatform?.()) return;
-  let seen = Number(localStorage.getItem(NATIVE_SEEN) || 0);
-  if (!seen) { localStorage.setItem(NATIVE_SEEN, String(Date.now())); return; } // first run: no backlog flood
+  if (!isNative()) return;
+  const seen = Number(getLocal(NATIVE_SEEN) || 0);
+  if (!seen) { setLocal(NATIVE_SEEN, String(Date.now())); return; } // first run: no backlog flood
   const fresh = items.filter(a => new Date(a.createdAt).getTime() > seen);
   if (!fresh.length) return;
-  localStorage.setItem(NATIVE_SEEN, String(Math.max(...fresh.map(a => new Date(a.createdAt).getTime()))));
-  const { LocalNotifications } = await import('@capacitor/local-notifications');
-  if ((await LocalNotifications.requestPermissions()).display !== 'granted') return;
-  await LocalNotifications.schedule({
+  setLocal(NATIVE_SEEN, String(Math.max(...fresh.map(a => new Date(a.createdAt).getTime()))));
+  if (getLocal(NATIVE_ON) === 'off') return;
+  const LN = await localNotifications();
+  if ((await LN.checkPermissions()).display !== 'granted') return; // never prompt from a background poll
+  await LN.schedule({
     notifications: fresh.slice(0, 5).map((a, i) => ({
       id: (Date.now() % 1e9) + i,
       title: a.targetType === 'feedback' ? `New feedback · ${a.actorName}` : a.targetType === 'milestone' ? 'Milestone update' : 'Blackfire CRM',
@@ -30,16 +54,9 @@ async function notifyPhone(items) {
   });
 }
 
-function isEmailActivity(a) {
-  const s = (a.summary || '').toLowerCase();
-  const ac = (a.action || '').toLowerCase();
-  const t = (a.type || '').toLowerCase();
-  return t === 'email' || ac.includes('email') || s.includes('email') || s.includes('sent mail') || s.includes('bulk mail');
-}
-
 // Web Push for the browser / iPhone home-screen app (the Android app uses notifyPhone above).
 // iOS only offers PushManager once the CRM is added to the home screen.
-const webPushSupported = () => !window.Capacitor?.isNativePlatform?.()
+const webPushSupported = () => !isNative()
   && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 
 function b64ToBytes(b64) {
@@ -47,35 +64,72 @@ function b64ToBytes(b64) {
   return Uint8Array.from(raw, c => c.charCodeAt(0));
 }
 
-async function enableWebPush() {
-  if ((await Notification.requestPermission()) !== 'granted') throw new Error('Notifications were not allowed');
-  const reg = await navigator.serviceWorker.ready;
-  const { data } = await api.get('/push/key');
-  const sub = await reg.pushManager.getSubscription()
-    || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(data.publicKey) });
-  await api.post('/push/subscribe', sub.toJSON());
-}
+const pushSub = () => navigator.serviceWorker.ready.then(r => r.pushManager.getSubscription());
 
-function PushToggle() {
-  const [state, setState] = useState('checking'); // checking | off | on | busy | blocked
-  useEffect(() => {
-    if (!webPushSupported()) return setState('unsupported');
-    if (Notification.permission === 'denied') return setState('blocked');
-    navigator.serviceWorker.ready.then(r => r.pushManager.getSubscription())
-      .then(sub => {
-        setState(sub && Notification.permission === 'granted' ? 'on' : 'off');
-        if (sub) api.post('/push/subscribe', sub.toJSON()).catch(() => {}); // re-link after a login switch
-      })
-      .catch(() => setState('off'));
-  }, []);
-  if (state === 'unsupported' || state === 'checking') return <span style={{ fontSize: 10, color: 'var(--text3)' }}>Last 14 days</span>;
-  if (state === 'on') return <span style={{ fontSize: 10, color: 'var(--text3)' }}>Phone alerts on</span>;
-  if (state === 'blocked') return <span style={{ fontSize: 10, color: 'var(--text3)' }}>Alerts blocked in settings</span>;
+// Each returns the switch's new state: 'on' | 'off' | 'blocked' | 'unsupported'.
+const alerts = {
+  async read() {
+    if (isNative()) {
+      const { display } = await (await localNotifications()).checkPermissions();
+      if (display === 'denied') return 'blocked';
+      return display === 'granted' && getLocal(NATIVE_ON) !== 'off' ? 'on' : 'off';
+    }
+    if (!webPushSupported()) return 'unsupported';
+    if (Notification.permission === 'denied') return 'blocked';
+    const sub = await pushSub();
+    if (sub) api.post('/push/subscribe', sub.toJSON()).catch(() => {}); // re-link after a login switch
+    return sub && Notification.permission === 'granted' ? 'on' : 'off';
+  },
+  async turnOn() {
+    if (isNative()) {
+      const { display } = await (await localNotifications()).requestPermissions();
+      if (display !== 'granted') return 'blocked';
+      setLocal(NATIVE_ON, 'on');
+      return 'on';
+    }
+    if ((await Notification.requestPermission()) !== 'granted') return Notification.permission === 'denied' ? 'blocked' : 'off';
+    const reg = await navigator.serviceWorker.ready;
+    const { data } = await api.get('/push/key');
+    const sub = await reg.pushManager.getSubscription()
+      || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(data.publicKey) });
+    await api.post('/push/subscribe', sub.toJSON());
+    return 'on';
+  },
+  async turnOff() {
+    if (isNative()) { setLocal(NATIVE_ON, 'off'); return 'off'; }
+    const sub = await pushSub();
+    if (sub) {
+      await api.post('/push/unsubscribe', { endpoint: sub.endpoint }).catch(() => {});
+      await sub.unsubscribe();
+    }
+    return 'off';
+  },
+};
+
+const HINT = {
+  blocked: 'Notifications are blocked. Allow them in your phone or browser settings.',
+  unsupported: 'On iPhone, add the CRM to your Home Screen first (Share → Add to Home Screen).',
+};
+
+function AlertsSwitch() {
+  const [state, setState] = useState('checking');
+  useEffect(() => { alerts.read().then(setState, () => setState('off')); }, []);
+  const on = state === 'on';
+  const disabled = state === 'checking' || state === 'busy' || state === 'unsupported';
+  async function flip() {
+    if (state === 'blocked') return;
+    setState('busy');
+    try { setState(await (on ? alerts.turnOff() : alerts.turnOn())); }
+    catch { setState(await alerts.read().catch(() => 'off')); }
+  }
   return (
-    <button disabled={state === 'busy'} onClick={() => { setState('busy'); enableWebPush().then(() => setState('on'), () => setState(Notification.permission === 'denied' ? 'blocked' : 'off')); }}
-      style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', cursor: 'pointer' }}>
-      {state === 'busy' ? 'Enabling…' : 'Enable notifications'}
-    </button>
+    <label className="alert-switch" title={HINT[state] || (on ? 'Turn notifications off' : 'Turn notifications on')}>
+      <span>Notifications</span>
+      <button type="button" role="switch" aria-checked={on} disabled={disabled || state === 'blocked'}
+        className={`switch${on ? ' on' : ''}`} onClick={flip}>
+        <span className="switch-knob" />
+      </button>
+    </label>
   );
 }
 
@@ -161,9 +215,9 @@ export default function NotificationBell() {
           zIndex: 500, marginBottom: 6, overflow: 'hidden',
           maxHeight: 360, display: 'flex', flexDirection: 'column',
         }}>
-          <div style={{ padding: '12px 16px 8px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>Emails, Milestones &amp; Feedback</span>
-            <PushToggle />
+          <div style={{ padding: '10px 12px 8px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Alerts</span>
+            <AlertsSwitch />
           </div>
           <div style={{ overflowY: 'auto', flex: 1 }}>
             {emailItems.length === 0 && (

@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import { fetcher } from '../api';
+import Pager, { usePage } from '../components/Pager';
 
 function fmtDate(d) {
   const dt = new Date(d + 'T00:00:00');
@@ -20,6 +21,9 @@ export default function Overdue() {
     .filter(t => t.dueDate && t.dueDate < today && t.column !== 'done')
     .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
   const total = overdueEvents.length + overdueTasks.length;
+  const all = [...overdueEvents.map(e => ({ kind: 'event', due: e.date, item: e })), ...overdueTasks.map(t => ({ kind: 'task', due: t.dueDate, item: t }))]
+    .sort((a, b) => a.due.localeCompare(b.due));
+  const pg = usePage(all, 12);
 
   return (
     <>
@@ -34,7 +38,7 @@ export default function Overdue() {
           <div className="card empty" style={{ padding: 32, textAlign: 'center' }}>No overdue events or tasks.</div>
         ) : (
           <div className="upcoming-list">
-            {overdueEvents.map(ev => (
+            {pg.items.map(({ kind, item: ev }) => kind === 'event' ? (
               <div key={ev._id} className="upcoming-item overdue-item" style={{ cursor: 'pointer' }} onClick={() => navigate('/calendar')}>
                 <div className="up-dot" style={{ background: '#ef4444' }} />
                 <div className="up-info">
@@ -46,23 +50,23 @@ export default function Overdue() {
                 </div>
                 <div className="up-date" style={{ color: '#ef4444' }}>{fmtDate(ev.date)}</div>
               </div>
-            ))}
-            {overdueTasks.map(t => (
-              <div key={t._id} className="upcoming-item overdue-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/board?project=${t.project}`)}>
+            ) : (
+              <div key={ev._id} className="upcoming-item overdue-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/board?project=${ev.project}`)}>
                 <div className="up-dot" style={{ background: '#ef4444' }} />
                 <div className="up-info">
-                  <div className="up-title">{t.title}</div>
+                  <div className="up-title">{ev.title}</div>
                   <div className="up-meta">
                     <span>Task</span>
-                    {t.assigneeName && <span>{t.assigneeName}</span>}
+                    {ev.assigneeName && <span>{ev.assigneeName}</span>}
                     <span className="overdue-badge">Overdue</span>
                   </div>
                 </div>
-                <div className="up-date" style={{ color: '#ef4444' }}>{fmtDate(t.dueDate)}</div>
+                <div className="up-date" style={{ color: '#ef4444' }}>{fmtDate(ev.dueDate)}</div>
               </div>
             ))}
           </div>
         )}
+        <Pager {...pg} />
       </div>
     </>
   );

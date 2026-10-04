@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Pager, { usePage } from '../components/Pager';
 import useSWR, { mutate } from 'swr';
 import { referencesApi, fetcher } from '../api';
 import Modal from '../components/Modal';
@@ -131,6 +132,7 @@ export default function References() {
     const matchT = !tagFilter || (r.tags || []).includes(tagFilter);
     return matchQ && matchT;
   });
+  const refPg = usePage(visible, 12, `${search}|${tagFilter}`);
 
   function hostname(url) {
     try {
@@ -164,7 +166,7 @@ export default function References() {
         </div>
 
         <div className="ref-grid">
-          {visible.map(r => (
+          {refPg.items.map(r => (
             <div key={r._id} className="ref-card">
               {r.image && (
                 <div className="ref-img-wrap">
@@ -194,6 +196,7 @@ export default function References() {
           ))}
           {visible.length === 0 && <div className="empty"><div className="empty-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div><p>No reference links saved yet.</p></div>}
         </div>
+        <Pager {...refPg} />
       </div>
 
       <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Reference' : 'Add Reference'}

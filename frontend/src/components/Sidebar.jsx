@@ -78,7 +78,7 @@ export default function Sidebar({ user, onLogout, routeLoading, onSearchOpen }) 
           </NavLink>
         ))}
 
-        <div className="sb-section" style={{ marginTop: 12 }}>Products</div>
+        <div className="sb-section" style={{ marginTop: 12 }}>Projects</div>
         {boardNav.map(n => (
           <NavLink key={n.to} to={n.to}
             className={({ isActive }) => `sb-item${isActive ? ' active' : ''}`}>

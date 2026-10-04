@@ -25,6 +25,14 @@ const COLORS = [
   { id: 'red',    hex: '#ef4444' },
   { id: 'teal',   hex: '#06b6d4' },
   { id: 'gray',   hex: '#71717a' },
+  { id: 'indigo',  hex: '#6366f1' },
+  { id: 'sky',     hex: '#0ea5e9' },
+  { id: 'lime',    hex: '#84cc16' },
+  { id: 'orange',  hex: '#f97316' },
+  { id: 'rose',    hex: '#f43f5e' },
+  { id: 'fuchsia', hex: '#d946ef' },
+  { id: 'yellow',  hex: '#eab308' },
+  { id: 'black',   hex: '#18181b' },
 ];
 
 const EMPTY_TASK = { title:'', description:'', priority:'medium', color:'blue', tags:'', dueDate:'', assignees:[] };
@@ -624,7 +632,7 @@ export default function Board() {
         </div>
       </div>
 
-      <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Task' : `Add to ${columns.find(c=>c.id===editCol)?.label || 'Stage'}`}
+      <Modal large open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Task' : `Add to ${columns.find(c=>c.id===editCol)?.label || 'Stage'}`}
         footer={<><button className="btn btn-secondary" onClick={() => setModal(false)}>Cancel</button><button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button></>}>
         <div className="form-group"><label>Title *</label><input value={form.title} onChange={e => setForm(f=>({...f,title:e.target.value}))} placeholder="Task title" /></div>
         
@@ -722,7 +730,7 @@ export default function Board() {
         </div>
       </Modal>
 
-      <Modal open={!!viewingTask} onClose={() => { setViewingTask(null); setDetailComments([]); setCommentText(''); }} title="Task Details" footer={<button className="btn btn-secondary" onClick={() => { setViewingTask(null); setDetailComments([]); setCommentText(''); }}>Close</button>}>
+      <Modal large open={!!viewingTask} onClose={() => { setViewingTask(null); setDetailComments([]); setCommentText(''); }} title="Task Details" footer={<button className="btn btn-secondary" onClick={() => { setViewingTask(null); setDetailComments([]); setCommentText(''); }}>Close</button>}>
         {viewingTask && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {viewingTask.image && (
@@ -860,7 +868,7 @@ export default function Board() {
       </Modal>
 
       {/* Board Design Modal */}
-      <Modal open={designModal} onClose={() => setDesignModal(false)} title={designBoard.id ? 'Edit Board Layout' : 'Create New Board'}
+      <Modal large open={designModal} onClose={() => setDesignModal(false)} title={designBoard.id ? 'Edit Board Layout' : 'Create New Board'}
         footer={
           <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
             {designBoard.id && boards.length > 1 ? (

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import Pager, { usePage } from '../components/Pager';
 import useSWR from 'swr';
 import { fetcher } from '../api';
 import { AccountAvatar } from '../components/Avatar';
@@ -43,6 +44,7 @@ export default function AdminDashboard() {
   const totalMinutes = stats.reduce((a, s) => a + s.minutes, 0);
   const maxMinutes = Math.max(...stats.map(s => s.minutes), 1);
   const activeDays = new Set(history.filter(r => r.clockIn).map(r => r.date)).size;
+  const statPg = usePage(stats, 10, days);
 
   return (
     <>
@@ -101,7 +103,7 @@ export default function AdminDashboard() {
               </tr>
             </thead>
             <tbody>
-              {stats.map(s => (
+              {statPg.items.map(s => (
                 <tr key={s.user._id}>
                   <td>
                     <div className="cell-user">
@@ -128,6 +130,7 @@ export default function AdminDashboard() {
               {stats.length === 0 && <tr><td colSpan={7}><div className="empty" style={{ padding: '28px 0' }}>No attendance data yet.</div></td></tr>}
             </tbody>
           </table>
+          <Pager {...statPg} style={{ padding: '0 0 16px' }} />
         </div>
       </div>
     </>

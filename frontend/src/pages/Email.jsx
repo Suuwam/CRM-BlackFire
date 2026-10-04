@@ -7,6 +7,11 @@ import { useToast } from '../components/Toast';
 
 const TOKENS = ['{{name}}', '{{email}}', '{{username}}', '{{role}}'];
 const EMPTY_TPL = { name: '', subject: '', body: '' };
+// Previews longer than these are cut with an ellipsis until "Show full email" is pressed.
+const BODY_PREVIEW = 600;
+const SUBJECT_PREVIEW = 110;
+const clip = (text, max) => (text.length > max ? `${text.slice(0, max).trimEnd()}…` : text);
+
 const DRAFT_KEY = id => `crm_email_draft_${id || 'new'}`;
 
 function saveDraft(id, form) {
@@ -41,6 +46,7 @@ export default function Email() {
   const [editing, setEditing] = useState(null);
   const [sending, setSending] = useState(false);
   const [results, setResults] = useState(null);
+  const [fullBody, setFullBody] = useState(false);
   const toast = useToast();
 
   const { data: templates = [] } = useSWR('/templates', fetcher, {
@@ -100,6 +106,8 @@ export default function Email() {
   const previewFor = recipients[0] || employees[0] || null;
   const subjectPreview = selTpl ? substitute(selTpl.subject, previewFor) : '';
   const bodyPreview = selTpl ? substitute(selTpl.body, previewFor) : '';
+  const bodyLong = bodyPreview.length > BODY_PREVIEW;
+  useEffect(() => { setFullBody(false); setResults(null); }, [selTpl?._id]);
 
   async function handleSend() {
     if (!selTpl) return toast('Select a template first', 'error');
@@ -122,82 +130,86 @@ export default function Email() {
         <button className="btn btn-primary" onClick={openAdd}>+ New Template</button>
       </div>
 
-      <div className="page-body">
+      <div className="page-body email-page">
         <div className="email-layout">
           <div className="email-col">
-            <div className="section-title">Templates</div>
-            <div className="tpl-list">
-              {templates.map(t => (
-                <div key={t._id} className={`tpl-item${selTpl?._id === t._id ? ' active' : ''}`} onClick={() => setSelTpl(t)}>
-                  <div className="tpl-name">{t.name}</div>
-                  <div className="tpl-sub">{t.subject}</div>
-                </div>
-              ))}
-              {templates.length === 0 && <p className="text-sm text-muted">No templates yet.</p>}
+            <div className="email-pane email-pane--templates">
+              <div className="section-title">Templates <span className="email-count">{templates.length}</span></div>
+              <div className="tpl-list">
+                {templates.map(t => (
+                  <div key={t._id} className={`tpl-item${selTpl?._id === t._id ? ' active' : ''}`} onClick={() => setSelTpl(t)} title={t.name}>
+                    <div className="tpl-name">{t.name}</div>
+                    <div className="tpl-sub">{t.subject || 'No subject'}</div>
+                  </div>
+                ))}
+                {templates.length === 0 && <p className="text-sm text-muted">No templates yet.</p>}
+              </div>
             </div>
 
-            <div className="section-title" style={{ marginTop: 20 }}>
-              Employees
-              <button className="btn btn-sm btn-ghost" style={{ marginLeft: 'auto', fontSize: 11 }}
-                onClick={() => setSelected(selected.length === employees.length ? [] : employees.map(e => e._id))}>
-                {selected.length === employees.length && employees.length ? 'Clear' : 'Select all'}
-              </button>
-            </div>
-            <div className="search" style={{ marginBottom: 8 }}>
-              <span className="search-ico">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-              </span>
-              <input placeholder="Search employees..." value={search} onChange={e => setSearch(e.target.value)} />
-            </div>
-            <div className="emp-list">
-              {employees.map(e => (
-                <label key={e._id} className={`emp-item${selected.includes(e._id) ? ' on' : ''}`}>
-                  <input type="checkbox" checked={selected.includes(e._id)} onChange={() => toggle(e._id)} />
-                  <AccountAvatar name={e.name} photo={e.photo} size={30} />
-                  <div style={{ minWidth: 0 }}>
-                    <div className="emp-name">{e.name}</div>
-                    <div className="emp-mail">{e.email || <span style={{ color: '#ef4444' }}>No email</span>}</div>
-                  </div>
-                  <span className="emp-role">{e.role}</span>
-                </label>
-              ))}
-              {employees.length === 0 && <p className="text-sm text-muted">No employees found.</p>}
+            <div className="email-pane email-pane--people">
+              <div className="section-title">
+                Employees <span className="email-count">{selected.length ? `${selected.length}/${employees.length}` : employees.length}</span>
+                <button className="btn btn-sm btn-ghost" style={{ marginLeft: 'auto', fontSize: 11 }}
+                  onClick={() => setSelected(selected.length === employees.length ? [] : employees.map(e => e._id))}>
+                  {selected.length === employees.length && employees.length ? 'Clear' : 'Select all'}
+                </button>
+              </div>
+              <div className="search email-search">
+                <span className="search-ico">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                </span>
+                <input placeholder="Search employees..." value={search} onChange={e => setSearch(e.target.value)} />
+              </div>
+              <div className="emp-list">
+                {employees.map(e => (
+                  <label key={e._id} className={`emp-item${selected.includes(e._id) ? ' on' : ''}`}>
+                    <input type="checkbox" checked={selected.includes(e._id)} onChange={() => toggle(e._id)} />
+                    <AccountAvatar name={e.name} photo={e.photo} size={30} />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div className="emp-name">{e.name}</div>
+                      <div className="emp-mail">{e.email || <span style={{ color: '#ef4444' }}>No email</span>}</div>
+                    </div>
+                    <span className="emp-role">{e.role}</span>
+                  </label>
+                ))}
+                {employees.length === 0 && <p className="text-sm text-muted">No employees found.</p>}
+              </div>
             </div>
           </div>
 
           <div className="email-composer">
             {selTpl ? (
-              <div className="card">
+              <div className="card email-card">
                 <div className="composer-head">
-                  <div>
-                    <div className="composer-title">{selTpl.name}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="composer-title" title={selTpl.name}>{selTpl.name}</div>
                     <div className="text-sm text-muted">
-                      {recipients.length ? `${recipients.length} recipient${recipients.length > 1 ? 's' : ''} selected` : 'Select employees on the left'}
-                      {previewFor && ` · preview as ${previewFor.name}`}
+                      {previewFor ? `Preview as ${previewFor.name}` : 'Preview'} · tokens like {'{{name}}'} are filled in per recipient
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                     <button className="btn btn-sm btn-secondary" onClick={openEdit}>Edit</button>
                     <button className="btn btn-sm btn-danger" onClick={del}>Delete</button>
                   </div>
                 </div>
 
-                <div className="form-group" style={{ marginBottom: 12 }}>
-                  <label>Subject</label>
-                  <div className="preview-box" style={{ minHeight: 'auto', padding: '8px 12px', fontSize: 13 }}>{subjectPreview || selTpl.subject}</div>
-                </div>
-                <div className="form-group" style={{ marginBottom: 14 }}>
-                  <label>Body</label>
-                  <div className="preview-box">{bodyPreview}</div>
+                <div className="email-field">
+                  <span className="email-field-label">Subject</span>
+                  <span className="email-subject" title={subjectPreview}>{clip(subjectPreview || 'No subject', SUBJECT_PREVIEW)}</span>
                 </div>
 
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <button className="btn btn-sm btn-secondary" onClick={() => { navigator.clipboard.writeText(bodyPreview); toast('Copied to clipboard', 'success'); }}>Copy body</button>
-                  <button className="btn btn-primary" style={{ marginLeft: 'auto' }} onClick={handleSend} disabled={sending || !selected.length}>
-                    {sending ? 'Sending…' : selected.length ? `Send to ${selected.length} employee${selected.length > 1 ? 's' : ''}` : 'Select employees'}
-                  </button>
+                <div className="email-body-wrap">
+                  <div className={`preview-box email-body${fullBody ? ' is-full' : ''}`}>
+                    {fullBody || !bodyLong ? bodyPreview : clip(bodyPreview, BODY_PREVIEW)}
+                    {!bodyPreview && <span className="text-muted">This template has no body yet.</span>}
+                  </div>
+                  {bodyLong && (
+                    <button className="email-more" onClick={() => setFullBody(f => !f)}>
+                      {fullBody ? 'Show less' : `Show full email (${bodyPreview.length.toLocaleString()} characters)`}
+                    </button>
+                  )}
                 </div>
 
                 {results && (
@@ -211,6 +223,21 @@ export default function Email() {
                     ))}
                   </div>
                 )}
+
+                <div className="email-send-bar">
+                  <div className="email-recipients">
+                    {recipients.length === 0 ? <span className="text-muted">No recipients yet. Tick employees on the left.</span> : (
+                      <>
+                        {recipients.slice(0, 4).map(r => <span key={r._id} className="email-chip">{r.name}</span>)}
+                        {recipients.length > 4 && <span className="email-chip email-chip--more">+{recipients.length - 4} more</span>}
+                      </>
+                    )}
+                  </div>
+                  <button className="btn btn-sm btn-secondary" onClick={() => { navigator.clipboard.writeText(bodyPreview); toast('Copied to clipboard', 'success'); }}>Copy body</button>
+                  <button className="btn btn-primary" onClick={handleSend} disabled={sending || !selected.length}>
+                    {sending ? 'Sending…' : selected.length ? `Send to ${selected.length} employee${selected.length > 1 ? 's' : ''}` : 'Select employees'}
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="empty">

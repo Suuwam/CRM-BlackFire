@@ -19,7 +19,7 @@ The internal CRM for **Blackfire AI**: attendance and live team presence, milest
 
 1. Tap the button above on your phone. It downloads `crm-blackfire.apk`.
 2. Open the file. If Android asks, allow **Install unknown apps** for your browser or Files app.
-3. Open **Blackfire CRM**, sign in, and tap **Allow** when it asks to send notifications.
+3. Open **Blackfire CRM**. On the first launch it asks once to send notifications. Tap **Allow**. Android remembers the answer, and you can change it later with the **Notifications** switch under **Alerts**.
 
 ### iPhone / iPad
 
@@ -29,9 +29,9 @@ You don't need the App Store. You install it from Safari in about 30 seconds (re
 2. Tap the **Share** button (the square with an arrow ↑ at the bottom of the screen).
 3. Scroll down and tap **Add to Home Screen**, then tap **Add**.
 4. Open **Blackfire** from your home screen and sign in.
-5. To get notifications, tap **Alerts** at the bottom of the menu, then **Enable notifications**, then **Allow**.
+5. To get notifications, tap **Alerts** at the bottom of the menu, turn on the **Notifications** switch, then tap **Allow**.
 
-> The **Enable notifications** button only appears in the home-screen app. iPhones don't allow notifications from a regular Safari tab.
+> The **Notifications** switch only works in the home-screen app. iPhones don't allow notifications from a regular Safari tab.
 
 ### What you get notified about
 New website feedback, milestone changes, and emails, on both Android and iPhone. Tapping a notification opens the matching page. You won't be notified about changes you made yourself.
@@ -118,7 +118,7 @@ node frontend/sw.test.mjs       # service worker never serves a stale app shell
 | `ATTENDANCE_TZ` | | Day boundary for attendance (default `Asia/Kathmandu`) |
 | `SMTP_HOST` `SMTP_PORT` `SMTP_SECURE` `SMTP_USER` `SMTP_PASS` `MAIL_FROM` | for email | Outgoing mail |
 | `CLOUDINARY_CLOUD_NAME` `CLOUDINARY_API_KEY` `CLOUDINARY_API_SECRET` | for uploads | Profile photos and card images |
-| `VAPID_PUBLIC_KEY` `VAPID_PRIVATE_KEY` `VAPID_SUBJECT` | no | Push keys. If unset, they're generated on first use and stored in Mongo (`settings`). If you change them, everyone has to tap *Enable notifications* again. |
+| `VAPID_PUBLIC_KEY` `VAPID_PRIVATE_KEY` `VAPID_SUBJECT` | no | Push keys. If unset, they're generated on first use and stored in Mongo (`settings`). If you change them, everyone has to turn the *Notifications* switch on again. |
 
 Frontend: `VITE_API_URL` (default `/api`), `VITE_SHIFT_MINUTES`, `VITE_ON_TIME_BY`.
 

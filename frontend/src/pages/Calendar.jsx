@@ -17,6 +17,14 @@ const COLORS = [
   { id: 'red',    hex: '#ef4444', bg: '#fef2f2', border: '#f87171', text: '#991b1b' },
   { id: 'teal',   hex: '#06b6d4', bg: '#ecfeff', border: '#22d3ee', text: '#155e75' },
   { id: 'gray',   hex: '#71717a', bg: '#f4f4f5', border: '#a1a1aa', text: '#27272a' },
+  { id: 'indigo',  hex: '#6366f1', bg: '#eef2ff', border: '#a5b4fc', text: '#3730a3' },
+  { id: 'sky',     hex: '#0ea5e9', bg: '#f0f9ff', border: '#7dd3fc', text: '#075985' },
+  { id: 'lime',    hex: '#84cc16', bg: '#f7fee7', border: '#bef264', text: '#3f6212' },
+  { id: 'orange',  hex: '#f97316', bg: '#fff7ed', border: '#fdba74', text: '#9a3412' },
+  { id: 'rose',    hex: '#f43f5e', bg: '#fff1f2', border: '#fda4af', text: '#9f1239' },
+  { id: 'fuchsia', hex: '#d946ef', bg: '#fdf4ff', border: '#f0abfc', text: '#86198f' },
+  { id: 'yellow',  hex: '#eab308', bg: '#fefce8', border: '#fde047', text: '#854d0e' },
+  { id: 'black',   hex: '#18181b', bg: '#f4f4f5', border: '#52525b', text: '#18181b' },
 ];
 
 const COLOR_MAP = COLORS.reduce((acc, c) => ({ ...acc, [c.id]: c }), {});
@@ -450,7 +458,7 @@ export default function Calendar() {
         </div>
       </div>
 
-      <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Event / Post' : 'Add Event / Post'}
+      <Modal large open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Event / Post' : 'Add Event / Post'}
         footer={<><button className="btn btn-secondary" onClick={() => setModal(false)}>Cancel</button><button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button></>}>
         <div className="form-group"><label>Title *</label><input value={form.title} onChange={e => setForm(f=>({...f,title:e.target.value}))} placeholder="Post or event title" /></div>
         

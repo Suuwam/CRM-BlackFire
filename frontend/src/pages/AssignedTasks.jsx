@@ -5,6 +5,7 @@ import { fetcher, tasksApi } from '../api';
 import { AccountAvatar } from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
+import Pager, { usePage } from '../components/Pager';
 
 const COL_META = {
   backlog: { label: 'Backlog', color: '#3b82f6' },
@@ -43,9 +44,9 @@ function AssignedTaskBarChart({ tasks = [] }) {
   const maxVal = Math.max(...items.map(i => i.count), 1);
 
   return (
-    <div className="assigned-chart-card" style={{ marginTop: 16, padding: 16, background: 'var(--surface2)', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 6 }}>
-        <div style={{ fontSize: 13, fontWeight: 700 }}>Status breakdown</div>
+    <div className="card assigned-chart-card">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 6 }}>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>{metric === 'status' ? 'Status' : 'Priority'} breakdown</div>
         <div style={{ display: 'flex', gap: 4 }}>
           <button className={`btn btn-sm ${metric === 'status' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMetric('status')} style={{ fontSize: 10, padding: '2px 7px' }}>Status</button>
           <button className={`btn btn-sm ${metric === 'priority' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMetric('priority')} style={{ fontSize: 10, padding: '2px 7px' }}>Priority</button>
@@ -63,7 +64,7 @@ function AssignedTaskBarChart({ tasks = [] }) {
               style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, padding: '4px 6px', borderRadius: 6, background: hoveredId === item.id ? 'var(--surface)' : 'transparent' }}
             >
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
-              <span style={{ fontWeight: 600, minWidth: 90 }}>{item.label}</span>
+              <span style={{ fontWeight: 600, minWidth: 104 }}>{item.label}</span>
               <div style={{ flex: 1, height: 8, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${barW}%`, background: item.color, borderRadius: 99 }} />
               </div>
@@ -76,6 +77,13 @@ function AssignedTaskBarChart({ tasks = [] }) {
   );
 }
 
+const PRIORITY = { high: { label: 'High', color: '#ef4444' }, medium: { label: 'Medium', color: '#f59e0b' }, low: { label: 'Low', color: '#10b981' } };
+const PER_PAGE = 8;
+
+function fmtDue(d) {
+  return new Date(d + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 export default function AssignedTasks() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -85,6 +93,8 @@ export default function AssignedTasks() {
 
   const { data: tasks = [], mutate: mutateTasks } = useSWR('/tasks', fetcher, { revalidateOnFocus: false });
   const { data: users = [] } = useSWR('/users', fetcher, { revalidateOnFocus: false });
+  const { data: boards = [] } = useSWR('/boards', fetcher, { revalidateOnFocus: false });
+  const boardOf = (id) => boards.find(b => b._id === id);
 
   useEffect(() => {
     if (!focusUserId && user?._id) setFocusUserId(String(user._id));
@@ -111,80 +121,95 @@ export default function AssignedTasks() {
     if (focusUser?.name && taskAssigneeName && taskAssigneeName === focusUser.name) return true;
     return false;
   });
+  const today = new Date().toISOString().slice(0, 10);
   const openAssigned = assignedTasks.filter(t => t.column !== 'done' && t.column !== 'cancelled');
   const doneAssigned = assignedTasks.filter(t => t.column === 'done');
+  const overdue = openAssigned.filter(t => t.dueDate && t.dueDate < today);
   const visibleAssigned = taskFilter === 'open' ? openAssigned : taskFilter === 'done' ? doneAssigned : assignedTasks;
+  const pg = usePage(visibleAssigned, PER_PAGE, `${focusUserId}:${taskFilter}`);
+  const completion = assignedTasks.length ? Math.round((doneAssigned.length / assignedTasks.length) * 100) : 0;
 
   return (
     <>
       <div className="page-head">
         <div>
           <h1>Assigned Tasks</h1>
-          <p>{user?.role === 'admin' ? 'Tasks for the selected account.' : 'Your assigned tasks.'}</p>
+          <p>{user?.role === 'admin' ? 'Pick an account to see what it is working on.' : 'Everything assigned to you, across every board.'}</p>
         </div>
+        {user?.role === 'admin' && (
+          <select value={focusUserId} onChange={e => setFocusUserId(e.target.value)} style={{ width: 260 }} aria-label="Account">
+            {users.map(u => <option key={u._id} value={u._id}>{u.name} ({u.username})</option>)}
+          </select>
+        )}
       </div>
       <div className="page-body">
-        {user?.role === 'admin' && (
-          <div className="form-group" style={{ marginBottom: 16, maxWidth: 360 }}>
-            <label>Account</label>
-            <select value={focusUserId} onChange={e => setFocusUserId(e.target.value)}>
-              {users.map(u => <option key={u._id} value={u._id}>{u.name} ({u.username})</option>)}
-            </select>
-          </div>
-        )}
-
-        <div className="assigned-person" style={{ maxWidth: 480, marginBottom: 16 }}>
-          <AccountAvatar name={focusUser?.name || '?'} size={34} />
-          <div className="assigned-person-info">
-            <div className="assigned-person-name">{focusUser?.name || 'Unassigned'}</div>
-            <div className="assigned-person-meta">{focusUser?.email || 'No email on file'}</div>
-          </div>
-        </div>
-
-        <div className="assigned-filters">
-          <button type="button" className={`assigned-filter${taskFilter === 'open' ? ' active' : ''}`} onClick={() => setTaskFilter('open')}>
-            Open <span className="count">{openAssigned.length}</span>
-          </button>
-          <button type="button" className={`assigned-filter${taskFilter === 'done' ? ' active' : ''}`} onClick={() => setTaskFilter('done')}>
-            Done <span className="count">{doneAssigned.length}</span>
-          </button>
-          <button type="button" className={`assigned-filter${taskFilter === 'all' ? ' active' : ''}`} onClick={() => setTaskFilter('all')}>
-            All <span className="count">{assignedTasks.length}</span>
-          </button>
-        </div>
-
-        <div className="assigned-list" style={{ maxWidth: 720 }}>
-          {visibleAssigned.length === 0 && (
-            <div className="empty" style={{ padding: '24px 0' }}>
-              {taskFilter === 'open' ? 'No open tasks.' : taskFilter === 'done' ? 'No completed tasks.' : 'No tasks assigned.'}
+        <div className="assigned-top">
+          <div className="assigned-person">
+            <AccountAvatar name={focusUser?.name || '?'} photo={focusUser?.photo} size={40} />
+            <div className="assigned-person-info">
+              <div className="assigned-person-name">{focusUser?.name || 'Unassigned'}</div>
+              <div className="assigned-person-meta">{focusUser?.email || 'No email on file'}</div>
             </div>
-          )}
-          {visibleAssigned.map(task => {
-            const col = COL_META[task.column] || COL_META.backlog;
-            const isDone = task.column === 'done';
-            return (
-              <div key={task._id} className={`assigned-item${isDone ? ' is-done' : ''}`}>
-                <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => navigate(`/board?project=${task.project}`)}>
-                  <div className="assigned-title" style={{ textDecoration: isDone ? 'line-through' : 'none' }}>{task.title}</div>
-                  <div className="assigned-meta">
-                    <span className="assigned-pill">
-                      <span className="assigned-pill-dot" style={{ background: col.color }} />
-                      {col.label}
-                    </span>
-                    {task.project && <span className="assigned-pill">{task.project}</span>}
-                  </div>
-                </div>
-                {isDone ? (
-                  <span className="assigned-done-mark">✓</span>
-                ) : (
-                  <button className="assigned-done-btn" aria-label="Mark as done" title="Mark as done" onClick={() => quickDoneTask(task._id)}>✓</button>
-                )}
-              </div>
-            );
-          })}
+          </div>
+          <div className="stats-grid assigned-stats">
+            <div className="stat-card"><div className="stat-label">Open</div><div className="stat-value">{openAssigned.length}</div></div>
+            <div className="stat-card"><div className="stat-label">Done</div><div className="stat-value">{doneAssigned.length}</div></div>
+            <div className={`stat-card${overdue.length ? ' stat-card--overdue' : ''}`}><div className="stat-label">Overdue</div><div className="stat-value" style={{ color: overdue.length ? '#ef4444' : undefined }}>{overdue.length}</div></div>
+            <div className="stat-card"><div className="stat-label">Completion</div><div className="stat-value">{completion}%</div></div>
+          </div>
         </div>
 
-        <div style={{ maxWidth: 720 }}>
+        <div className="assigned-grid">
+          <div className="card" style={{ padding: 16 }}>
+            <div className="assigned-filters">
+              {[['open', 'Open', openAssigned.length], ['done', 'Done', doneAssigned.length], ['all', 'All', assignedTasks.length]].map(([id, label, n]) => (
+                <button key={id} type="button" className={`assigned-filter${taskFilter === id ? ' active' : ''}`} onClick={() => setTaskFilter(id)}>
+                  {label} <span className="count">{n}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="assigned-list">
+              {visibleAssigned.length === 0 && (
+                <div className="empty" style={{ padding: '32px 0', textAlign: 'center' }}>
+                  {taskFilter === 'open' ? 'No open tasks. Nice.' : taskFilter === 'done' ? 'No completed tasks yet.' : 'No tasks assigned.'}
+                </div>
+              )}
+              {pg.items.map(task => {
+                const col = COL_META[task.column] || COL_META.backlog;
+                const isDone = task.column === 'done';
+                const board = boardOf(task.project);
+                const pri = PRIORITY[task.priority] || PRIORITY.medium;
+                const late = !isDone && task.dueDate && task.dueDate < today;
+                return (
+                  <div key={task._id} className={`assigned-item card-color-${task.color || 'blue'}${isDone ? ' is-done' : ''}`}>
+                    <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => navigate(`/board?project=${task.project}`)}>
+                      <div className="assigned-title" style={{ textDecoration: isDone ? 'line-through' : 'none' }} title={task.title}>{task.title}</div>
+                      <div className="assigned-meta">
+                        <span className="assigned-pill"><span className="assigned-pill-dot" style={{ background: col.color }} />{col.label}</span>
+                        {task.project && (
+                          <span className="assigned-pill"><span className="assigned-pill-dot" style={{ background: board?.color || 'var(--text3)' }} />{board?.label || task.project}</span>
+                        )}
+                        <span className="assigned-pill" style={{ color: pri.color }}>{pri.label}</span>
+                        {task.dueDate && (
+                          <span className="assigned-pill" style={late ? { background: '#fee2e2', color: '#b91c1c' } : undefined}>
+                            {late ? 'Overdue · ' : 'Due '}{fmtDue(task.dueDate)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {isDone ? (
+                      <span className="assigned-done-mark">✓</span>
+                    ) : (
+                      <button className="assigned-done-btn" aria-label="Mark as done" title="Mark as done" onClick={() => quickDoneTask(task._id)}>✓</button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <Pager {...pg} />
+          </div>
+
           <AssignedTaskBarChart tasks={assignedTasks} />
         </div>
       </div>

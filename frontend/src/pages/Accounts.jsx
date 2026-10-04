@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Pager, { usePage } from '../components/Pager';
 import useSWR, { mutate } from 'swr';
 import { usersApi, fetcher } from '../api';
 import Modal from '../components/Modal';
@@ -122,6 +123,8 @@ export default function Accounts() {
   }
 
   const pendingApps = applications.filter(a => a.status === 'pending' || a.status === 'rejected');
+  const appPg = usePage(pendingApps, 9);
+  const userPg = usePage(users, 12);
 
   return (
     <>
@@ -155,7 +158,7 @@ export default function Accounts() {
             </div>
           ) : (
             <div className="accounts-grid">
-              {pendingApps.map(app => (
+              {appPg.items.map(app => (
                 <div className="account-card" key={app._id} style={{ borderLeft: app.status === 'rejected' ? '4px solid #ef4444' : '4px solid var(--accent)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <div>
                     <div className="account-top">
@@ -198,6 +201,7 @@ export default function Accounts() {
               ))}
             </div>
           )}
+          <Pager {...appPg} />
         </div>
 
         <div className="divider" style={{ margin: '32px 0' }}></div>
@@ -213,7 +217,7 @@ export default function Accounts() {
             </div>
           ) : (
             <div className="accounts-grid">
-              {users.map(account => (
+              {userPg.items.map(account => (
                 <div className="account-card" key={account._id}>
                   <div className="account-top">
                     <div className="account-top-left">
@@ -248,6 +252,7 @@ export default function Accounts() {
               ))}
             </div>
           )}
+          <Pager {...userPg} />
         </div>
       </div>
 
