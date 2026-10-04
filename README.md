@@ -58,7 +58,7 @@ New website feedback, milestone changes, and emails, on both Android and iPhone.
 
 Every review left on one of our websites (LipiSub first) arrives in the CRM within seconds.
 
-- **Sidebar → Feedback** shows *All websites*, plus one entry for each connected site.
+- **Sidebar → Feedback** (at the bottom) lists every website. Admins add new ones there.
 - **Each site's dashboard** shows:
   - the average rating
   - **positive (4–5★), neutral (3★) and negative (1–2★)** counts and their split
@@ -69,13 +69,13 @@ Every review left on one of our websites (LipiSub first) arrives in the CRM with
 - Everyone signed in can view feedback. Only admins can add or remove websites.
 
 #### Connecting a website (no code changes in the CRM)
-1. Go to **Feedback → All websites**, type the site's name, and click **Add website**.
-2. Click **Setup** and copy the two values into that site's server environment:
+1. Go to **Feedback**, type the site's name, and click **+ Add website**.
+2. The site's card opens **How to connect**. Copy the two lines into that site's backend `.env` (LipiSub: cPanel → File Manager → `api.lipisub.com/.env`):
    ```
    CRM_WEBHOOK_URL=https://crm-blackfire.vercel.app/api/feedback/hook/<site>
    CRM_WEBHOOK_SECRET=<the secret shown>
    ```
-3. Restart the site. To bring in reviews from before the link was set up, resend them from the site's admin (LipiSub: *Admin → Feedback → Send to CRM*).
+3. Restart the site's backend (LipiSub: cPanel → Setup Node.js App → Restart). In LipiSub, *Admin → Feedback* should now say "New reviews are sent to the CRM automatically". Press **Send to CRM** on older reviews to bring them in. The card turns **● Connected** when the first review arrives.
 
 **New secret** replaces a leaked secret. The site stops sending until you update its env. **Remove** deletes the site and all its reviews.
 

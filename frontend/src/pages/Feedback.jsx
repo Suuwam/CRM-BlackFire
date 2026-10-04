@@ -53,16 +53,16 @@ function Sources() {
         {isAdmin && (
           <form className="card" onSubmit={add} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div className="form-group" style={{ flex: 1, minWidth: 200, margin: 0 }}>
-              <label>Connect a website</label>
-              <input value={name} maxLength={80} placeholder="e.g. LipiSub" onChange={e => setName(e.target.value)} />
+              <label>Add website</label>
+              <input value={name} maxLength={80} placeholder="Website name, e.g. LipiSub" onChange={e => setName(e.target.value)} />
             </div>
-            <button className="btn btn-primary">Add website</button>
+            <button className="btn btn-primary">+ Add website</button>
           </form>
         )}
 
         {sources && sources.length === 0 && (
           <div className="card" style={{ textAlign: 'center', color: 'var(--text3)', padding: 48 }}>
-            No websites connected yet{isAdmin ? ' — add one above' : ''}
+            No websites yet{isAdmin ? '. Type a name above and press “+ Add website”, then follow the steps it shows.' : '. An admin can add one.'}
           </div>
         )}
 
@@ -72,25 +72,23 @@ function Sources() {
               <div style={{ flex: 1, minWidth: 180 }}>
                 <Link to={`/feedback/${s.slug}`} style={{ fontSize: 18, fontWeight: 650, color: 'var(--text)' }}>{s.name}</Link>
                 <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>
-                  {s.total} review{s.total === 1 ? '' : 's'} · {s.lastReceivedAt ? `last ${new Date(s.lastReceivedAt).toLocaleString()}` : 'nothing received yet'}
+                  {s.lastReceivedAt
+                    ? <><span style={{ color: '#16a34a' }}>● Connected</span> · {s.total} review{s.total === 1 ? '' : 's'} · last {new Date(s.lastReceivedAt).toLocaleString()}</>
+                    : <><span style={{ color: '#d97706' }}>● Waiting for the first review</span>{isAdmin && ' · open “How to connect”'}</>}
                 </div>
               </div>
               {s.total > 0 && <SentimentBar counts={s.counts} total={s.total} width={220} />}
               <Link className="btn btn-sm btn-secondary" to={`/feedback/${s.slug}`}>Dashboard ›</Link>
               {isAdmin && (
                 <button className="btn btn-sm btn-secondary" onClick={() => setOpen(open === s._id ? null : s._id)}>
-                  {open === s._id ? 'Hide setup' : 'Setup'}
+                  {open === s._id ? 'Hide' : 'How to connect'}
                 </button>
               )}
             </div>
 
             {isAdmin && open === s._id && (
               <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)', fontSize: 13 }}>
-                <p style={{ color: 'var(--text2)', marginBottom: 10 }}>
-                  Set these on {s.name}'s server, then restart it. Every new review arrives here signed with the secret.
-                </p>
-                <Copyable label="CRM_WEBHOOK_URL" value={`${apiRoot()}/feedback/hook/${s.slug}`} />
-                <Copyable label="CRM_WEBHOOK_SECRET" value={s.secret} />
+                <ConnectSteps source={s} />
                 <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
                   <button className="btn btn-sm btn-secondary" onClick={() => confirm(`New secret for ${s.name}? It stops sending until you update its CRM_WEBHOOK_SECRET.`)
                     && run(() => feedbackApi.rotateSecret(s._id), 'New secret made')}>New secret</button>
@@ -106,17 +104,35 @@ function Sources() {
   );
 }
 
-function Copyable({ label, value }) {
+// Step-by-step for the site's server. LipiSub reads exactly these two variables
+// (lipsub-backend/src/config/env.js); another site copies LipiSub's crmWebhook.js.
+function ConnectSteps({ source }) {
   const toast = useToast();
+  const env = `CRM_WEBHOOK_URL=${apiRoot()}/feedback/hook/${source.slug}\nCRM_WEBHOOK_SECRET=${source.secret}`;
+  const step = { margin: '0 0 10px', paddingLeft: 18, color: 'var(--text2)', lineHeight: 1.6 };
   return (
-    <div className="form-group" style={{ marginBottom: 8 }}>
-      <label>{label}</label>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <input readOnly value={value} onFocus={e => e.target.select()} style={{ fontFamily: 'monospace', fontSize: 12 }} />
-        <button type="button" className="btn btn-sm btn-secondary"
-          onClick={() => navigator.clipboard.writeText(value).then(() => toast('Copied', 'success'))}>Copy</button>
-      </div>
-    </div>
+    <>
+      <div style={{ fontWeight: 650, marginBottom: 8 }}>Connect {source.name} in 4 steps</div>
+      <ol style={step}>
+        <li>On {source.name}'s <b>backend server</b>, open its <code>.env</code> file.
+          For LipiSub: cPanel → <b>File Manager</b> → <code>api.lipisub.com/.env</code>.</li>
+        <li>Paste these two lines at the bottom (replace them if they're already there), then save:
+          <div style={{ position: 'relative', margin: '6px 0' }}>
+            <pre style={{ margin: 0, padding: '10px 12px', paddingRight: 70, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{env}</pre>
+            <button type="button" className="btn btn-sm btn-secondary" style={{ position: 'absolute', top: 6, right: 6 }}
+              onClick={() => navigator.clipboard.writeText(env).then(() => toast('Copied both lines', 'success'))}>Copy</button>
+          </div>
+        </li>
+        <li><b>Restart</b> the backend. For LipiSub: cPanel → <b>Setup Node.js App</b> → <b>Restart</b>.</li>
+        <li>Check it: in {source.name}'s <b>Admin → Feedback</b> the note should now read
+          “New reviews are sent to the CRM automatically”. Press <b>Send to CRM</b> on older reviews to bring them in.
+          This card turns <span style={{ color: '#16a34a' }}>● Connected</span> when the first review arrives.</li>
+      </ol>
+      <p style={{ fontSize: 12, color: 'var(--text3)', margin: 0 }}>
+        Keep the secret private. If it leaks, press <b>New secret</b> and repeat steps 2–3.
+        A website other than LipiSub needs LipiSub's <code>crmWebhook.js</code> copied in first (see the CRM README).
+      </p>
+    </>
   );
 }
 

@@ -1,7 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import useSWR from 'swr';
 import NotificationBell from './NotificationBell';
-import { fetcher } from '../api';
 
 const nav = [
   { to: '/dashboard',  label: 'Dashboard' },
@@ -26,10 +24,6 @@ const adminNav = [
 ];
 
 export default function Sidebar({ user, onLogout, routeLoading, onSearchOpen }) {
-  const { data: feedbackSources } = useSWR(user ? '/feedback/sources' : null, fetcher);
-  const feedbackNav = [{ to: '/feedback', label: 'All websites', end: true },
-    ...(feedbackSources || []).map(s => ({ to: `/feedback/${s.slug}`, label: s.name }))];
-
   return (
     <aside className="sidebar">
       <div className="sb-brand">
@@ -99,14 +93,6 @@ export default function Sidebar({ user, onLogout, routeLoading, onSearchOpen }) 
           </NavLink>
         ))}
 
-        <div className="sb-section" style={{ marginTop: 12 }}>Feedback</div>
-        {feedbackNav.map(n => (
-          <NavLink key={n.to} to={n.to} end={n.end}
-            className={({ isActive }) => `sb-item${isActive ? ' active' : ''}`}>
-            {n.label}
-          </NavLink>
-        ))}
-
         {user?.role === 'admin' && (
           <>
             <div className="sb-section" style={{ marginTop: 12 }}>Admin</div>
@@ -125,6 +111,11 @@ export default function Sidebar({ user, onLogout, routeLoading, onSearchOpen }) 
             ))}
           </>
         )}
+
+        {/* Feedback from our websites; the sites themselves are added inside the page. */}
+        <NavLink to="/feedback" className={({ isActive }) => `sb-item${isActive ? ' active' : ''}`} style={{ marginTop: 12 }}>
+          Feedback
+        </NavLink>
 
         {onLogout && (
           <button
