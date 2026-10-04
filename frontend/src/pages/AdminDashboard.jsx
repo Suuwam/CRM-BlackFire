@@ -3,6 +3,7 @@ import Pager, { usePage, useFitCount } from '../components/Pager';
 import useSWR from 'swr';
 import { fetcher } from '../api';
 import { AccountAvatar } from '../components/Avatar';
+import StorageCard from '../components/StorageCard';
 import { fmtClock, fmtDuration, isLate, isOnline, workedMinutes } from '../lib/time';
 
 const RANGES = [7, 30, 90];
@@ -90,7 +91,9 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div className="table-card fit-area" style={{ marginTop: 20 }} ref={tableRef}>
+        <StorageCard />
+
+        <div className="table-card fit-area" style={{ marginTop: 16 }} ref={tableRef}>
           <table className="data-table">
             <thead>
               <tr>

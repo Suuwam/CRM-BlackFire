@@ -1057,7 +1057,7 @@ html.theme-fade, html.theme-fade *, html.theme-fade *::before, html.theme-fade *
 @media (prefers-reduced-motion: reduce) { .theme-icon { transition: none; } }
 .theme-toggle:hover { color: var(--text); border-color: var(--text3); box-shadow: var(--shadow-md); }
 .clock-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text3); flex-shrink: 0; }
-.clock-dot.live { background: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,.18); }
+.clock-dot.live { background: #16a34a; }
 
 /* Dashboard — exactly one screen, panels scroll internally */
 .dash-page { display: flex; flex-direction: column; height: 100%; max-height: 100%; overflow: hidden; }
@@ -1399,3 +1399,24 @@ button.stat-card { display: block; width: 100%; cursor: pointer; }
   .page-fit .scroll-area { flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 6px; }
   .page-fit .scroll-area .upcoming-item:hover { transform: none; }
 }
+/* Admin Overview: storage meter + archive */
+.storage-card { margin-top: 16px; display: flex; gap: 24px; align-items: center; padding: 16px 20px; }
+.storage-card--loading { color: var(--text3); font-size: 12.5px; }
+.storage-main { flex: 1; min-width: 0; }
+.storage-head { display: flex; align-items: center; gap: 10px; }
+.storage-badge { font-size: 10.5px; font-weight: 700; padding: 1px 8px; border-radius: 99px; }
+.storage-badge--ok { background: #dcfce7; color: #15803d; }
+.storage-badge--warn { background: #fef3c7; color: #b45309; }
+.storage-badge--critical { background: #fee2e2; color: #b91c1c; }
+.storage-numbers { font-size: 13px; color: var(--text2); margin: 6px 0 8px; }
+.storage-numbers strong { color: var(--text); font-size: 15px; }
+.storage-left { color: var(--text3); }
+.storage-track { height: 8px; border-radius: 99px; background: var(--surface2); border: 1px solid var(--border); overflow: hidden; }
+.storage-fill { height: 100%; border-radius: 99px; }
+.storage-fill--ok { background: #16a34a; }
+.storage-fill--warn { background: #f59e0b; }
+.storage-fill--critical { background: #ef4444; }
+.storage-top { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; font-size: 11px; color: var(--text3); }
+.storage-action { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; text-align: right; }
+.storage-old { font-size: 12px; color: var(--text2); }
+@media (max-width: 768px) { .storage-card { flex-direction: column; align-items: stretch; } .storage-action { align-items: stretch; text-align: left; } }

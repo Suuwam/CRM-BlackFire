@@ -52,7 +52,7 @@ New website feedback, milestone changes, and emails, on both Android and iPhone.
 | **Links** | A bookmark board for design assets, docs and tools, with tags and search. |
 | **Board** | Kanban per project: Backlog → To Do → In Progress → QA → Done, with drag and drop. |
 | **Feedback** | Reviews from our websites, with a dashboard for each site. See below. |
-| **Admin** | Admin Overview (everyone's work history) and Accounts (approve sign-up requests; set role, active and milestone access). |
+| **Admin** | Admin Overview (everyone's work history, plus **CRM storage**: used vs. left, and a button to download a ZIP of data older than 6 months and then delete it) and Accounts (approve sign-up requests; set role, active and milestone access). |
 
 ### 💬 Website Feedback
 
@@ -88,6 +88,19 @@ The site has to send LipiSub's format. The easiest way is to copy `lipsub-backen
 
 ---
 
+### 🗄️ Storage and archiving (Admin Overview)
+- **CRM storage** shows the database's size (data + indexes) against your plan (`STORAGE_LIMIT_MB`, default 512 MB). The meter turns amber at 70% and red at 90%. Photos and card images live on Cloudinary and aren't counted.
+- **Download ZIP & delete** gets rid of history older than 6 months, in two confirmed steps:
+  1. It downloads `blackfire-crm-before-<date>.zip`: a README plus one JSON file per collection.
+  2. Only after the ZIP has been saved, it asks again and deletes exactly those records.
+- **What counts as old:**
+  - activity log, attendance and past calendar events
+  - feedback reviews
+  - tasks that are done or cancelled, and milestones that are done
+  - reviewed sign-up requests (password hashes are left out of the ZIP)
+- **Never touched:** accounts, boards, open tasks, templates, links and website settings.
+- **Safety:** the server refuses any cutoff newer than 180 days, and every delete is recorded in the activity feed.
+
 ## 💻 Run locally
 
 ```bash
@@ -105,6 +118,7 @@ cd frontend && npm install && npm run dev
 Checks:
 ```bash
 node backend/test-feedback.js   # webhook signatures + similar-feedback grouping
+node backend/test-zip.js        # the archive ZIP opens in a real unzip, byte for byte
 node frontend/sw.test.mjs       # service worker never serves a stale app shell
 ```
 
@@ -118,6 +132,7 @@ node frontend/sw.test.mjs       # service worker never serves a stale app shell
 | `ATTENDANCE_TZ` | | Day boundary for attendance (default `Asia/Kathmandu`) |
 | `SMTP_HOST` `SMTP_PORT` `SMTP_SECURE` `SMTP_USER` `SMTP_PASS` `MAIL_FROM` | for email | Outgoing mail |
 | `CLOUDINARY_CLOUD_NAME` `CLOUDINARY_API_KEY` `CLOUDINARY_API_SECRET` | for uploads | Profile photos and card images |
+| `STORAGE_LIMIT_MB` | | Size of your MongoDB plan, for the Admin Overview storage meter (default `512`, the Atlas free tier) |
 | `VAPID_PUBLIC_KEY` `VAPID_PRIVATE_KEY` `VAPID_SUBJECT` | no | Push keys. If unset, they're generated on first use and stored in Mongo (`settings`). If you change them, everyone has to turn the *Notifications* switch on again. |
 
 Frontend: `VITE_API_URL` (default `/api`), `VITE_SHIFT_MINUTES`, `VITE_ON_TIME_BY`.
