@@ -5,7 +5,7 @@ import { fetcher, tasksApi } from '../api';
 import { AccountAvatar } from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
-import Pager, { usePage, useFitCount } from '../components/Pager';
+import Pager, { usePage } from '../components/Pager';
 import { hexOf } from '../components/ColorPicker';
 
 const COL_META = {
@@ -17,69 +17,90 @@ const COL_META = {
   cancelled: { label: 'Cancelled', color: '#6b7280' },
 };
 
-function AssignedTaskBarChart({ tasks = [] }) {
-  const [metric, setMetric] = useState('status');
-  const [hoveredId, setHoveredId] = useState(null);
-  const totalAssigned = tasks.length;
-  if (totalAssigned === 0) return null;
+const PRIORITIES = [
+  { id: 'high', label: 'High', color: '#ef4444' },
+  { id: 'medium', label: 'Medium', color: '#f59e0b' },
+  { id: 'low', label: 'Low', color: '#10b981' },
+];
 
-  let items = [];
-  if (metric === 'status') {
-    items = Object.entries(COL_META).map(([id, s]) => ({
-      id,
-      ...s,
-      count: tasks.filter(t => (t.column || 'backlog') === id).length,
-    }));
-  } else {
-    const priorities = [
-      { id: 'high', label: 'High Priority', color: '#ef4444' },
-      { id: 'medium', label: 'Medium Priority', color: '#f59e0b' },
-      { id: 'low', label: 'Low Priority', color: '#10b981' },
-    ];
-    items = priorities.map(p => ({
-      ...p,
-      count: tasks.filter(t => (t.priority || 'medium') === p.id).length,
-    }));
-  }
-
-  const maxVal = Math.max(...items.map(i => i.count), 1);
-
+// Open work by difficulty (priority), as a doughnut. Hovering a slice or legend row focuses it.
+function PriorityDonut({ tasks }) {
+  const [hover, setHover] = useState(null);
+  const open = tasks.filter(t => t.column !== 'done' && t.column !== 'cancelled');
+  const items = PRIORITIES.map(p => ({ ...p, count: open.filter(t => (t.priority || 'medium') === p.id).length }));
+  const total = items.reduce((n, i) => n + i.count, 0);
+  const R = 52, C = 2 * Math.PI * R, GAP = total > 1 ? 3 : 0;
+  let offset = 0;
+  const shown = hover != null ? items[hover] : null;
   return (
     <div className="card assigned-chart-card">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 6 }}>
-        <div style={{ fontSize: 13, fontWeight: 700 }}>{metric === 'status' ? 'Status' : 'Priority'} breakdown</div>
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button className={`btn btn-sm ${metric === 'status' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMetric('status')} style={{ fontSize: 10, padding: '2px 7px' }}>Status</button>
-          <button className={`btn btn-sm ${metric === 'priority' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMetric('priority')} style={{ fontSize: 10, padding: '2px 7px' }}>Priority</button>
-        </div>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {items.map(item => {
-          const barW = (item.count / maxVal) * 100;
-          const pct = Math.round((item.count / totalAssigned) * 100);
-          return (
-            <div
-              key={item.id}
-              onMouseEnter={() => setHoveredId(item.id)}
-              onMouseLeave={() => setHoveredId(null)}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, padding: '4px 6px', borderRadius: 6, background: hoveredId === item.id ? 'var(--surface)' : 'transparent' }}
-            >
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
-              <span style={{ fontWeight: 600, minWidth: 104 }}>{item.label}</span>
-              <div style={{ flex: 1, height: 8, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${barW}%`, background: item.color, borderRadius: 99 }} />
-              </div>
-              <span style={{ fontWeight: 750, minWidth: 48, textAlign: 'right' }}>{item.count} ({pct}%)</span>
+      <div className="assigned-chart-title">Open work by priority</div>
+      {total === 0 ? <div className="empty" style={{ padding: '28px 0', textAlign: 'center' }}>No open tasks.</div> : (
+        <div className="assigned-donut">
+          <div className="assigned-donut-wrap">
+            <svg viewBox="0 0 140 140" role="img" aria-label={items.map(i => `${i.label} ${i.count}`).join(', ')}>
+              <circle cx="70" cy="70" r={R} fill="none" stroke="var(--surface2)" strokeWidth="20" />
+              {items.map((it, i) => {
+                const len = (it.count / total) * C;
+                const seg = it.count ? (
+                  <circle key={it.id} cx="70" cy="70" r={R} fill="none" stroke={it.color}
+                    strokeWidth={hover === i ? 24 : 20} strokeDasharray={`${Math.max(len - GAP, 0.01)} ${C}`} strokeDashoffset={-offset}
+                    transform="rotate(-90 70 70)" opacity={hover == null || hover === i ? 1 : 0.35}
+                    onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} style={{ transition: 'all .15s', cursor: 'pointer' }} />
+                ) : null;
+                offset += len;
+                return seg;
+              })}
+            </svg>
+            <div className="assigned-donut-center">
+              <strong>{shown ? shown.count : total}</strong>
+              <span>{shown ? shown.label : 'open'}</span>
             </div>
-          );
-        })}
-      </div>
+          </div>
+          <ul className="assigned-donut-legend">
+            {items.map((it, i) => (
+              <li key={it.id} className={hover === i ? 'on' : ''} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
+                <span className="dot" style={{ background: it.color }} />
+                <span className="lbl">{it.label}</span>
+                <strong>{it.count}</strong>
+                <span className="pct">{total ? Math.round((it.count / total) * 100) : 0}%</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Every task by stage, as columns.
+function StatusColumns({ tasks }) {
+  const [hover, setHover] = useState(null);
+  const items = Object.entries(COL_META).map(([id, s]) => ({ id, ...s, count: tasks.filter(t => (t.column || 'backlog') === id).length }));
+  const max = Math.max(1, ...items.map(i => i.count));
+  return (
+    <div className="card assigned-chart-card assigned-chart-card--grow">
+      <div className="assigned-chart-title">Status breakdown <span>{tasks.length} task{tasks.length === 1 ? '' : 's'}</span></div>
+      {tasks.length === 0 ? <div className="empty" style={{ padding: '28px 0', textAlign: 'center' }}>No tasks assigned.</div> : (
+        <div className="assigned-cols">
+          {items.map((it, i) => (
+            <div key={it.id} className={`assigned-col${hover === i ? ' on' : ''}`} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}
+              title={`${it.label}: ${it.count} (${Math.round((it.count / tasks.length) * 100)}%)`}>
+              <span className="assigned-col-val">{it.count}</span>
+              <div className="assigned-col-track">
+                <div className="assigned-col-bar" style={{ height: `${(it.count / max) * 100}%`, background: it.color }} />
+              </div>
+              <span className="assigned-col-lbl">{it.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 const PRIORITY = { high: { label: 'High', color: '#ef4444' }, medium: { label: 'Medium', color: '#f59e0b' }, low: { label: 'Low', color: '#10b981' } };
-const PER_PAGE = 8;
+const PER_PAGE = 18;
 
 function fmtDue(d) {
   return new Date(d + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -127,8 +148,7 @@ export default function AssignedTasks() {
   const doneAssigned = assignedTasks.filter(t => t.column === 'done');
   const overdue = openAssigned.filter(t => t.dueDate && t.dueDate < today);
   const visibleAssigned = taskFilter === 'open' ? openAssigned : taskFilter === 'done' ? doneAssigned : assignedTasks;
-  const [listRef, fit] = useFitCount(PER_PAGE, visibleAssigned.length);
-  const pg = usePage(visibleAssigned, fit, `${focusUserId}:${taskFilter}`);
+  const pg = usePage(visibleAssigned, PER_PAGE, `${focusUserId}:${taskFilter}`);
   const completion = assignedTasks.length ? Math.round((doneAssigned.length / assignedTasks.length) * 100) : 0;
 
   return (
@@ -171,7 +191,7 @@ export default function AssignedTasks() {
               ))}
             </div>
 
-            <div className="assigned-list fit-area" ref={listRef}>
+            <div className="assigned-list scroll-area" key={pg.page}>
               {visibleAssigned.length === 0 && (
                 <div className="empty" style={{ padding: '32px 0', textAlign: 'center' }}>
                   {taskFilter === 'open' ? 'No open tasks. Nice.' : taskFilter === 'done' ? 'No completed tasks yet.' : 'No tasks assigned.'}
@@ -212,7 +232,10 @@ export default function AssignedTasks() {
             <Pager {...pg} />
           </div>
 
-          <AssignedTaskBarChart tasks={assignedTasks} />
+          <div className="assigned-charts">
+            <PriorityDonut tasks={assignedTasks} />
+            <StatusColumns tasks={assignedTasks} />
+          </div>
         </div>
       </div>
     </>
