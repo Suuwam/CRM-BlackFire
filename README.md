@@ -113,6 +113,7 @@ node frontend/sw.test.mjs       # service worker never serves a stale app shell
 | Variable | Needed | What for |
 |---|---|---|
 | `MONGO_URI` | **yes** | MongoDB Atlas connection string |
+| `BOOTSTRAP_ADMIN_PASSWORD` | | Password for the `admin` account created on a brand-new database that has no admin yet (default `blackfire`). Change it after the first sign-in. It's never reapplied after that. |
 | `ALLOWED_ORIGINS` | prod | Comma-separated CORS allow-list |
 | `ATTENDANCE_TZ` | | Day boundary for attendance (default `Asia/Kathmandu`) |
 | `SMTP_HOST` `SMTP_PORT` `SMTP_SECURE` `SMTP_USER` `SMTP_PASS` `MAIL_FROM` | for email | Outgoing mail |

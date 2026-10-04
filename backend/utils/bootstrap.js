@@ -1,34 +1,25 @@
 const User = require('../models/User');
-const { verifyPassword } = require('./password');
+
+// First-run only: make a default admin when the CRM has no admin at all, so a fresh
+// database can be signed into. It never touches an existing account; it used to reset
+// admin's password on every login, which undid password changes and left the
+// default (published in this repo) working forever.
+let checked = false;
 
 async function ensureBootstrapAdmin() {
+  if (checked) return;
   try {
-    const username = 'admin';
-    const email = 'admin@blackfire.local';
-    const password = 'blackfire';
-
-    const existing = await User.findOne({ username });
-    if (existing) {
-      const passwordMatches = await verifyPassword(password, existing.password);
-      if (existing.role !== 'admin' || !existing.active || existing.email !== email || !passwordMatches) {
-        existing.name = existing.name || 'Blackfire Admin';
-        existing.email = email;
-        existing.password = password;
-        existing.role = 'admin';
-        existing.active = true;
-        await existing.save();
-      }
-      return existing;
+    if (!(await User.exists({ role: 'admin' }))) {
+      await User.create({
+        name: 'Blackfire Admin',
+        username: 'admin',
+        email: 'admin@blackfire.local',
+        password: process.env.BOOTSTRAP_ADMIN_PASSWORD || 'blackfire', // change it right after first sign-in
+        role: 'admin',
+        active: true,
+      });
     }
-
-    return await User.create({
-      name: 'Blackfire Admin',
-      username,
-      email,
-      password,
-      role: 'admin',
-      active: true,
-    });
+    checked = true;
   } catch (err) {
     console.error('ensureBootstrapAdmin error:', err.message);
   }
