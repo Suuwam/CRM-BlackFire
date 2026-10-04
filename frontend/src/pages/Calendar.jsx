@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import ColorPicker, { isHex } from '../components/ColorPicker';
+import ColorPicker, { isHex, hexOf, inkOn } from '../components/ColorPicker';
 import useSWR, { mutate } from 'swr';
 import { eventsApi, fetcher } from '../api';
 import Modal from '../components/Modal';
@@ -53,6 +53,18 @@ function clearCalDraft(id) { try { sessionStorage.removeItem(getCalDraftKey(id))
 
 export default function Calendar() {
   const today = new Date();
+  // Each person's own calendar colour, kept in this browser.
+  const [calColor, setCalColorState] = useState(() => { try { return localStorage.getItem('crm_calendar_color') || ''; } catch { return ''; } });
+  const setCalColor = (c) => { setCalColorState(c); try { c ? localStorage.setItem('crm_calendar_color', c) : localStorage.removeItem('crm_calendar_color'); } catch {} };
+  const [themeOpen, setThemeOpen] = useState(false);
+  const themeRef = useRef(null);
+  useEffect(() => {
+    if (!themeOpen) return;
+    const away = e => { if (themeRef.current && !themeRef.current.contains(e.target) && !e.target.closest('.color-panel')) setThemeOpen(false); };
+    document.addEventListener('mousedown', away);
+    return () => document.removeEventListener('mousedown', away);
+  }, [themeOpen]);
+  const calVars = calColor ? { '--cal-accent': hexOf(calColor), '--cal-ink': inkOn(calColor), '--cal-tint': `${hexOf(calColor)}17` } : undefined;
   const [year, setYear]   = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [sel, setSel]     = useState(null);
@@ -236,9 +248,9 @@ export default function Calendar() {
   return (
     <>
       <div className="page-head">
-        <div><h1>Calendar & Content Scheduler</h1><p>Social media post tracking with vector SVG platform logos & custom day color coding</p></div>
+        <div><h1>Calendar</h1><p>Posts and events by day · pick a day to see and schedule</p></div>
       </div>
-      <div className="page-body cal-page-body">
+      <div className="page-body cal-page-body" style={calVars}>
         <div className="cal-container">
           {/* Square Grid Calendar */}
           <div className="cal-main">
@@ -248,6 +260,19 @@ export default function Calendar() {
                 <span className="cal-year-badge">{year}</span>
               </div>
               <div className="cal-header-right">
+                <div className="cal-theme" ref={themeRef}>
+                  <button className="cal-theme-btn" onClick={() => setThemeOpen(o => !o)} aria-expanded={themeOpen} title="Calendar colour">
+                    <span className="cal-theme-dot" />Colour
+                  </button>
+                  {themeOpen && (
+                    <div className="cal-theme-pop">
+                      <div className="cal-theme-title">Calendar colour</div>
+                      <ColorPicker hex value={calColor || '#18181b'} onChange={setCalColor} />
+                      {calColor && <button className="btn btn-sm btn-ghost" style={{ marginTop: 10 }} onClick={() => { setCalColor(''); setThemeOpen(false); }}>Reset to default</button>}
+                    </div>
+                  )}
+                </div>
+                <div className="cal-nav-group">
                 <button className="cal-nav-btn" onClick={prevMonth} aria-label="Previous month">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
                 </button>
@@ -257,6 +282,7 @@ export default function Calendar() {
                 <button className="cal-nav-btn" onClick={nextMonth} aria-label="Next month">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
                 </button>
+                </div>
               </div>
             </div>
 
@@ -270,7 +296,7 @@ export default function Calendar() {
               {cells.map((cell, i) => {
                 if (cell.other) {
                   return (
-                    <div key={i} className="cal-cell cal-cell--other">
+                    <div key={i} className={`cal-cell cal-cell--other${i % 7 === 0 || i % 7 === 6 ? ' cal-cell--weekend' : ''}`}>
                       <span className="cal-cell-num">{cell.day}</span>
                     </div>
                   );
@@ -287,13 +313,13 @@ export default function Calendar() {
 
                 return (
                   <div key={i}
-                    className={`cal-cell${isToday ? ' cal-cell--today' : ''}${isSel ? ' cal-cell--sel' : ''}`}
+                    className={`cal-cell${isToday ? ' cal-cell--today' : ''}${isSel ? ' cal-cell--sel' : ''}${i % 7 === 0 || i % 7 === 6 ? ' cal-cell--weekend' : ''}`}
                     style={dayAccent ? { borderTop: `3px solid ${dayAccent.hex}` } : {}}
                     onClick={() => setSel(isSel ? null : cell.day)}>
                     
                     <div className="cal-cell-head">
                       <span className={`cal-cell-num${isToday ? ' cal-cell-num--today' : ''}`}>{cell.day}</span>
-                      {evs.length > 0 && <span className="text-xs text-muted cal-ev-count-label" style={{ fontWeight:600 }}>{evs.length} ev</span>}
+                      {evs.length > 0 && <span className="cal-ev-count" title={`${evs.length} event${evs.length > 1 ? 's' : ''}`}>{evs.length}</span>}
                     </div>
 
                     {/* Mobile: single colored dot. Desktop: full chips */}

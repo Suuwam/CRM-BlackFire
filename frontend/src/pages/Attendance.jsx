@@ -6,14 +6,21 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
 import {
   fmtClock, fmtDayLabel, fmtDuration, isLate, isOnline,
-  overtimeMinutes, shiftDay, todayKey, workedMinutes, ON_TIME_BY,
+  overtimeMinutes, shiftDay, todayKey, workedMinutes, ON_TIME_BY, SHIFT_MINUTES,
 } from '../lib/time';
+
+const svg = (d) => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">{d}</svg>;
+const ICONS = {
+  green: svg(<><path d="M20 6 9 17l-5-5" /></>),
+  blue: svg(<><circle cx="12" cy="8" r="4" /><path d="M4 21v-1a6 6 0 0 1 12 0v1M17 11l4 4m0-4-4 4" /></>),
+  amber: svg(<><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>),
+};
 
 function SummaryCard({ title, tone, items }) {
   return (
     <div className={`sum-card sum-card--${tone}`}>
       <div className="sum-card-title">
-        <span className="sum-card-ico" />
+        <span className="sum-card-ico">{ICONS[tone]}</span>
         {title}
       </div>
       <div className="sum-card-items">
@@ -163,13 +170,20 @@ export default function Attendance() {
                         </div>
                       ) : <span className="text-muted">—</span>}
                     </td>
-                    <td>{row?.clockIn ? fmtDuration(workedMinutes(row)) : <span className="text-muted">—</span>}</td>
+                    <td>
+                      {row?.clockIn ? (
+                        <div className="att-hours">
+                          <span>{fmtDuration(workedMinutes(row))}</span>
+                          <div className="att-hours-track"><div style={{ width: `${Math.min(100, (workedMinutes(row) / SHIFT_MINUTES) * 100)}%` }} /></div>
+                        </div>
+                      ) : <span className="text-muted">—</span>}
+                    </td>
                     <td>{row?.clockIn && overtimeMinutes(row) > 0 ? fmtDuration(overtimeMinutes(row)) : <span className="text-muted">—</span>}</td>
                     <td>
-                      {!row?.clockIn && <span className="tag tag-red">Absent</span>}
-                      {row?.clockIn && row.clockOut && <span className="tag tag-gray">Clocked out</span>}
-                      {online && <span className="tag tag-green">Online</span>}
-                      {row?.clockIn && !row.clockOut && !online && <span className="tag tag-amber">Away</span>}
+                      {!row?.clockIn && <span className="team-pill tone-red">Absent</span>}
+                      {row?.clockIn && row.clockOut && <span className="team-pill tone-blue">Clocked out</span>}
+                      {online && <span className="team-pill tone-green">Online</span>}
+                      {row?.clockIn && !row.clockOut && !online && <span className="team-pill tone-amber">Away</span>}
                     </td>
                     <td>
                       {editing ? (

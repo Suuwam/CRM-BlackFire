@@ -234,7 +234,20 @@ function SourceDashboard({ slug }) {
         </div>
       </div>
 
-      <div className="page-body page-fit fb-dash">
+      {st.total === 0 ? (
+        <div className="page-body">
+          <div className="card fb-hero" style={{ '--site': st.source.color }}>
+            <span className="fb-hero-badge">{st.source.name.slice(0, 1).toUpperCase()}</span>
+            <div className="fb-hero-title">Waiting for {st.source.name}'s first review</div>
+            <p>As soon as someone leaves feedback on {st.source.name}, it shows up here with ratings, trends and similar-review groups.
+              If nothing arrives, check that the website is connected.</p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <Link className="btn btn-primary" to="/feedback">How to connect</Link>
+            </div>
+          </div>
+        </div>
+      ) : (
+      <div className="page-body page-fit fb-dash" style={{ '--site': st.source.color }}>
         <div className="fb-insights">
         <div className="stats-grid">
           <div className="stat-card">
@@ -323,7 +336,7 @@ function SourceDashboard({ slug }) {
               {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-          {list?.items.length === 0 && <div style={{ color: 'var(--text3)', fontSize: 13 }}>No reviews match</div>}
+          {list?.items.length === 0 && <div className="fb-none">No reviews match these filters.</div>}
           <div className="fit-area" ref={reviewRef}>
           {list?.items.map(f => (
             <div key={f._id} style={{ padding: '10px 0', borderTop: '1px solid var(--border)', fontSize: 13 }}>
@@ -348,6 +361,7 @@ function SourceDashboard({ slug }) {
           )}
         </div>
       </div>
+      )}
     </>
   );
 }

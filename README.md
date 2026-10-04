@@ -45,9 +45,9 @@ New website feedback, milestone changes, and emails, on both Android and iPhone.
 | **Dashboard** | Workload, throughput, priority mix, hours today and the week ahead. |
 | **Milestones** | Numbered company milestones. Everyone can mark them done, and every change notifies the team. |
 | **Attendance** | Signing in clocks you in and signing out clocks you out (or use the top-bar pill). Daily board with hours, overtime and notes. |
-| **Team** | Who's online right now, based on a 60 s heartbeat. Offline after 3 missed beats. |
+| **Team** | Who's online, away, clocked out or offline (60 s heartbeat), with each person's hours today against the shift. |
 | **Assigned · Backlog · Overdue** | Your tasks, the full activity trail, and anything past due. |
-| **Calendar** | Month grid with color-coded work items and a side panel to add, edit or delete them. |
+| **Calendar** | Month grid with color-coded posts and events and a side panel to add, edit or delete them. **Colour** sets your own calendar accent (saved in your browser). |
 | **Email** | Reusable templates sent to one or many employees, with `{{name}}`, `{{email}}`, `{{username}}` and `{{role}}` filled in. |
 | **Links** | A bookmark board for design assets, docs and tools, with tags and search. |
 | **Board** | Kanban per project, each board in its own colour (any colour: 16 presets plus a full picker), with open / done / overdue counts and progress: Backlog → To Do → In Progress → QA → Done, with drag and drop. |
