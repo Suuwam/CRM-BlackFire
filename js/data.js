@@ -174,7 +174,7 @@ function seedIfEmpty() {
     subject: 'Project Proposal for {{company}} — {{project}}',
     body: `Hi {{name}},
 
-Thank you for connecting with us at Aawazz/Blackfire. We're excited about the opportunity to collaborate on {{project}}.
+Thank you for connecting with us at Blackfire. We're excited about the opportunity to collaborate on {{project}}.
 
 Based on our conversation, we've outlined an initial proposal tailored to {{company}}'s goals. Please find the key highlights below:
 
@@ -187,7 +187,7 @@ We'd love to schedule a call to walk you through our process and answer any ques
 Looking forward to hearing from you!
 
 Warm regards,
-Aawazz / Blackfire Team`,
+Blackfire Team`,
   });
 
   Templates.add({
@@ -202,7 +202,7 @@ We wanted to check if you had any questions or needed any additional information
 We're available for a quick call this week — feel free to suggest a time that works for you.
 
 Best,
-Aawazz / Blackfire Team`,
+Blackfire Team`,
   });
 
   Templates.add({
@@ -220,7 +220,7 @@ All deliverables have been prepared and are attached. A brief summary:
 It has been a pleasure working with you and {{company}}. We hope to collaborate again in the future!
 
 Warm regards,
-Aawazz / Blackfire Team`,
+Blackfire Team`,
   });
 
   References.add({ title: 'Behance — Audio Brand Inspiration', url: 'https://www.behance.net/search/projects?field=graphic_design&search=music+branding', tags: ['design', 'inspiration'], notes: 'Great visual references for music industry branding' });

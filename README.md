@@ -1,6 +1,6 @@
-# Blackfire × Aawazz CRM ⚡
+# Blackfire CRM ⚡
 
-The internal CRM for **Blackfire AI** and **Aawazz**: attendance and live team presence, milestones, a multi-project Kanban board, calendar, employee email automation, a links board, and feedback dashboards for every website we run. It's available on the web, on Android, and on iPhone.
+The internal CRM for **Blackfire AI**: attendance and live team presence, milestones, a multi-project Kanban board, calendar, employee email automation, a links board, and feedback dashboards for every website we run. It's available on the web, on Android, and on iPhone.
 
 **Open it:** **[crm-blackfire.vercel.app](https://crm-blackfire.vercel.app)**
 
@@ -50,7 +50,7 @@ New website feedback, milestone changes, and emails, on both Android and iPhone.
 | **Calendar** | Month grid with color-coded work items and a side panel to add, edit or delete them. |
 | **Email** | Reusable templates sent to one or many employees, with `{{name}}`, `{{email}}`, `{{username}}` and `{{role}}` filled in. |
 | **Links** | A bookmark board for design assets, docs and tools, with tags and search. |
-| **Board** | Kanban per project (Blackfire AI, Aawazz…): Backlog → To Do → In Progress → QA → Done, with drag and drop. |
+| **Board** | Kanban per project: Backlog → To Do → In Progress → QA → Done, with drag and drop. |
 | **Feedback** | Reviews from our websites, with a dashboard for each site. See below. |
 | **Admin** | Admin Overview (everyone's work history) and Accounts (approve sign-up requests; set role, active and milestone access). |
 
@@ -173,4 +173,4 @@ The code lives in two repositories that are kept identical:
 ---
 
 ## 📝 License
-Created for **Blackfire AI** & **Aawazz**.
+Created for **Blackfire AI**.

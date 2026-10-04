@@ -28,7 +28,7 @@ const COLORS = [
 ];
 
 const EMPTY_TASK = { title:'', description:'', priority:'medium', color:'blue', tags:'', dueDate:'', assignees:[] };
-const APP_TITLE = 'CRM | Blackfire & Aawazz';
+const APP_TITLE = 'CRM | Blackfire';
 
 // --- Draft cache helpers for Board tasks ---
 const DRAFT_KEY_PREFIX = 'crm_board_draft_';
