@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import Pager, { usePage } from '../components/Pager';
+import Pager, { usePage, useFitCount } from '../components/Pager';
 import useSWR from 'swr';
 import { fetcher } from '../api';
 import { AccountAvatar } from '../components/Avatar';
@@ -44,7 +44,8 @@ export default function AdminDashboard() {
   const totalMinutes = stats.reduce((a, s) => a + s.minutes, 0);
   const maxMinutes = Math.max(...stats.map(s => s.minutes), 1);
   const activeDays = new Set(history.filter(r => r.clockIn).map(r => r.date)).size;
-  const statPg = usePage(stats, 10, days);
+  const [tableRef, fit] = useFitCount(10, stats.length, { item: 'tbody tr', gap: 0 });
+  const statPg = usePage(stats, fit, days);
 
   return (
     <>
@@ -60,7 +61,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="page-body">
+      <div className="page-body page-fit">
         <div className="stats-grid">
           <div className="stat-card">
             <div className="stat-label">Online now</div>
@@ -89,7 +90,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div className="table-card" style={{ marginTop: 20 }}>
+        <div className="table-card fit-area" style={{ marginTop: 20 }} ref={tableRef}>
           <table className="data-table">
             <thead>
               <tr>
@@ -130,8 +131,8 @@ export default function AdminDashboard() {
               {stats.length === 0 && <tr><td colSpan={7}><div className="empty" style={{ padding: '28px 0' }}>No attendance data yet.</div></td></tr>}
             </tbody>
           </table>
-          <Pager {...statPg} style={{ padding: '0 0 16px' }} />
         </div>
+        <Pager {...statPg} />
       </div>
     </>
   );

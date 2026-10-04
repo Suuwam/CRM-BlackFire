@@ -36,11 +36,13 @@ function notify(req, action, m) {
 router.get('/', async (req, res) => {
   try {
     const page = Math.max(0, Number(req.query.page) || 0);
+    // The page asks for as many as fit on screen; capped so one request stays small.
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || PER_PAGE));
     const [total, items] = await Promise.all([
       Milestone.countDocuments(),
-      Milestone.find().sort({ createdAt: -1 }).skip(page * PER_PAGE).limit(PER_PAGE).lean(),
+      Milestone.find().sort({ createdAt: -1 }).skip(page * limit).limit(limit).lean(),
     ]);
-    res.json({ items, total, page, pages: Math.max(1, Math.ceil(total / PER_PAGE)) });
+    res.json({ items, total, page, pages: Math.max(1, Math.ceil(total / limit)) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

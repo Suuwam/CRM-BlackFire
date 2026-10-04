@@ -632,8 +632,10 @@ export default function Board() {
         </div>
       </div>
 
-      <Modal large open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Task' : `Add to ${columns.find(c=>c.id===editCol)?.label || 'Stage'}`}
+      <Modal large wide open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Task' : `Add to ${columns.find(c=>c.id===editCol)?.label || 'Stage'}`}
         footer={<><button className="btn btn-secondary" onClick={() => setModal(false)}>Cancel</button><button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button></>}>
+        <div className="modal-cols">
+        <div className="modal-col">
         <div className="form-group"><label>Title *</label><input value={form.title} onChange={e => setForm(f=>({...f,title:e.target.value}))} placeholder="Task title" /></div>
         
         {/* Task Color Coding Selector */}
@@ -663,8 +665,24 @@ export default function Board() {
             </select>
           </div>
         </div>
+        <div className="form-row">
+          <div className="form-group"><label>Tags (comma separated)</label><input value={form.tags} onChange={e => setForm(f=>({...f,tags:e.target.value}))} placeholder="bug, feature, audio" /></div>
+          <div className="form-group"><label>Due Date</label><input type="date" value={form.dueDate} onChange={e => setForm(f=>({...f,dueDate:e.target.value}))} /></div>
+        </div>
+        <div className="form-group"><label>Card Cover Picture</label><input ref={coverInputRef} type="file" accept="image/*" onChange={pickCover} />
+          {coverSrc && (
+            <div className="cover-paste-card">
+              <img src={coverSrc} alt="" />
+              {imagePasted && <div className="cover-paste-badge">[image pasted]</div>}
+            </div>
+          )}
+          {imageLimit && <div className="cover-paste-limit">Only one image can be added</div>}
+          {imageFile && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>{imageFile.name || 'Pasted image'} — uploads on save <button className="btn btn-secondary btn-sm" style={{ padding: '2px 6px', fontSize: 10, marginLeft: 6 }} onClick={resetCover}>Clear</button></div>}
+        </div>
+        </div>
+        <div className="modal-col">
         {/* Multi-assignee picker with search */}
-        <div className="form-group">
+        <div className="form-group modal-col-assign">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <label style={{ margin: 0 }}>Assign to (select multiple)</label>
             <span style={{ fontSize: 11, color: 'var(--text3)' }}>
@@ -678,7 +696,7 @@ export default function Board() {
             onChange={e => setAssigneeSearch(e.target.value)}
             style={{ marginBottom: 8, padding: '6px 10px', fontSize: 12 }}
           />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}>
+          <div className="assignee-list" style={{ display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}>
             {users
               .filter(u => 
                 (u.name || '').toLowerCase().includes(assigneeSearch.toLowerCase()) ||
@@ -714,19 +732,7 @@ export default function Board() {
             </div>
           )}
         </div>
-        <div className="form-row">
-          <div className="form-group"><label>Tags (comma separated)</label><input value={form.tags} onChange={e => setForm(f=>({...f,tags:e.target.value}))} placeholder="bug, feature, audio" /></div>
-          <div className="form-group"><label>Due Date</label><input type="date" value={form.dueDate} onChange={e => setForm(f=>({...f,dueDate:e.target.value}))} /></div>
         </div>
-        <div className="form-group"><label>Card Cover Picture</label><input ref={coverInputRef} type="file" accept="image/*" onChange={pickCover} />
-          {coverSrc && (
-            <div className="cover-paste-card">
-              <img src={coverSrc} alt="" />
-              {imagePasted && <div className="cover-paste-badge">[image pasted]</div>}
-            </div>
-          )}
-          {imageLimit && <div className="cover-paste-limit">Only one image can be added</div>}
-          {imageFile && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>{imageFile.name || 'Pasted image'} — uploads on save <button className="btn btn-secondary btn-sm" style={{ padding: '2px 6px', fontSize: 10, marginLeft: 6 }} onClick={resetCover}>Clear</button></div>}
         </div>
       </Modal>
 

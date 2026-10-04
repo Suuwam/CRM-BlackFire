@@ -4,7 +4,7 @@ import useSWR from 'swr';
 import { feedbackApi, fetcher, apiRoot } from '../api';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
-import Pager, { usePage } from '../components/Pager';
+import Pager, { usePage, useFitCount } from '../components/Pager';
 
 const SENTIMENTS = [
   { key: 'positive', label: 'Positive', sub: '4–5★', color: 'var(--fb-pos)' },
@@ -28,7 +28,8 @@ function Sources() {
   const { data: sources, mutate } = useSWR('/feedback/sources', fetcher);
   const [name, setName] = useState('');
   const [open, setOpen] = useState(null); // source _id whose connection details are shown
-  const srcPg = usePage(sources || [], 10);
+  const [srcRef, srcFit] = useFitCount(10, sources?.length);
+  const srcPg = usePage(sources || [], srcFit);
 
   async function run(fn, ok) {
     try { const r = await fn(); toast(ok, 'success'); mutate(); return r; }
@@ -51,7 +52,7 @@ function Sources() {
         </div>
       </div>
 
-      <div className="page-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="page-body page-fit" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {isAdmin && (
           <form className="card" onSubmit={add} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div className="form-group" style={{ flex: 1, minWidth: 200, margin: 0 }}>
@@ -68,6 +69,7 @@ function Sources() {
           </div>
         )}
 
+        <div className="fit-area" ref={srcRef} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {srcPg.items.map(s => (
           <div key={s._id} className="card">
             <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -101,6 +103,7 @@ function Sources() {
             )}
           </div>
         ))}
+        </div>
         <Pager {...srcPg} />
       </div>
     </>
@@ -169,9 +172,10 @@ function SourceDashboard({ slug }) {
   const [sentiment, setSentiment] = useState('');
   const [category, setCategory] = useState('');
   const [page, setPage] = useState(0);
+  const [reviewRef, perPage] = useFitCount(20, `${sentiment}|${category}|${page}`);
   const { data: st, error } = useSWR(`/feedback/sources/${slug}/stats`, fetcher);
   const { data: list } = useSWR(
-    `/feedback/sources/${slug}/items?page=${page}&sentiment=${sentiment}&category=${category}`, fetcher, { keepPreviousData: true });
+    `/feedback/sources/${slug}/items?page=${page}&limit=${perPage}&sentiment=${sentiment}&category=${category}`, fetcher, { keepPreviousData: true });
 
   if (error) return <div className="page-body"><div className="card">That website isn't connected. <Link to="/feedback">Back to Feedback</Link></div></div>;
   if (!st) return null;
@@ -186,7 +190,8 @@ function SourceDashboard({ slug }) {
         </div>
       </div>
 
-      <div className="page-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="page-body page-fit fb-dash">
+        <div className="fb-insights">
         <div className="stats-grid">
           <div className="stat-card">
             <div className="stat-label">Average rating</div>
@@ -260,7 +265,9 @@ function SourceDashboard({ slug }) {
           </div>
         </div>
 
-        <div className="card">
+        </div>
+
+        <div className="card fb-reviews">
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
             <div className="section-title" style={{ marginRight: 'auto' }}>All reviews · {list?.total ?? 0}</div>
             <select value={sentiment} onChange={e => filter(setSentiment)(e.target.value)} style={{ width: 'auto' }}>
@@ -273,6 +280,7 @@ function SourceDashboard({ slug }) {
             </select>
           </div>
           {list?.items.length === 0 && <div style={{ color: 'var(--text3)', fontSize: 13 }}>No reviews match</div>}
+          <div className="fit-area" ref={reviewRef}>
           {list?.items.map(f => (
             <div key={f._id} style={{ padding: '10px 0', borderTop: '1px solid var(--border)', fontSize: 13 }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -283,9 +291,10 @@ function SourceDashboard({ slug }) {
                   {[f.user?.name || f.user?.email, f.user?.plan, f.page, new Date(f.sentAt).toLocaleString()].filter(Boolean).join(' · ')}
                 </span>
               </div>
-              {f.message && <div style={{ marginTop: 4, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{f.message}</div>}
+              {f.message && <div className="fb-review-msg" title={f.message}>{f.message}</div>}
             </div>
           ))}
+          </div>
           {list?.pages > 1 && (
             <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginTop: 12 }}>
               <button className="btn btn-sm btn-secondary" disabled={page === 0} onClick={() => setPage(p => p - 1)}>‹ Prev</button>

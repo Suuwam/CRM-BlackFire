@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import { fetcher } from '../api';
-import Pager, { usePage } from '../components/Pager';
+import Pager, { usePage, useFitCount } from '../components/Pager';
 
 function fmtDate(d) {
   const dt = new Date(d + 'T00:00:00');
@@ -23,7 +23,8 @@ export default function Overdue() {
   const total = overdueEvents.length + overdueTasks.length;
   const all = [...overdueEvents.map(e => ({ kind: 'event', due: e.date, item: e })), ...overdueTasks.map(t => ({ kind: 'task', due: t.dueDate, item: t }))]
     .sort((a, b) => a.due.localeCompare(b.due));
-  const pg = usePage(all, 12);
+  const [listRef, fit] = useFitCount(12, all.length);
+  const pg = usePage(all, fit);
 
   return (
     <>
@@ -33,11 +34,11 @@ export default function Overdue() {
           <p>{total === 0 ? 'Nothing is overdue.' : `${total} item${total === 1 ? '' : 's'} past due.`}</p>
         </div>
       </div>
-      <div className="page-body">
+      <div className="page-body page-fit">
         {total === 0 ? (
           <div className="card empty" style={{ padding: 32, textAlign: 'center' }}>No overdue events or tasks.</div>
         ) : (
-          <div className="upcoming-list">
+          <div className="upcoming-list fit-area" ref={listRef}>
             {pg.items.map(({ kind, item: ev }) => kind === 'event' ? (
               <div key={ev._id} className="upcoming-item overdue-item" style={{ cursor: 'pointer' }} onClick={() => navigate('/calendar')}>
                 <div className="up-dot" style={{ background: '#ef4444' }} />

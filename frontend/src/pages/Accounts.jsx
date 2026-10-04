@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import Pager, { usePage } from '../components/Pager';
+import Pager, { usePage, useFitCount } from '../components/Pager';
 import useSWR, { mutate } from 'swr';
 import { usersApi, fetcher } from '../api';
 import Modal from '../components/Modal';
@@ -123,8 +123,10 @@ export default function Accounts() {
   }
 
   const pendingApps = applications.filter(a => a.status === 'pending' || a.status === 'rejected');
-  const appPg = usePage(pendingApps, 9);
-  const userPg = usePage(users, 12);
+  const [appRef, appFit] = useFitCount(9, pendingApps.length);
+  const [userRef, userFit] = useFitCount(12, users.length);
+  const appPg = usePage(pendingApps, appFit);
+  const userPg = usePage(users, userFit);
 
   return (
     <>
@@ -133,9 +135,9 @@ export default function Accounts() {
         <button className="btn btn-primary" onClick={openAdd}>+ Add Account</button>
       </div>
 
-      <div className="page-body">
+      <div className="page-body page-fit">
         {/* Account Requests Section */}
-        <div style={{ marginBottom: 32 }}>
+        <div className={pendingApps.length ? 'fit-grow' : ''}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <div className="section-title" style={{ fontSize: '14px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Account Requests ({pendingApps.length})
@@ -152,12 +154,12 @@ export default function Accounts() {
             )}
           </div>
           {pendingApps.length === 0 ? (
-            <div className="card empty" style={{ padding: '32px', textAlign: 'center', background: 'var(--surface)', color: 'var(--text3)' }}>
-              <div className="empty-ico" style={{ fontSize: '24px', marginBottom: '8px' }}>✓</div>
+            <div className="card empty" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface)', color: 'var(--text3)' }}>
+              <span style={{ color: '#16a34a', fontWeight: 700 }}>✓</span>
               No pending registration requests.
             </div>
           ) : (
-            <div className="accounts-grid">
+            <div className="accounts-grid fit-area" ref={appRef}>
               {appPg.items.map(app => (
                 <div className="account-card" key={app._id} style={{ borderLeft: app.status === 'rejected' ? '4px solid #ef4444' : '4px solid var(--accent)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <div>
@@ -204,10 +206,10 @@ export default function Accounts() {
           <Pager {...appPg} />
         </div>
 
-        <div className="divider" style={{ margin: '32px 0' }}></div>
+        <div className="divider" style={{ margin: '20px 0' }}></div>
 
         {/* Registered Users Section */}
-        <div>
+        <div className="fit-grow" style={{ flexGrow: 2 }}>
           <div className="section-title" style={{ fontSize: '14px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '16px' }}>
             Active Accounts ({users.length})
           </div>
@@ -216,7 +218,7 @@ export default function Accounts() {
               No registered accounts found.
             </div>
           ) : (
-            <div className="accounts-grid">
+            <div className="accounts-grid fit-area" ref={userRef}>
               {userPg.items.map(account => (
                 <div className="account-card" key={account._id}>
                   <div className="account-top">

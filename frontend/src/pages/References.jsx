@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import Pager, { usePage } from '../components/Pager';
+import Pager, { usePage, useFitCount } from '../components/Pager';
 import useSWR, { mutate } from 'swr';
 import { referencesApi, fetcher } from '../api';
 import Modal from '../components/Modal';
@@ -132,7 +132,8 @@ export default function References() {
     const matchT = !tagFilter || (r.tags || []).includes(tagFilter);
     return matchQ && matchT;
   });
-  const refPg = usePage(visible, 12, `${search}|${tagFilter}`);
+  const [gridRef, fit] = useFitCount(12, visible.length);
+  const refPg = usePage(visible, fit, `${search}|${tagFilter}`);
 
   function hostname(url) {
     try {
@@ -147,7 +148,7 @@ export default function References() {
         <div><h1>References & Knowledge Vault</h1><p>Curated links with automatic preview cards & web metadata scraper</p></div>
         <button className="btn btn-primary" onClick={openAdd}>+ Add Link</button>
       </div>
-      <div className="page-body">
+      <div className="page-body page-fit">
         <div className="toolbar">
           <div className="search">
             <span className="search-ico">
@@ -165,7 +166,7 @@ export default function References() {
           </div>
         </div>
 
-        <div className="ref-grid">
+        <div className="ref-grid fit-area" ref={gridRef}>
           {refPg.items.map(r => (
             <div key={r._id} className="ref-card">
               {r.image && (

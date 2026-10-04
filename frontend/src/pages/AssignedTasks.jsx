@@ -5,7 +5,7 @@ import { fetcher, tasksApi } from '../api';
 import { AccountAvatar } from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
-import Pager, { usePage } from '../components/Pager';
+import Pager, { usePage, useFitCount } from '../components/Pager';
 
 const COL_META = {
   backlog: { label: 'Backlog', color: '#3b82f6' },
@@ -126,7 +126,8 @@ export default function AssignedTasks() {
   const doneAssigned = assignedTasks.filter(t => t.column === 'done');
   const overdue = openAssigned.filter(t => t.dueDate && t.dueDate < today);
   const visibleAssigned = taskFilter === 'open' ? openAssigned : taskFilter === 'done' ? doneAssigned : assignedTasks;
-  const pg = usePage(visibleAssigned, PER_PAGE, `${focusUserId}:${taskFilter}`);
+  const [listRef, fit] = useFitCount(PER_PAGE, visibleAssigned.length);
+  const pg = usePage(visibleAssigned, fit, `${focusUserId}:${taskFilter}`);
   const completion = assignedTasks.length ? Math.round((doneAssigned.length / assignedTasks.length) * 100) : 0;
 
   return (
@@ -142,7 +143,7 @@ export default function AssignedTasks() {
           </select>
         )}
       </div>
-      <div className="page-body">
+      <div className="page-body page-fit">
         <div className="assigned-top">
           <div className="assigned-person">
             <AccountAvatar name={focusUser?.name || '?'} photo={focusUser?.photo} size={40} />
@@ -159,8 +160,8 @@ export default function AssignedTasks() {
           </div>
         </div>
 
-        <div className="assigned-grid">
-          <div className="card" style={{ padding: 16 }}>
+        <div className="assigned-grid fit-grow">
+          <div className="card assigned-list-card" style={{ padding: 16 }}>
             <div className="assigned-filters">
               {[['open', 'Open', openAssigned.length], ['done', 'Done', doneAssigned.length], ['all', 'All', assignedTasks.length]].map(([id, label, n]) => (
                 <button key={id} type="button" className={`assigned-filter${taskFilter === id ? ' active' : ''}`} onClick={() => setTaskFilter(id)}>
@@ -169,7 +170,7 @@ export default function AssignedTasks() {
               ))}
             </div>
 
-            <div className="assigned-list">
+            <div className="assigned-list fit-area" ref={listRef}>
               {visibleAssigned.length === 0 && (
                 <div className="empty" style={{ padding: '32px 0', textAlign: 'center' }}>
                   {taskFilter === 'open' ? 'No open tasks. Nice.' : taskFilter === 'done' ? 'No completed tasks yet.' : 'No tasks assigned.'}

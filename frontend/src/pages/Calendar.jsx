@@ -458,8 +458,10 @@ export default function Calendar() {
         </div>
       </div>
 
-      <Modal large open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Event / Post' : 'Add Event / Post'}
+      <Modal large wide open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Event / Post' : 'Add Event / Post'}
         footer={<><button className="btn btn-secondary" onClick={() => setModal(false)}>Cancel</button><button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button></>}>
+        <div className="modal-cols">
+        <div className="modal-col">
         <div className="form-group"><label>Title *</label><input value={form.title} onChange={e => setForm(f=>({...f,title:e.target.value}))} placeholder="Post or event title" /></div>
         
         {/* Social Platforms Selector with Vector SVG Icons */}
@@ -500,8 +502,25 @@ export default function Calendar() {
           <div className="form-group"><label>Time</label><input type="time" value={form.time} onChange={e => setForm(f=>({...f,time:e.target.value}))} /></div>
         </div>
 
-        {/* Multi-assignee task picker with search */}
+        <div className="form-row">
         <div className="form-group">
+          <label>Status</label>
+          <select value={form.status} onChange={e => setForm(f=>({...f,status:e.target.value}))}>
+            <option value="scheduled">Scheduled</option><option value="done">Done</option><option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+
+        <div className="form-group"><label>Event Picture</label>
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0] || null)} />
+          {imageFile && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>{imageFile.name || 'Pasted image'} — uploads on save <button className="btn btn-secondary btn-sm" style={{ padding: '2px 6px', fontSize: 10, marginLeft: 6 }} onClick={() => setImageFile(null)}>Clear</button></div>}
+        </div>
+        </div>
+
+        <div className="form-group"><label>Notes</label><textarea value={form.notes} onChange={e => setForm(f=>({...f,notes:e.target.value}))} onPaste={pasteImage} placeholder="Post caption or notes... (paste an image to attach it)" /></div>
+        </div>
+        <div className="modal-col">
+        {/* Multi-assignee task picker with search */}
+        <div className="form-group modal-col-assign">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <label style={{ margin: 0 }}>Assign task to (select multiple)</label>
             <span style={{ fontSize: 11, color: 'var(--text3)' }}>
@@ -515,7 +534,7 @@ export default function Calendar() {
             onChange={e => setAssigneeSearch(e.target.value)}
             style={{ marginBottom: 8, padding: '6px 10px', fontSize: 12 }}
           />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}>
+          <div className="assignee-list" style={{ display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}>
             {users
               .filter(u => 
                 (u.name || '').toLowerCase().includes(assigneeSearch.toLowerCase()) ||
@@ -552,19 +571,8 @@ export default function Calendar() {
           )}
         </div>
 
-        <div className="form-group">
-          <label>Status</label>
-          <select value={form.status} onChange={e => setForm(f=>({...f,status:e.target.value}))}>
-            <option value="scheduled">Scheduled</option><option value="done">Done</option><option value="cancelled">Cancelled</option>
-          </select>
         </div>
-
-        <div className="form-group"><label>Event Picture</label>
-          <input ref={fileInputRef} type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0] || null)} />
-          {imageFile && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>{imageFile.name || 'Pasted image'} — uploads on save <button className="btn btn-secondary btn-sm" style={{ padding: '2px 6px', fontSize: 10, marginLeft: 6 }} onClick={() => setImageFile(null)}>Clear</button></div>}
         </div>
-
-        <div className="form-group"><label>Notes</label><textarea value={form.notes} onChange={e => setForm(f=>({...f,notes:e.target.value}))} onPaste={pasteImage} placeholder="Post caption or notes... (paste an image to attach it)" /></div>
       </Modal>
     </>
   );

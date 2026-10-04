@@ -4,9 +4,10 @@ import { milestonesApi, fetcher } from '../api';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
+import { useFitCount } from '../components/Pager';
 
 const EMPTY = { title: '', description: '' };
-const PER_PAGE = 10; // matches the backend page size
+const PER_PAGE = 10; // first guess; useFitCount replaces it with what fits on screen
 
 const dramatic = { fontFamily: "'Cinzel', 'Georgia', serif", fontWeight: 900, letterSpacing: '.04em' };
 
@@ -19,7 +20,8 @@ export default function Milestones() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY);
 
-  const { data, mutate } = useSWR(`/milestones?page=${page}`, fetcher, { keepPreviousData: true });
+  const [listRef, perPage] = useFitCount(PER_PAGE, page);
+  const { data, mutate } = useSWR(`/milestones?page=${page}&limit=${perPage}`, fetcher, { keepPreviousData: true });
   const items = data?.items || [];
   const total = data?.total || 0;
   const pages = data?.pages || 1;
@@ -56,13 +58,14 @@ export default function Milestones() {
         {canWrite && <button className="milestone-new" onClick={openAdd}><span>+</span> New Milestone</button>}
       </div>
 
-      <div className="page-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="page-body page-fit" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="fit-area" ref={listRef} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {data && items.length === 0 && (
           <div className="card" style={{ textAlign: 'center', color: 'var(--text3)', padding: 48 }}>No milestones yet</div>
         )}
 
         {items.map((m, i) => {
-          const number = total - (page * PER_PAGE + i); // oldest is #01
+          const number = total - (page * perPage + i); // oldest is #01
           return (
             <div key={m._id} className="card" style={{ display: 'flex', gap: 24, alignItems: 'center', opacity: m.done ? 0.7 : 1 }}>
               <div style={{ ...dramatic, fontSize: 'clamp(44px, 8vw, 80px)', lineHeight: 1, minWidth: '1.6em', color: m.done ? '#16a34a' : 'var(--text)' }}>
@@ -89,6 +92,8 @@ export default function Milestones() {
             </div>
           );
         })}
+
+        </div>
 
         {pages > 1 && (
           <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>

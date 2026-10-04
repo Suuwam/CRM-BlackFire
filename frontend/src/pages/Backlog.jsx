@@ -3,18 +3,20 @@ import useSWR from 'swr';
 import { fetcher } from '../api';
 import { SkeletonRows } from '../components/Skeleton';
 import { useDebounced } from '../lib/useDebounced';
+import { useFitCount } from '../components/Pager';
 
-const PAGE_SIZE = 7;
+const PAGE_SIZE = 7; // first guess; useFitCount replaces it with what fits on screen
 
 export default function Backlog() {
   const [page, setPage] = useState(0);
   const [filter, setFilter] = useState('');
+  const [listRef, perPage] = useFitCount(PAGE_SIZE);
 
   // Was: download 250 rows, render 7. Now the server sends exactly the page being shown.
   // keepPreviousData holds the current page on screen while the next one loads, so paging
   // does not blank the list.
   const { data, isLoading } = useSWR(
-    `/activity?days=50&page=${page}&limit=${PAGE_SIZE}`,
+    `/activity?days=50&page=${page}&limit=${perPage}`,
     fetcher,
     { revalidateOnFocus: false, keepPreviousData: true },
   );
@@ -38,7 +40,7 @@ export default function Backlog() {
           <p>Every sign-in, clock-out and change from the last 50 days.</p>
         </div>
       </div>
-      <div className="page-body">
+      <div className="page-body page-fit">
         <div className="toolbar" style={{ marginBottom: 14 }}>
           <div className="search">
             <span className="search-ico">
@@ -51,7 +53,7 @@ export default function Backlog() {
           <span className="text-sm text-muted">{data?.total ?? 0} entries</span>
         </div>
 
-        <div className="activity-list" style={{ maxHeight: 'none' }}>
+        <div className="activity-list fit-area" ref={listRef} style={{ maxHeight: 'none' }}>
           {isLoading && !data && <SkeletonRows rows={PAGE_SIZE} />}
           {!isLoading && slice.length === 0 && <div className="empty" style={{ padding: '24px 0' }}>No activity found.</div>}
           {slice.map(item => {
