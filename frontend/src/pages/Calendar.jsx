@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import ColorPicker, { isHex } from '../components/ColorPicker';
 import useSWR, { mutate } from 'swr';
 import { eventsApi, fetcher } from '../api';
 import Modal from '../components/Modal';
@@ -28,6 +29,8 @@ const COLORS = [
 ];
 
 const COLOR_MAP = COLORS.reduce((acc, c) => ({ ...acc, [c.id]: c }), {});
+// A preset id → its tuned chip colours; a custom "#rrggbb" → a tint of itself.
+const colorFor = (v) => COLOR_MAP[v] || (isHex(v) ? { id: v, hex: v, bg: `${v}22`, border: v, text: 'var(--text)' } : COLOR_MAP.blue);
 
 const EMPTY_EV = { title:'', date:'', time:'', assignees:[], notes:'', color:'blue', platforms:[], status:'scheduled' };
 
@@ -280,7 +283,7 @@ export default function Calendar() {
                 // Collect all social platforms scheduled for this day
                 const dayPlatforms = [...new Set(evs.flatMap(e => e.platforms || []))];
                 const topColorEv = evs.find(e => e.color && e.color !== 'blue') || evs[0];
-                const dayAccent = topColorEv ? COLOR_MAP[topColorEv.color] || COLOR_MAP.blue : null;
+                const dayAccent = topColorEv ? colorFor(topColorEv.color) : null;
 
                 return (
                   <div key={i}
@@ -305,7 +308,7 @@ export default function Calendar() {
                       )}
                       {/* Desktop chips */}
                       {evs.slice(0, 2).map(ev => {
-                        const c = COLOR_MAP[ev.color] || COLOR_MAP.blue;
+                        const c = colorFor(ev.color);
                         return (
                           <div key={ev._id} className="cal-chip" style={{ background: c.bg, color: c.text, borderLeft: `2px solid ${c.border}` }}>
                             {ev.image && <span title="Has picture"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></span>}
@@ -386,7 +389,7 @@ export default function Calendar() {
                 </div>
               )}
               {selEvents.map(ev => {
-                const c = COLOR_MAP[ev.color] || COLOR_MAP.blue;
+                const c = colorFor(ev.color);
                 return (
                   <div key={ev._id} className="cal-ev-card" style={{ borderLeftColor: c.hex }}>
                     <div className="cal-ev-head">
@@ -486,15 +489,7 @@ export default function Calendar() {
         {/* Color Coding Picker */}
         <div className="form-group">
           <label>Color Code (Event & Calendar Day Accent)</label>
-          <div className="color-picker-row">
-            {COLORS.map(c => (
-              <div key={c.id}
-                className={`color-dot-opt${form.color === c.id ? ' selected' : ''}`}
-                style={{ background: c.hex }}
-                title={c.id}
-                onClick={() => setForm(f=>({...f, color: c.id}))} />
-            ))}
-          </div>
+          <ColorPicker value={form.color} onChange={color => setForm(f => ({ ...f, color }))} />
         </div>
 
         <div className="form-row">

@@ -5,6 +5,8 @@ import { feedbackApi, fetcher, apiRoot } from '../api';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import Pager, { usePage, useFitCount } from '../components/Pager';
+import Modal from '../components/Modal';
+import ColorPicker from '../components/ColorPicker';
 
 const SENTIMENTS = [
   { key: 'positive', label: 'Positive', sub: '4–5★', color: 'var(--fb-pos)' },
@@ -26,88 +28,130 @@ function Sources() {
   const isAdmin = user?.role === 'admin';
   const toast = useToast();
   const { data: sources, mutate } = useSWR('/feedback/sources', fetcher);
-  const [name, setName] = useState('');
-  const [open, setOpen] = useState(null); // source _id whose connection details are shown
-  const [srcRef, srcFit] = useFitCount(10, sources?.length);
+  const [adding, setAdding] = useState(null);   // { name, color } while the add window is open
+  const [setupId, setSetupId] = useState(null); // website whose setup window is open
+  const [srcRef, srcFit] = useFitCount(9, sources?.length);
   const srcPg = usePage(sources || [], srcFit);
+  const setup = sources?.find(s => s._id === setupId);
 
   async function run(fn, ok) {
-    try { const r = await fn(); toast(ok, 'success'); mutate(); return r; }
+    try { const r = await fn(); if (ok) toast(ok, 'success'); mutate(); return r; }
     catch (e) { toast(e.response?.data?.error || 'Something went wrong', 'error'); }
   }
 
   async function add(e) {
     e.preventDefault();
-    if (!name.trim()) return;
-    const r = await run(() => feedbackApi.createSource({ name }), 'Website added — paste its URL and secret into the site');
-    if (r) { setName(''); setOpen(r.data._id); }
+    if (!adding?.name.trim()) return;
+    const r = await run(() => feedbackApi.createSource(adding), 'Website added. Follow the steps to connect it.');
+    if (r) { setAdding(null); setSetupId(r.data._id); }
   }
+
+  const all = sources || [];
+  const reviews = all.reduce((n, s) => n + s.total, 0);
+  const positive = all.reduce((n, s) => n + s.counts.positive, 0);
+  const avg = reviews ? Math.round((all.reduce((n, s) => n + s.avgRating * s.total, 0) / reviews) * 10) / 10 : 0;
 
   return (
     <>
       <div className="page-head">
         <div>
           <h1>Feedback</h1>
-          <p>Reviews sent in by each website · positive, neutral and negative at a glance</p>
+          <p>Reviews from every website, each with its own dashboard</p>
         </div>
+        {isAdmin && <button className="btn btn-primary" onClick={() => setAdding({ name: '', color: '#3b82f6' })}>+ Add website</button>}
       </div>
 
       <div className="page-body page-fit" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {isAdmin && (
-          <form className="card" onSubmit={add} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-            <div className="form-group" style={{ flex: 1, minWidth: 200, margin: 0 }}>
-              <label>Add website</label>
-              <input value={name} maxLength={80} placeholder="Website name, e.g. LipiSub" onChange={e => setName(e.target.value)} />
-            </div>
-            <button className="btn btn-primary">+ Add website</button>
-          </form>
-        )}
-
-        {sources && sources.length === 0 && (
-          <div className="card" style={{ textAlign: 'center', color: 'var(--text3)', padding: 48 }}>
-            No websites yet{isAdmin ? '. Type a name above and press “+ Add website”, then follow the steps it shows.' : '. An admin can add one.'}
+        {all.length > 0 && (
+          <div className="stats-grid fb-summary">
+            <div className="stat-card"><div className="stat-label">Websites</div><div className="stat-value">{all.length}</div><div className="stat-sub">{all.filter(s => s.lastReceivedAt).length} connected</div></div>
+            <div className="stat-card"><div className="stat-label">Reviews</div><div className="stat-value">{reviews.toLocaleString()}</div><div className="stat-sub">across all websites</div></div>
+            <div className="stat-card"><div className="stat-label">Average rating</div><div className="stat-value">{avg || '–'}</div><div className="stat-sub">{reviews ? stars(Math.round(avg)) : 'no reviews yet'}</div></div>
+            <div className="stat-card"><div className="stat-label">Positive</div><div className="stat-value" style={{ color: 'var(--fb-pos)' }}>{pct(positive, reviews)}%</div><div className="stat-sub">4–5★ reviews</div></div>
           </div>
         )}
 
-        <div className="fit-area" ref={srcRef} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {srcPg.items.map(s => (
-          <div key={s._id} className="card">
-            <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: 180 }}>
-                <Link to={`/feedback/${s.slug}`} style={{ fontSize: 18, fontWeight: 650, color: 'var(--text)' }}>{s.name}</Link>
-                <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>
-                  {s.lastReceivedAt
-                    ? <><span style={{ color: '#16a34a' }}>● Connected</span> · {s.total} review{s.total === 1 ? '' : 's'} · last {new Date(s.lastReceivedAt).toLocaleString()}</>
-                    : <><span style={{ color: '#d97706' }}>● Waiting for the first review</span>{isAdmin && ' · open “How to connect”'}</>}
-                </div>
-              </div>
-              {s.total > 0 && <SentimentBar counts={s.counts} total={s.total} width={220} />}
-              <Link className="btn btn-sm btn-secondary" to={`/feedback/${s.slug}`}>Dashboard ›</Link>
-              {isAdmin && (
-                <button className="btn btn-sm btn-secondary" onClick={() => setOpen(open === s._id ? null : s._id)}>
-                  {open === s._id ? 'Hide' : 'How to connect'}
-                </button>
-              )}
-            </div>
-
-            {isAdmin && open === s._id && (
-              <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)', fontSize: 13 }}>
-                <ConnectSteps source={s} />
-                <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-                  <button className="btn btn-sm btn-secondary" onClick={() => confirm(`New secret for ${s.name}? It stops sending until you update its CRM_WEBHOOK_SECRET.`)
-                    && run(() => feedbackApi.rotateSecret(s._id), 'New secret made')}>New secret</button>
-                  <button className="btn btn-sm btn-danger" onClick={() => confirm(`Remove ${s.name} and all ${s.total} of its reviews?`)
-                    && run(() => feedbackApi.deleteSource(s._id), 'Website removed')}>Remove</button>
-                </div>
-              </div>
-            )}
+        {sources && all.length === 0 && (
+          <div className="card fb-empty">
+            <div className="fb-empty-title">No websites yet</div>
+            <p>{isAdmin ? 'Add your first website, then paste the two lines it gives you into that site’s server.' : 'An admin can add one.'}</p>
+            {isAdmin && <button className="btn btn-primary" onClick={() => setAdding({ name: '', color: '#3b82f6' })}>+ Add website</button>}
           </div>
-        ))}
+        )}
+
+        <div className="fb-grid fit-area" ref={srcRef}>
+          {srcPg.items.map(s => (
+            <div key={s._id} className="card fb-site" style={{ '--site': s.color || '#3b82f6' }}>
+              <div className="fb-site-head">
+                <span className="fb-site-badge">{s.name.slice(0, 1).toUpperCase()}</span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <Link to={`/feedback/${s.slug}`} className="fb-site-name">{s.name}</Link>
+                  <div className={`fb-site-status${s.lastReceivedAt ? ' is-on' : ''}`}>
+                    {s.lastReceivedAt ? `Connected · last review ${timeAgo(s.lastReceivedAt)}` : 'Waiting for the first review'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="fb-site-stats">
+                <div><strong>{s.total ? s.avgRating : '–'}</strong><span>{s.total ? stars(Math.round(s.avgRating)) : 'rating'}</span></div>
+                <div><strong>{s.total.toLocaleString()}</strong><span>review{s.total === 1 ? '' : 's'}</span></div>
+                <div><strong style={{ color: 'var(--fb-pos)' }}>{pct(s.counts.positive, s.total)}%</strong><span>positive</span></div>
+              </div>
+              {s.total > 0 ? <SentimentBar counts={s.counts} total={s.total} /> : <div className="fb-site-bar-empty" />}
+
+              <div className="fb-site-actions">
+                <Link className="btn btn-sm btn-primary fb-site-open" to={`/feedback/${s.slug}`}>Open dashboard</Link>
+                {isAdmin && <button className="btn btn-sm btn-secondary" onClick={() => setSetupId(s._id)}>{s.lastReceivedAt ? 'Settings' : 'How to connect'}</button>}
+              </div>
+            </div>
+          ))}
         </div>
         <Pager {...srcPg} />
       </div>
+
+      <Modal open={!!adding} onClose={() => setAdding(null)} title="Add website"
+        footer={<><button className="btn btn-secondary" onClick={() => setAdding(null)}>Cancel</button><button className="btn btn-primary" onClick={add}>Add website</button></>}>
+        {adding && (
+          <form onSubmit={add}>
+            <div className="form-group"><label>Website name</label>
+              <input autoFocus value={adding.name} maxLength={80} placeholder="e.g. LipiSub" onChange={e => setAdding(a => ({ ...a, name: e.target.value }))} />
+            </div>
+            <div className="form-group" style={{ marginTop: 14 }}><label>Colour</label>
+              <ColorPicker hex value={adding.color} onChange={color => setAdding(a => ({ ...a, color }))} />
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      <Modal large open={!!setup} onClose={() => setSetupId(null)} title={setup ? `${setup.name} settings` : ''}
+        footer={setup && (
+          <>
+            <button className="btn btn-danger" style={{ marginRight: 'auto' }} onClick={() => confirm(`Remove ${setup.name} and all ${setup.total} of its reviews?`)
+              && run(() => feedbackApi.deleteSource(setup._id), 'Website removed').then(r => r && setSetupId(null))}>Remove website</button>
+            <button className="btn btn-secondary" onClick={() => confirm(`New secret for ${setup.name}? It stops sending until you update its CRM_WEBHOOK_SECRET.`)
+              && run(() => feedbackApi.rotateSecret(setup._id), 'New secret made')}>New secret</button>
+            <button className="btn btn-primary" onClick={() => setSetupId(null)}>Done</button>
+          </>
+        )}>
+        {setup && (
+          <>
+            <div className="form-group" style={{ marginBottom: 18 }}><label>Colour</label>
+              <ColorPicker hex value={setup.color} onChange={color => run(() => feedbackApi.updateSource(setup._id, { color }))} />
+            </div>
+            <ConnectSteps source={setup} />
+          </>
+        )}
+      </Modal>
     </>
   );
+}
+
+function timeAgo(d) {
+  const m = Math.round((Date.now() - new Date(d)) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m} min ago`;
+  if (m < 1440) return `${Math.round(m / 60)} h ago`;
+  return `${Math.round(m / 1440)} d ago`;
 }
 
 // Step-by-step for the site's server. LipiSub reads exactly these two variables
@@ -185,7 +229,7 @@ function SourceDashboard({ slug }) {
     <>
       <div className="page-head">
         <div>
-          <h1>{st.source.name} feedback</h1>
+          <h1><span className="fb-head-badge" style={{ background: st.source.color }}>{st.source.name.slice(0, 1).toUpperCase()}</span>{st.source.name} feedback</h1>
           <p><Link to="/feedback">All websites</Link> · {st.total} review{st.total === 1 ? '' : 's'}</p>
         </div>
       </div>

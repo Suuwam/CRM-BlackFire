@@ -6,6 +6,7 @@ import { AccountAvatar } from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
 import Pager, { usePage, useFitCount } from '../components/Pager';
+import { hexOf } from '../components/ColorPicker';
 
 const COL_META = {
   backlog: { label: 'Backlog', color: '#3b82f6' },
@@ -183,7 +184,7 @@ export default function AssignedTasks() {
                 const pri = PRIORITY[task.priority] || PRIORITY.medium;
                 const late = !isDone && task.dueDate && task.dueDate < today;
                 return (
-                  <div key={task._id} className={`assigned-item card-color-${task.color || 'blue'}${isDone ? ' is-done' : ''}`}>
+                  <div key={task._id} className={`assigned-item${isDone ? ' is-done' : ''}`} style={{ borderLeft: `4px solid ${hexOf(task.color)}` }}>
                     <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => navigate(`/board?project=${task.project}`)}>
                       <div className="assigned-title" style={{ textDecoration: isDone ? 'line-through' : 'none' }} title={task.title}>{task.title}</div>
                       <div className="assigned-meta">

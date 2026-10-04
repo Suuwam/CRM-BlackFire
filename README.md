@@ -50,7 +50,7 @@ New website feedback, milestone changes, and emails, on both Android and iPhone.
 | **Calendar** | Month grid with color-coded work items and a side panel to add, edit or delete them. |
 | **Email** | Reusable templates sent to one or many employees, with `{{name}}`, `{{email}}`, `{{username}}` and `{{role}}` filled in. |
 | **Links** | A bookmark board for design assets, docs and tools, with tags and search. |
-| **Board** | Kanban per project: Backlog → To Do → In Progress → QA → Done, with drag and drop. |
+| **Board** | Kanban per project, each board in its own colour (any colour: 16 presets plus a full picker), with open / done / overdue counts and progress: Backlog → To Do → In Progress → QA → Done, with drag and drop. |
 | **Feedback** | Reviews from our websites, with a dashboard for each site. See below. |
 | **Admin** | Admin Overview (everyone's work history, plus **CRM storage**: used vs. left, and a button to download a ZIP of data older than 6 months and then delete it) and Accounts (approve sign-up requests; set role, active and milestone access). |
 
@@ -66,6 +66,7 @@ Every review left on one of our websites (LipiSub first) arrives in the CRM with
   - the breakdown by star rating and by category
   - **similar feedback**: reviews that say the same thing, grouped together (e.g. *"10× export froze"*)
   - a filterable list of every review
+- Each website has its own **colour**: it marks the website's card and dashboard. Pick it when adding the site, or change it later under **Settings**.
 - Everyone signed in can view feedback. Only admins can add or remove websites.
 
 #### Connecting a website (no code changes in the CRM)

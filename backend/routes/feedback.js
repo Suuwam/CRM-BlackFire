@@ -70,6 +70,8 @@ router.post('/hook/:slug', hookLimiter, async (req, res) => {
 
 router.use(requireSessionUser);
 
+const HEX = /^#[0-9a-f]{6}$/i;
+
 function slugify(name) {
   return String(name).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
 }
@@ -85,13 +87,15 @@ router.get('/sources', async (req, res) => {
   try {
     const [sources, counts] = await Promise.all([
       FeedbackSource.find().sort({ createdAt: 1 }).lean(),
-      Feedback.aggregate([{ $group: { _id: { s: '$source', m: '$sentiment' }, n: { $sum: 1 } } }]),
+      Feedback.aggregate([{ $group: { _id: { s: '$source', m: '$sentiment' }, n: { $sum: 1 }, stars: { $sum: '$rating' } } }]),
     ]);
     const isAdmin = req.sessionUser.role === 'admin';
     res.json(sources.map(s => {
       const c = { positive: 0, neutral: 0, negative: 0 };
-      for (const r of counts) if (String(r._id.s) === String(s._id)) c[r._id.m] = r.n;
-      return { ...s, secret: isAdmin ? s.secret : undefined, counts: c, total: c.positive + c.neutral + c.negative };
+      let stars = 0;
+      for (const r of counts) if (String(r._id.s) === String(s._id)) { c[r._id.m] = r.n; stars += r.stars; }
+      const total = c.positive + c.neutral + c.negative;
+      return { ...s, secret: isAdmin ? s.secret : undefined, counts: c, total, avgRating: total ? Math.round((stars / total) * 10) / 10 : 0 };
     }));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -102,9 +106,26 @@ router.post('/sources', requireAdmin, async (req, res) => {
     const slug = slugify(req.body.slug || name);
     if (!name || !slug) return res.status(400).json({ error: 'Name is required' });
     if (await FeedbackSource.exists({ slug })) return res.status(400).json({ error: `A source called "${slug}" already exists` });
-    const s = await FeedbackSource.create({ name, slug, secret: crypto.randomBytes(32).toString('hex') });
+    const color = HEX.test(req.body.color || '') ? req.body.color : undefined;
+    const s = await FeedbackSource.create({ name, slug, color, secret: crypto.randomBytes(32).toString('hex') });
     res.status(201).json(s);
   } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Rename or recolour a website. The slug (and so its webhook URL) never changes.
+router.patch('/sources/:id', requireAdmin, async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Invalid ID format' });
+  const update = {};
+  if (typeof req.body.name === 'string' && req.body.name.trim()) update.name = req.body.name.trim().slice(0, 80);
+  if (req.body.color !== undefined) {
+    if (!HEX.test(req.body.color)) return res.status(400).json({ error: 'Colour must look like #3b82f6' });
+    update.color = req.body.color.toLowerCase();
+  }
+  try {
+    const s = await FeedbackSource.findByIdAndUpdate(req.params.id, update, { new: true });
+    if (!s) return res.status(404).json({ error: 'Feedback source not found' });
+    res.json(s);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // New secret, e.g. if the old one leaked. The site stops delivering until its env is updated.
@@ -148,7 +169,7 @@ router.get('/sources/:slug/stats', async (req, res) => {
     const ratings = toObj(byRating);
     const total = Object.values(ratings).reduce((a, b) => a + b, 0);
     res.json({
-      source: { _id: source._id, name: source.name, slug: source.slug, lastReceivedAt: source.lastReceivedAt },
+      source: { _id: source._id, name: source.name, slug: source.slug, color: source.color || '#3b82f6', lastReceivedAt: source.lastReceivedAt },
       total,
       avgRating: total ? Math.round(Object.entries(ratings).reduce((s, [r, n]) => s + r * n, 0) / total * 10) / 10 : 0,
       sentiment: { positive: 0, neutral: 0, negative: 0, ...toObj(bySentiment) },

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import ColorPicker, { hexOf } from '../components/ColorPicker';
 import { useSearchParams } from 'react-router-dom';
 import useSWR, { mutate } from 'swr';
 import { tasksApi, boardsApi, fetcher } from '../api';
@@ -16,24 +17,6 @@ const NEW_BOARD_COLUMNS = [
   { id: 'done',       label: 'Done' },
 ];
 
-const COLORS = [
-  { id: 'blue',   hex: '#3b82f6' },
-  { id: 'purple', hex: '#8b5cf6' },
-  { id: 'pink',   hex: '#ec4899' },
-  { id: 'green',  hex: '#10b981' },
-  { id: 'amber',  hex: '#f59e0b' },
-  { id: 'red',    hex: '#ef4444' },
-  { id: 'teal',   hex: '#06b6d4' },
-  { id: 'gray',   hex: '#71717a' },
-  { id: 'indigo',  hex: '#6366f1' },
-  { id: 'sky',     hex: '#0ea5e9' },
-  { id: 'lime',    hex: '#84cc16' },
-  { id: 'orange',  hex: '#f97316' },
-  { id: 'rose',    hex: '#f43f5e' },
-  { id: 'fuchsia', hex: '#d946ef' },
-  { id: 'yellow',  hex: '#eab308' },
-  { id: 'black',   hex: '#18181b' },
-];
 
 const EMPTY_TASK = { title:'', description:'', priority:'medium', color:'blue', tags:'', dueDate:'', assignees:[] };
 const APP_TITLE = 'CRM | Blackfire';
@@ -291,7 +274,7 @@ export default function Board() {
     setDesignBoard({
       id: b._id,
       label: b.label,
-      color: COLORS.find(c => c.hex === b.color)?.id || 'blue',
+      color: b.color || '#3b82f6',
       columns: (b.columns || []).map(c => ({ ...c })),
     });
     setDesignModal(true);
@@ -306,7 +289,7 @@ export default function Board() {
     const saved = boards.find(b => b._id === designBoard.id);
     const payload = {
       label: designBoard.label.trim(),
-      color: COLORS.find(c => c.id === designBoard.color)?.hex || '#3b82f6',
+      color: hexOf(designBoard.color),
       columns: resolveColumnIds(designBoard.columns, saved?.columns || []),
     };
     setBoardSaving(true);
@@ -476,6 +459,11 @@ export default function Board() {
     takeCover(file, false);
   }
 
+  // Keep the open board's tab in view when the strip scrolls (phones, many boards).
+  useEffect(() => {
+    tabsRef.current?.querySelector('.board-tab.active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  }, [project, boards.length]);
+
   function colTasks(col) { return tasks.filter(t => t.column === col); }
   const getAssigneeLabel = (task) => task.assigneeName || task.assignee || 'Unassigned';
   const getAssignedByLabel = (task) => task.assignedByName || 'System';
@@ -487,7 +475,7 @@ export default function Board() {
   return (
     <>
       <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-        <div><h1>{activeProject?.label || 'Project Board'}</h1><p>Task tracking with color coding & cover image attachments</p></div>
+        <div><h1>Project Boards</h1><p>{boards.length} board{boards.length === 1 ? '' : 's'} · drag a tab to reorder</p></div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {activeProject && (
             <button className="btn btn-secondary btn-sm" onClick={() => openEditBoard(project)}>
@@ -506,7 +494,7 @@ export default function Board() {
           </button>
         )}
         {/* Project tabs */}
-        <div ref={tabsRef} className="board-tabs" style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%', overflowX: 'auto', marginBottom: 12 }}>
+        <div ref={tabsRef} className="board-tabs board-strip">
           {orderedBoards.map(p => (
             <button
               key={p._id}
@@ -525,34 +513,46 @@ export default function Board() {
                 if (dragMoved.current) return;
                 selectProject(p._id);
               }}
-              style={project===p._id ? { background: p.color, borderColor: p.color, color: '#fff' } : {}}>
+              style={{ '--tab': p.color }}>
               {(project === p._id && isLoading) ? (
-                <div style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'authSpin 0.6s linear infinite' }} />
+                <div className="board-tab-spin" />
               ) : (
-                <span className="proj-dot" style={{ background: project===p._id ? '#fff' : p.color }} />
+                <span className="proj-dot" style={{ background: p.color }} />
               )}
               {p.label}
             </button>
           ))}
-          <button className="board-tab" onClick={openAddBoard}
-            style={{
-              padding: '6px 12px', background: 'var(--surface2)', border: '1px dashed var(--border)',
-              borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
-              fontSize: 12.5, fontWeight: 550, color: 'var(--text2)'
-            }}>
-            <span>+</span> Add Board
+          <button className="board-tab board-tab-add" onClick={openAddBoard}>
+            <span>+</span> Add board
           </button>
         </div>
 
         {/* Board header — same markup for every board, accent comes from the board itself */}
-        {activeProject && (
-          <div className="board-banner" style={{ background: activeProject.color }}>
-            <div>
-              <div className="board-banner-title">{activeProject.label}</div>
-              <div className="board-banner-sub">{columns.length} stage{columns.length === 1 ? '' : 's'} · {tasks.length} task{tasks.length === 1 ? '' : 's'}</div>
+        {activeProject && (() => {
+          const today = new Date().toISOString().slice(0, 10);
+          const done = tasks.filter(t => t.column === 'done').length;
+          const open = tasks.filter(t => t.column !== 'done' && t.column !== 'cancelled').length;
+          const late = tasks.filter(t => t.dueDate && t.dueDate < today && t.column !== 'done' && t.column !== 'cancelled').length;
+          const progress = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+          return (
+            <div className="board-summary" style={{ '--tab': activeProject.color }}>
+              <span className="board-summary-badge">{activeProject.label.slice(0, 1).toUpperCase()}</span>
+              <div className="board-summary-main">
+                <div className="board-summary-title">{activeProject.label}</div>
+                <div className="board-summary-sub">{columns.length} stage{columns.length === 1 ? '' : 's'} · {tasks.length} task{tasks.length === 1 ? '' : 's'}</div>
+              </div>
+              <div className="board-summary-stats">
+                <span><strong>{open}</strong> open</span>
+                <span><strong>{done}</strong> done</span>
+                <span className={late ? 'is-late' : ''}><strong>{late}</strong> overdue</span>
+              </div>
+              <div className="board-summary-progress" title={`${done} of ${tasks.length} done`}>
+                <div className="board-summary-progress-label"><span>Progress</span><strong>{progress}%</strong></div>
+                <div className="board-summary-track"><div style={{ width: `${progress}%` }} /></div>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Kanban board */}
         <div className="kanban-wrapper" style={{ position: 'relative', minHeight: '50vh' }}>
@@ -577,7 +577,7 @@ export default function Board() {
                   onDrop={() => onDrop(col.id)}
                 >
                   {ct.map(t => (
-                    <div key={t._id} className={`k-card card-color-${t.color || 'blue'}`} draggable
+                    <div key={t._id} className="k-card" style={{ borderLeft: `4px solid ${hexOf(t.color)}` }} draggable
                       onDragStart={() => onDragStart(t._id)} onClick={() => openViewTask(t)}>
 
                       {t.image && (
@@ -641,15 +641,7 @@ export default function Board() {
         {/* Task Color Coding Selector */}
         <div className="form-group">
           <label>Color Code Accent</label>
-          <div className="color-picker-row">
-            {COLORS.map(c => (
-              <div key={c.id}
-                className={`color-dot-opt${form.color === c.id ? ' selected' : ''}`}
-                style={{ background: c.hex }}
-                title={c.id}
-                onClick={() => setForm(f=>({...f, color: c.id}))} />
-            ))}
-          </div>
+          <ColorPicker value={form.color} onChange={color => setForm(f => ({ ...f, color }))} />
         </div>
 
         <div className="form-group"><label>Description</label><textarea value={form.description} onChange={e => setForm(f=>({...f,description:e.target.value}))} onPaste={pasteImage} placeholder="Optional details... (paste an image to attach it as the cover)" /></div>
@@ -894,15 +886,7 @@ export default function Board() {
 
         <div className="form-group">
           <label>Accent Color</label>
-          <div className="color-picker-row">
-            {COLORS.map(c => (
-              <div key={c.id}
-                className={`color-dot-opt${designBoard.color === c.id ? ' selected' : ''}`}
-                style={{ background: c.hex }}
-                title={c.id}
-                onClick={() => setDesignBoard(b => ({ ...b, color: c.id }))} />
-            ))}
-          </div>
+          <ColorPicker hex value={designBoard.color} onChange={color => setDesignBoard(b => ({ ...b, color }))} />
         </div>
 
         <div className="form-group">

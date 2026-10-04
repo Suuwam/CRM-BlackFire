@@ -134,6 +134,7 @@ export const feedbackApi = {
   createSource: (data) => api.post('/feedback/sources', data),
   rotateSecret: (id) => api.post(`/feedback/sources/${id}/rotate`),
   deleteSource: (id) => api.delete(`/feedback/sources/${id}`),
+  updateSource: (id, data) => api.patch(`/feedback/sources/${id}`, data),
 };
 
 // Absolute API root, for showing a website the webhook URL to paste into its env.
